@@ -1,8 +1,8 @@
-# OneShot
+# buildanything
 
 **One command to build an entire product.**
 
-OneShot is a Claude Code plugin that orchestrates 73 specialist AI agents into a full engineering pipeline. You describe what you want to build. OneShot handles architecture, implementation, testing, code review, security audit, accessibility, and documentation — the same process that teams at Meta, Google, and Stripe run, compressed into one session.
+buildanything is a Claude Code plugin that orchestrates 73 specialist AI agents into a full engineering pipeline. You describe what you want to build. buildanything handles architecture, implementation, testing, code review, security audit, accessibility, and documentation — the same process that teams at Meta, Google, and Stripe run, compressed into one session.
 
 No agent expertise required. No manual coordination. Just `/build`.
 
@@ -58,7 +58,7 @@ Outputs a decision brief: GO / PIVOT / INVESTIGATE / KILL.
 
 ## The 73 Agents
 
-OneShot includes agents from [agency-agents](https://github.com/msitarzewski/agency-agents) and custom research agents, organized into specialist divisions:
+buildanything includes agents from [agency-agents](https://github.com/msitarzewski/agency-agents) and custom research agents, organized into specialist divisions:
 
 ### Design (8)
 Brand Guardian · Image Prompt Engineer · Inclusive Visuals Specialist · UI Designer · UX Architect · UX Researcher · Visual Storyteller · Whimsy Injector
@@ -92,9 +92,9 @@ market-intel · tech-feasibility · user-research · business-model · risk-anal
 
 ## Works With
 
-OneShot is designed to work alongside Claude Code's built-in plugins:
+buildanything is designed to work alongside Claude Code's built-in plugins:
 
-- **feature-dev** — OneShot's `/build` command invokes `code-architect`, `code-explorer`, and `code-reviewer` from this plugin
+- **feature-dev** — buildanything's `/build` command invokes `code-architect`, `code-explorer`, and `code-reviewer` from this plugin
 - **pr-review-toolkit** — `silent-failure-hunter`, `code-simplifier`, `type-design-analyzer`, `comment-analyzer` are used in hardening
 - **code-review** — Used for final code review passes
 - **commit-commands** — Used for clean git commits during the pipeline
