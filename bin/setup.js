@@ -5,6 +5,14 @@ const { execFileSync } = require("child_process");
 const REPO = "sujitmeka/buildanything";
 const MARKETPLACE = "buildanything-marketplace";
 const PLUGIN = "buildanything";
+const OFFICIAL_MARKETPLACE = "claude-plugins-official";
+
+const OFFICIAL_PLUGINS = [
+  { name: "feature-dev", desc: "code-architect, code-explorer, code-reviewer" },
+  { name: "pr-review-toolkit", desc: "silent-failure-hunter, code-simplifier, type-design-analyzer" },
+  { name: "code-review", desc: "final code review passes" },
+  { name: "commit-commands", desc: "clean git commits" },
+];
 
 function run(command, args) {
   try {
@@ -31,7 +39,7 @@ function main() {
   }
   console.log(`  Found Claude Code ${version}`);
 
-  // Add marketplace
+  // Add marketplace and install buildanything
   console.log(`  Adding marketplace from ${REPO}...`);
   const addResult = run("claude", ["plugin", "marketplace", "add", REPO]);
   if (addResult === null) {
@@ -42,7 +50,6 @@ function main() {
   }
   console.log("  Marketplace added.");
 
-  // Install plugin
   console.log(`  Installing ${PLUGIN} plugin...`);
   const installResult = run("claude", [
     "plugin",
@@ -57,12 +64,39 @@ function main() {
     );
     process.exit(1);
   }
+  console.log("  buildanything installed.\n");
+
+  // Install official companion plugins
+  console.log("  Installing companion plugins from official marketplace...");
+  const installed = [];
+  const skipped = [];
+
+  for (const plugin of OFFICIAL_PLUGINS) {
+    const fullName = `${plugin.name}@${OFFICIAL_MARKETPLACE}`;
+    process.stdout.write(`    ${plugin.name} (${plugin.desc})... `);
+    const result = run("claude", ["plugin", "install", fullName]);
+    if (result === null) {
+      console.log("skipped (may already be installed)");
+      skipped.push(plugin.name);
+    } else {
+      console.log("installed");
+      installed.push(plugin.name);
+    }
+  }
 
   console.log(
-    "\n  Installed! Start Claude Code and use:\n" +
+    "\n  Setup complete! Start Claude Code and use:\n" +
       "    /buildanything:build <your idea>       — full product pipeline\n" +
       "    /buildanything:idea-sweep <your idea>  — parallel research sweep\n"
   );
+
+  if (installed.length > 0) {
+    console.log(`  Companion plugins installed: ${installed.join(", ")}`);
+  }
+  if (skipped.length > 0) {
+    console.log(`  Already installed: ${skipped.join(", ")}`);
+  }
+  console.log();
 }
 
 main();
