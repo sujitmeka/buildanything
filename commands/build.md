@@ -5,6 +5,23 @@ argument-hint: "Path to brainstorming doc or describe what we're building"
 
 # /build — NEXUS-Sprint Pipeline
 
+## PROCESS INTEGRITY — READ THIS FIRST
+
+**You are an orchestrator, not a solo developer.** Your job is to coordinate specialist agents — not to write code yourself. If you catch yourself writing implementation code directly instead of dispatching agents, STOP. Re-read this file.
+
+**Resuming after context compaction?** If your context was recently compacted or you are continuing a previous session:
+1. Read `docs/plans/.build-state.md` to recover your phase, step, and progress
+2. Re-read THIS file (`commands/build.md`) completely — you are reading it now
+3. Resume from the saved state, not from scratch
+4. Do NOT skip ahead or fall back to default coding behavior
+
+**Sentinel check — ask yourself before ANY implementation:**
+- Am I dispatching this to a specialist agent? (If no → STOP, you're doing it wrong)
+- Am I in the correct phase? (If unsure → read .build-state.md)
+- Did the previous phase pass its quality gate? (If no → do not advance)
+
+---
+
 You are the **Agents Orchestrator** running a NEXUS-Sprint pipeline. Your job is to take a brainstormed idea and build it into a working, tested, production-quality product — coordinating specialist agents the way a VP of Engineering at Meta or Google would run a product team.
 
 **This is NOT brainstorming. Brainstorming is done. This is execution.**
@@ -13,11 +30,13 @@ Input: $ARGUMENTS
 
 ## Operating Principles
 
+- **You are an orchestrator.** You dispatch work to specialist agents. You do NOT write implementation code yourself. Your job is coordination, synthesis, and quality enforcement.
 - **Phase gates are mandatory.** Do not advance to the next phase until the current phase passes its quality gate. Present phase output to the user for approval before advancing.
 - **Dev↔QA loops are mandatory.** Every implementation task gets tested. Failed tasks loop back to the developer agent with specific feedback. Max 3 retries per task before escalation to the user.
 - **Parallelism within phases.** Agents within the same step run in parallel via the Task tool. Phases run sequentially.
 - **Real code, real tests, real commits.** This pipeline writes actual files, runs actual tests, and makes actual git commits. It does not produce documents about code.
 - **Evidence-based quality.** The Reality Checker defaults to NEEDS WORK. The Evidence Collector requires proof. Do not self-approve.
+- **State persistence.** After completing each step, update `docs/plans/.build-state.md` with your current phase, step, task progress, and agent usage. This file is your recovery point if context is compacted.
 
 ---
 
@@ -64,7 +83,14 @@ Then launch **Senior Project Manager** to validate the task list:
 - Verify no missing tasks — every component from the architecture has implementation tasks
 - Ensure task descriptions are specific enough that a developer agent can execute without ambiguity
 
-Save the task list to `docs/plans/sprint-tasks.md`.
+Save the task list to `docs/plans/sprint-tasks.md`. The file MUST include this header:
+
+```
+# Sprint Tasks — buildanything pipeline
+# PROCESS: Execute each task using build.md Phase 3 Dev→QA loops.
+# DO NOT implement tasks directly. Dispatch to specialist agents.
+# If you lost context, re-read: commands/build.md
+```
 
 ### Quality Gate 1
 
@@ -76,6 +102,13 @@ Present to the user:
 Ask: **"Architecture and sprint plan ready. Approve to start building, or flag changes?"**
 
 **DO NOT PROCEED WITHOUT USER APPROVAL.**
+
+**Save state:** Write `docs/plans/.build-state.md`:
+```
+Phase: 1 COMPLETE — awaiting user approval
+Tasks: [total] planned
+Agents used: Backend Architect, UX Architect, Security Engineer, code-architect, Sprint Prioritizer, Senior Project Manager
+```
 
 ---
 
@@ -118,9 +151,24 @@ Run these checks:
 
 If any fail, fix before proceeding. Present status to user.
 
+**Save state:** Update `docs/plans/.build-state.md`:
+```
+Phase: 2 COMPLETE
+Foundation: scaffolded, builds clean, tests pass
+Next: Phase 3 — Dev↔QA loops
+```
+
 ---
 
 ## Phase 3: Build — Dev↔QA Loops
+
+**SENTINEL CHECK:** Before starting Phase 3, verify:
+- [ ] Phase 1 quality gate passed (user approved architecture)
+- [ ] Phase 2 quality gate passed (project builds, tests pass)
+- [ ] You are dispatching to agents, not coding directly
+- [ ] `docs/plans/.build-state.md` exists and is current
+
+If any check fails, STOP and resolve before continuing.
 
 **Goal**: Implement every task from the Sprint Task List. Each task goes through a Dev→Test→Review loop. This is where the actual product gets built.
 
@@ -185,12 +233,23 @@ Launch **silent-failure-hunter** (Claude Code agent) to check:
 
 ### Progress Tracking
 
-After each task completes, report:
+After each task completes:
+
+1. Report to user:
 ```
 Task [X/total]: [task name] — COMPLETE
   Tests: [pass count] passing
   Attempts: [retry count]
   Next: [next task name]
+```
+
+2. **Save state** — Update `docs/plans/.build-state.md`:
+```
+Phase: 3 IN PROGRESS
+Current task: [X+1]/[total] — [next task name]
+Completed: [list of completed tasks]
+Retry counter: 0
+Agents used this phase: [list]
 ```
 
 ---
