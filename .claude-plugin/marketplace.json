@@ -1,10 +1,10 @@
 {
-  "name": "autobuilder-marketplace",
+  "name": "buildanything-marketplace",
   "owner": {
     "name": "Sujit"
   },
   "metadata": {
-    "description": "autobuilder — one command to build an entire product. 73 agents, 2 commands, zero overwhelm.",
+    "description": "buildanything — one command to build an entire product. 73 agents, 2 commands, zero overwhelm.",
     "version": "1.0.0"
   },
   "plugins": [

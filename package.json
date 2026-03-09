@@ -1,9 +1,9 @@
 {
-  "name": "autobuilder",
+  "name": "buildanything",
   "version": "1.0.0",
   "description": "One command to build an entire product. 73 specialist agents orchestrated into a full engineering pipeline for Claude Code.",
   "bin": {
-    "autobuilder": "./bin/setup.js"
+    "buildanything": "./bin/setup.js"
   },
   "keywords": [
     "claude",
@@ -20,11 +20,11 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/sujitmeka/autobuilder.git"
+    "url": "git+https://github.com/sujitmeka/buildanything.git"
   },
-  "homepage": "https://github.com/sujitmeka/autobuilder#readme",
+  "homepage": "https://github.com/sujitmeka/buildanything#readme",
   "bugs": {
-    "url": "https://github.com/sujitmeka/autobuilder/issues"
+    "url": "https://github.com/sujitmeka/buildanything/issues"
   },
   "files": [
     "bin/",

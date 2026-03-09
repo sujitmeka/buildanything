@@ -10,13 +10,13 @@ No agent expertise required. No manual coordination. Just `/build`.
 
 **One command:**
 ```
-npx autobuilder
+npx buildanything
 ```
 
 **Or manually in Claude Code:**
 ```
-/plugin marketplace add sujitmeka/autobuilder
-/plugin install oneshot@autobuilder-marketplace
+/plugin marketplace add sujitmeka/buildanything
+/plugin install oneshot@buildanything-marketplace
 ```
 
 ## Commands

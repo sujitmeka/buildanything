@@ -2,8 +2,8 @@
 
 const { execFileSync } = require("child_process");
 
-const REPO = "sujitmeka/autobuilder";
-const MARKETPLACE = "autobuilder-marketplace";
+const REPO = "sujitmeka/buildanything";
+const MARKETPLACE = "buildanything-marketplace";
 const PLUGIN = "oneshot";
 
 function run(command, args) {
@@ -18,7 +18,7 @@ function run(command, args) {
 }
 
 function main() {
-  console.log("\n  autobuilder — one command to build an entire product\n");
+  console.log("\n  buildanything — one command to build an entire product\n");
 
   // Check claude is installed
   const version = run("claude", ["--version"]);
