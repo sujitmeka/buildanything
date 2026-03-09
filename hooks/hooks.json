@@ -1,23 +1,24 @@
 {
   "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|resume|clear|compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "'${CLAUDE_PLUGIN_ROOT}/hooks/session-start'",
+            "async": false
+          }
+        ]
+      }
+    ],
     "PreCompact": [
       {
         "matcher": "",
         "hooks": [
           {
             "type": "prompt",
-            "prompt": "ORCHESTRATOR STATE SAVE — Context is about to be compacted. If you are running the /buildanything:build pipeline, you MUST save your current state NOW before it is lost:\n\n1. Write a file `docs/plans/.build-state.md` with:\n   - Current phase and step (e.g., 'Phase 3, Step 3.1, Task 5/13')\n   - Which agents have been used so far\n   - Which tasks are complete, which is in progress\n   - Any pending quality gate results\n   - The retry counter for the current task\n\n2. After compaction, your FIRST action must be: Re-read `commands/build.md` (the orchestrator) and `docs/plans/.build-state.md` (your saved state). Do NOT proceed with implementation until you have reloaded the process.\n\nThis is critical — without this, you will lose the orchestrator process and fall back to default coding behavior."
-          }
-        ]
-      }
-    ],
-    "SubagentStop": [
-      {
-        "matcher": "",
-        "hooks": [
-          {
-            "type": "prompt",
-            "prompt": "If you are running the /buildanything:build pipeline, check: Are you still following the orchestrator process from build.md? Verify you are in the correct phase and step before continuing."
+            "prompt": "ORCHESTRATOR STATE SAVE — Context is about to be compacted. If you are running the /buildanything:build pipeline, you MUST do these things NOW before your context is lost:\n\n1. Use TodoWrite to update all task statuses (complete, in-progress, pending)\n2. Write `docs/plans/.build-state.md` with: current phase, step, task progress, retry counter, agents used, pending quality gate results\n3. The next thing that will happen after compaction is the SessionStart hook will fire and re-inject your orchestrator identity. But you MUST save state NOW or your progress tracking is lost."
           }
         ]
       }

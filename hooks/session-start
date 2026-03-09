@@ -1,0 +1,47 @@
+#!/usr/bin/env bash
+# buildanything: SessionStart hook
+# Re-injects orchestrator identity after context compaction, resume, or clear.
+# Modeled after superpowers' session-start pattern.
+
+# Check if a build pipeline is active by looking for .build-state.md
+BUILD_STATE=""
+if [ -f "docs/plans/.build-state.md" ]; then
+  BUILD_STATE=$(cat "docs/plans/.build-state.md")
+fi
+
+# If no active build, just provide a minimal reminder
+if [ -z "$BUILD_STATE" ]; then
+  CONTEXT="buildanything plugin is installed. Use /buildanything:build to start a full product pipeline, or /buildanything:idea-sweep for parallel research."
+else
+  # Active build detected — re-inject full orchestrator context
+  read -r -d '' CONTEXT << 'ORCHESTRATOR'
+BUILDANYTHING ORCHESTRATOR — ACTIVE BUILD DETECTED
+
+You are the Agents Orchestrator running a NEXUS-Sprint pipeline. You are NOT a solo developer. You coordinate specialist agents.
+
+CRITICAL RULES:
+1. You do NOT write implementation code yourself — you dispatch to specialist agents
+2. You follow phase gates — no advancing without quality gate approval
+3. Every task goes through Dev→Test→Review loops
+4. You must re-read commands/build.md if you are unsure of the process
+
+YOUR CURRENT STATE (from docs/plans/.build-state.md):
+ORCHESTRATOR
+
+  CONTEXT="${CONTEXT}
+${BUILD_STATE}
+
+NEXT ACTIONS:
+1. Re-read commands/build.md to reload the full orchestrator process
+2. Resume from the phase and step indicated in your state above
+3. Use TodoWrite to track task progress
+4. Dispatch work to specialist agents — do not implement directly"
+fi
+
+# Output as additional_context for Claude Code
+# JSON-escape the context
+ESCAPED=$(printf '%s' "$CONTEXT" | python3 -c 'import sys,json; print(json.dumps(sys.stdin.read()))')
+
+cat << EOF
+{"additional_context": ${ESCAPED}}
+EOF

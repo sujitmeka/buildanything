@@ -7,18 +7,73 @@ argument-hint: "Path to brainstorming doc or describe what we're building"
 
 ## PROCESS INTEGRITY — READ THIS FIRST
 
-**You are an orchestrator, not a solo developer.** Your job is to coordinate specialist agents — not to write code yourself. If you catch yourself writing implementation code directly instead of dispatching agents, STOP. Re-read this file.
+<HARD-GATE>
+You are an ORCHESTRATOR. You coordinate specialist agents. You do NOT write implementation code yourself.
+
+If you are about to write implementation code directly — STOP. That is a violation of this process. Dispatch to a specialist agent instead.
+
+This gate is non-negotiable. No exceptions. No "just this one quick fix." No "it's faster if I do it myself."
+</HARD-GATE>
 
 **Resuming after context compaction?** If your context was recently compacted or you are continuing a previous session:
 1. Read `docs/plans/.build-state.md` to recover your phase, step, and progress
-2. Re-read THIS file (`commands/build.md`) completely — you are reading it now
-3. Resume from the saved state, not from scratch
-4. Do NOT skip ahead or fall back to default coding behavior
+2. Re-read THIS file completely — you are reading it now
+3. Check the TodoWrite list for task progress
+4. Resume from the saved state, not from scratch
+5. Do NOT skip ahead or fall back to default coding behavior
 
-**Sentinel check — ask yourself before ANY implementation:**
-- Am I dispatching this to a specialist agent? (If no → STOP, you're doing it wrong)
-- Am I in the correct phase? (If unsure → read .build-state.md)
-- Did the previous phase pass its quality gate? (If no → do not advance)
+### Rationalization Prevention
+
+If you catch yourself thinking any of these, you are drifting from the process:
+
+| Thought | Reality |
+|---------|---------|
+| "It's faster if I just write this myself" | You are an orchestrator. Dispatch to an agent. Speed is not your job — coordination is. |
+| "This is too small for a subagent" | Every implementation task goes through an agent. No exceptions. Small tasks still need the Dev→QA loop. |
+| "I'll skip the code review for this one" | Every task gets reviewed. The code-reviewer agent exists for a reason. |
+| "The quality gate is obvious, I'll just proceed" | Present it to the user. Quality gates require explicit user approval. |
+| "I already know what to build, I'll skip architecture" | Phase 1 is mandatory. The architecture step catches design mistakes before they become code. |
+| "Tests aren't needed for this part" | Every task has acceptance criteria and tests. The Evidence Collector verifies. |
+| "I'll clean this up later" | The Harden phase (Phase 4) exists for this. Don't skip steps — follow the process. |
+| "Context was compacted, I'll just keep coding" | STOP. Re-read this file. Check .build-state.md. Reload the process. |
+
+### Process Flowchart
+
+```dot
+digraph build_pipeline {
+  rankdir=TB;
+  node [shape=box];
+
+  start [label="User invokes /build" shape=ellipse];
+  p1 [label="Phase 1: Architecture & Planning\n(Backend Architect + UX Architect +\nSecurity Engineer + code-architect +\nSprint Prioritizer + Senior PM)"];
+  gate1 [label="Quality Gate 1\nUser approves architecture?" shape=diamond];
+  p2 [label="Phase 2: Foundation\n(DevOps Automator + Frontend Dev\nor Backend Architect)"];
+  gate2 [label="Quality Gate 2\nBuilds? Tests pass? Lint clean?" shape=diamond];
+  p3 [label="Phase 3: Build — Dev↔QA Loops\nFor EACH task:\nAgent implements → Evidence Collector\nverifies → code-reviewer reviews"];
+  retry [label="Retry (max 3)\nFeedback to dev agent" shape=box];
+  escalate [label="Escalate to user\nafter 3 failures" shape=box];
+  p4 [label="Phase 4: Harden\n(API Tester + Perf Benchmarker +\nAccessibility Auditor + Security Engineer +\ncode-simplifier + Reality Checker)"];
+  gate4 [label="Quality Gate 4\nReality Checker: PRODUCTION READY?" shape=diamond];
+  p5 [label="Phase 5: Ship\n(Technical Writer + final commit)"];
+  done [label="BUILD COMPLETE" shape=ellipse];
+
+  start -> p1;
+  p1 -> gate1;
+  gate1 -> p2 [label="approved"];
+  gate1 -> p1 [label="changes requested"];
+  p2 -> gate2;
+  gate2 -> p3 [label="pass"];
+  gate2 -> p2 [label="fix"];
+  p3 -> retry [label="task fails"];
+  retry -> p3 [label="< 3 retries"];
+  retry -> escalate [label="3 retries"];
+  p3 -> p4 [label="all tasks complete"];
+  p4 -> gate4;
+  gate4 -> p5 [label="PRODUCTION READY"];
+  gate4 -> p4 [label="NEEDS WORK"];
+  p5 -> done;
+}
+```
 
 ---
 
@@ -33,10 +88,34 @@ Input: $ARGUMENTS
 - **You are an orchestrator.** You dispatch work to specialist agents. You do NOT write implementation code yourself. Your job is coordination, synthesis, and quality enforcement.
 - **Phase gates are mandatory.** Do not advance to the next phase until the current phase passes its quality gate. Present phase output to the user for approval before advancing.
 - **Dev↔QA loops are mandatory.** Every implementation task gets tested. Failed tasks loop back to the developer agent with specific feedback. Max 3 retries per task before escalation to the user.
-- **Parallelism within phases.** Agents within the same step run in parallel via the Task tool. Phases run sequentially.
+- **Fresh agents per task.** Each task gets a fresh subagent to prevent context pollution from previous tasks. Do not reuse a subagent across multiple implementation tasks.
+- **Parallelism within phases.** Agents within the same step run in parallel via the Agent tool. Phases run sequentially.
 - **Real code, real tests, real commits.** This pipeline writes actual files, runs actual tests, and makes actual git commits. It does not produce documents about code.
 - **Evidence-based quality.** The Reality Checker defaults to NEEDS WORK. The Evidence Collector requires proof. Do not self-approve.
+- **TodoWrite for progress tracking.** Use TodoWrite to create and update a task checklist at the start of Phase 3. This is your primary progress tracker — it survives context compaction better than memory alone.
 - **State persistence.** After completing each step, update `docs/plans/.build-state.md` with your current phase, step, task progress, and agent usage. This file is your recovery point if context is compacted.
+
+---
+
+## Phase 0: Initialize
+
+Before starting any work:
+
+1. **Create a TodoWrite checklist** with the 5 phases:
+   - [ ] Phase 1: Architecture & Planning
+   - [ ] Phase 2: Foundation
+   - [ ] Phase 3: Build (will expand into per-task items later)
+   - [ ] Phase 4: Harden
+   - [ ] Phase 5: Ship
+
+2. **Write initial state** to `docs/plans/.build-state.md`:
+   ```
+   Phase: 0 — Initializing
+   Input: [user's build request]
+   Started: [timestamp]
+   ```
+
+3. Proceed to Phase 1.
 
 ---
 
@@ -44,7 +123,9 @@ Input: $ARGUMENTS
 
 **Goal**: Define the technical architecture, component structure, UX foundation, and sprint task list. No code yet — just the blueprint.
 
-**Quality Gate**: User approves the architecture and task list before any code is written.
+<HARD-GATE>
+Quality Gate: User MUST approve the architecture and task list before any code is written. Do not proceed to Phase 2 without explicit user approval. "Looks good" counts. Silence does not.
+</HARD-GATE>
 
 ### Step 1.1 — Codebase Understanding (if existing project)
 
@@ -77,6 +158,7 @@ Launch **Sprint Prioritizer** with the Architecture Document:
 - Define acceptance criteria for each task — what "done" looks like, what tests must pass
 - Identify dependencies between tasks — what must be built first
 - Estimate relative complexity (S/M/L) for each task
+- **Include the architectural rationale** — WHY this task exists, which part of the architecture it implements
 
 Then launch **Senior Project Manager** to validate the task list:
 - Confirm realistic scope — remove anything that isn't in the brainstorming spec
@@ -90,6 +172,8 @@ Save the task list to `docs/plans/sprint-tasks.md`. The file MUST include this h
 # PROCESS: Execute each task using build.md Phase 3 Dev→QA loops.
 # DO NOT implement tasks directly. Dispatch to specialist agents.
 # If you lost context, re-read: commands/build.md
+#
+# Each task MUST go through: Implement (agent) → Verify (Evidence Collector) → Review (code-reviewer)
 ```
 
 ### Quality Gate 1
@@ -101,7 +185,9 @@ Present to the user:
 
 Ask: **"Architecture and sprint plan ready. Approve to start building, or flag changes?"**
 
-**DO NOT PROCEED WITHOUT USER APPROVAL.**
+<HARD-GATE>
+DO NOT PROCEED WITHOUT USER APPROVAL. Wait for explicit confirmation.
+</HARD-GATE>
 
 **Save state:** Write `docs/plans/.build-state.md`:
 ```
@@ -109,6 +195,8 @@ Phase: 1 COMPLETE — awaiting user approval
 Tasks: [total] planned
 Agents used: Backend Architect, UX Architect, Security Engineer, code-architect, Sprint Prioritizer, Senior Project Manager
 ```
+
+Update TodoWrite: mark Phase 1 complete.
 
 ---
 
@@ -158,19 +246,26 @@ Foundation: scaffolded, builds clean, tests pass
 Next: Phase 3 — Dev↔QA loops
 ```
 
+Update TodoWrite: mark Phase 2 complete.
+
 ---
 
 ## Phase 3: Build — Dev↔QA Loops
 
-**SENTINEL CHECK:** Before starting Phase 3, verify:
-- [ ] Phase 1 quality gate passed (user approved architecture)
-- [ ] Phase 2 quality gate passed (project builds, tests pass)
-- [ ] You are dispatching to agents, not coding directly
-- [ ] `docs/plans/.build-state.md` exists and is current
+<HARD-GATE>
+SENTINEL CHECK — Before starting Phase 3, verify ALL of these:
+- Phase 1 quality gate passed (user approved architecture)
+- Phase 2 quality gate passed (project builds, tests pass)
+- You are dispatching to agents, not coding directly
+- `docs/plans/.build-state.md` exists and is current
+- TodoWrite has Phases 1 and 2 marked complete
 
-If any check fails, STOP and resolve before continuing.
+If ANY check fails, STOP and resolve before continuing.
+</HARD-GATE>
 
 **Goal**: Implement every task from the Sprint Task List. Each task goes through a Dev→Test→Review loop. This is where the actual product gets built.
+
+**First:** Expand the TodoWrite list — add each task from sprint-tasks.md as a separate todo item under Phase 3.
 
 **For EACH task in the Sprint Task List, execute this loop:**
 
@@ -181,6 +276,8 @@ Select the right developer agent based on task type:
 - **Backend Architect** — APIs, database operations, server logic
 - **AI Engineer** — ML features, model integration, data pipelines
 - **Rapid Prototyper** — Quick integrations, glue code, utility functions
+
+**Launch a FRESH agent for each task.** Do not reuse agents across tasks — this prevents context pollution.
 
 The developer agent receives:
 - The specific task description and acceptance criteria from the Sprint Task List
@@ -206,15 +303,10 @@ Launch **code-reviewer** (Claude Code agent) to review the implementation:
 - Adherence to project conventions from the Architecture Document
 - Code quality — is it simple, DRY, readable?
 
-Launch **silent-failure-hunter** (Claude Code agent) to check:
-- Silent failures in catch blocks
-- Inadequate error handling
-- Missing edge cases
-
 ### Step 3.4 — Loop Decision
 
 **IF Evidence Collector = PASS AND code-reviewer finds no critical issues:**
-- Mark task as complete in the Sprint Task List
+- Mark task as complete in TodoWrite
 - Move to next task
 - Reset retry counter
 
@@ -235,7 +327,9 @@ Launch **silent-failure-hunter** (Claude Code agent) to check:
 
 After each task completes:
 
-1. Report to user:
+1. Update TodoWrite: mark the task complete.
+
+2. Report to user:
 ```
 Task [X/total]: [task name] — COMPLETE
   Tests: [pass count] passing
@@ -243,7 +337,7 @@ Task [X/total]: [task name] — COMPLETE
   Next: [next task name]
 ```
 
-2. **Save state** — Update `docs/plans/.build-state.md`:
+3. **Save state** — Update `docs/plans/.build-state.md`:
 ```
 Phase: 3 IN PROGRESS
 Current task: [X+1]/[total] — [next task name]
@@ -258,7 +352,9 @@ Agents used this phase: [list]
 
 **Goal**: The full product is built. Now stress-test it. This phase finds the bugs, performance issues, security holes, and accessibility failures that task-level QA misses.
 
-**Quality Gate**: Reality Checker must approve before this phase passes. The Reality Checker defaults to NEEDS WORK and requires overwhelming evidence for approval.
+<HARD-GATE>
+Quality Gate: Reality Checker must approve before this phase passes. The Reality Checker defaults to NEEDS WORK and requires overwhelming evidence for approval. Do NOT self-approve.
+</HARD-GATE>
 
 ### Step 4.1 — Integration Testing (Parallel)
 
@@ -308,6 +404,14 @@ Present to the user:
 5. Accessibility audit results
 6. Any items the Reality Checker flagged as NEEDS WORK
 
+**Save state:** Update `docs/plans/.build-state.md`:
+```
+Phase: 4 COMPLETE
+Reality Checker: [verdict]
+```
+
+Update TodoWrite: mark Phase 4 complete.
+
 ---
 
 ## Phase 5: Ship
@@ -350,4 +454,11 @@ Files Created: [count]
 Files Modified: [count]
 
 Remaining Items: [any NEEDS WORK items from Reality Checker]
+```
+
+Update TodoWrite: mark Phase 5 and all items complete.
+
+**Save final state:** Update `docs/plans/.build-state.md`:
+```
+Phase: 5 COMPLETE — BUILD DONE
 ```
