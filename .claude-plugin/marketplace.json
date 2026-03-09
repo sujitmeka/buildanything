@@ -1,0 +1,17 @@
+{
+  "name": "autobuilder-marketplace",
+  "owner": {
+    "name": "Sujit"
+  },
+  "metadata": {
+    "description": "autobuilder — one command to build an entire product. 73 agents, 2 commands, zero overwhelm.",
+    "version": "1.0.0"
+  },
+  "plugins": [
+    {
+      "name": "oneshot",
+      "source": "./",
+      "description": "Full product build pipeline with 73 specialist agents orchestrated across architecture, implementation, testing, and hardening phases. Includes /build (full factory) and /idea-sweep (parallel research)."
+    }
+  ]
+}
