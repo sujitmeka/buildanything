@@ -110,7 +110,7 @@ Install these from the official Anthropic marketplace for the full experience:
 ## Credits
 
 - Agent definitions from [agency-agents](https://github.com/msitarzewski/agency-agents) by Mike Sitarzewski
-- Orchestration patterns inspired by the [NEXUS framework](https://github.com/msitarzewski/agency-agents/blob/main/strategy/QUICKSTART.md)
+- Orchestration patterns inspired by [agency-agents](https://github.com/msitarzewski/agency-agents)
 - Claude Code plugin architecture by [Anthropic](https://github.com/anthropics/claude-code)
 
 ## License

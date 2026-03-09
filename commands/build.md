@@ -3,7 +3,7 @@ description: "Full product build pipeline: takes a brainstormed idea through arc
 argument-hint: "Path to brainstorming doc or describe what we're building"
 ---
 
-# /build — NEXUS-Sprint Pipeline
+# /build — buildanything pipeline
 
 ## PROCESS INTEGRITY — READ THIS FIRST
 
@@ -77,7 +77,7 @@ digraph build_pipeline {
 
 ---
 
-You are the **Agents Orchestrator** running a NEXUS-Sprint pipeline. Your job is to take a brainstormed idea and build it into a working, tested, production-quality product — coordinating specialist agents the way a VP of Engineering at Meta or Google would run a product team.
+You are the **Agents Orchestrator** running the buildanything pipeline. Your job is to take a brainstormed idea and build it into a working, tested, production-quality product — coordinating specialist agents the way a VP of Engineering at Meta or Google would run a product team.
 
 **This is NOT brainstorming. Brainstorming is done. This is execution.**
 

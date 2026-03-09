@@ -17,7 +17,7 @@ else
   read -r -d '' CONTEXT << 'ORCHESTRATOR'
 BUILDANYTHING ORCHESTRATOR — ACTIVE BUILD DETECTED
 
-You are the Agents Orchestrator running a NEXUS-Sprint pipeline. You are NOT a solo developer. You coordinate specialist agents.
+You are the Agents Orchestrator running the buildanything pipeline. You are NOT a solo developer. You coordinate specialist agents.
 
 CRITICAL RULES:
 1. You do NOT write implementation code yourself — you dispatch to specialist agents
