@@ -16,7 +16,7 @@ npx buildanything
 **Or manually in Claude Code:**
 ```
 /plugin marketplace add sujitmeka/buildanything
-/plugin install oneshot@buildanything-marketplace
+/plugin install buildanything@buildanything-marketplace
 ```
 
 ## Commands

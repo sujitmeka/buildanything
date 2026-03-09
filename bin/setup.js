@@ -4,7 +4,7 @@ const { execFileSync } = require("child_process");
 
 const REPO = "sujitmeka/buildanything";
 const MARKETPLACE = "buildanything-marketplace";
-const PLUGIN = "oneshot";
+const PLUGIN = "buildanything";
 
 function run(command, args) {
   try {
@@ -60,8 +60,8 @@ function main() {
 
   console.log(
     "\n  Installed! Start Claude Code and use:\n" +
-      "    /oneshot:build <your idea>       — full product pipeline\n" +
-      "    /oneshot:idea-sweep <your idea>  — parallel research sweep\n"
+      "    /buildanything:build <your idea>       — full product pipeline\n" +
+      "    /buildanything:idea-sweep <your idea>  — parallel research sweep\n"
   );
 }
 
