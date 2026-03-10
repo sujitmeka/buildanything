@@ -39,13 +39,64 @@ The metric is NOT predefined — you decide what to measure based on the project
 
 ---
 
-## Phase 0: Initialize
+## Phase 0: Context & Pre-Flight
 
-1. Create a TodoWrite checklist with Phases 1-5.
-2. Create `docs/plans/.build-state.md` with: "Phase: 0 — Starting. Input: [build request]."
+**Resuming after compaction?** Read `docs/plans/.build-state.md`, re-read this file and `commands/protocols/metric-loop.md`, check TodoWrite, resume from saved state. Skip Phase 0.
+
+### Step 0.1 — Read the Room
+
+Before doing anything, scan for existing context:
+
+- Check if the input is a file path (e.g., `docs/plans/brainstorm.md`). If so, read it — that's the user's design thinking.
+- Check if `docs/plans/` exists with any prior brainstorming, PRDs, or design docs. Read them.
+- Check if there's existing code in the project. If so, this is an enhancement, not a greenfield build.
+- Check the conversation history — has the user been discussing this idea already? Use that context.
+
+If you have existing context (brainstorm docs, prior conversation, existing code): synthesize what you know and confirm your understanding with the user. Ask clarifying questions about anything ambiguous.
+
+If there is NO existing context and the input is a raw idea: ask 3-5 targeted questions to clarify scope, constraints, and priorities before proceeding. Examples: "Is this a web app, mobile, or CLI?" "What's the primary user flow?" "Any specific tech stack requirements?" "What external services/APIs does this need?"
+
+Do NOT skip this step. A 2-minute conversation now saves hours of rework later.
+
+### Step 0.2 — Human Prerequisites Checklist
+
+Based on the build request and your understanding of the project, identify everything that requires HUMAN action before the agent can go heads-down. Present a checklist:
+
+**Scan for these categories:**
+
+- **API keys & secrets** — Does the project integrate with external services (Stripe, Supabase, OpenAI, Polymarket, etc.)? List each one. The user needs to create accounts, generate keys, and add them to `.env`.
+- **Database setup** — Does it need a database? (Supabase project, Postgres instance, etc.) The user needs to create it and provide the connection URL.
+- **Repository** — Is there a git repo? Does the user want one on GitHub? Should it be public or private?
+- **Deployment** — Will this be deployed? (Vercel, Railway, Fly.io, etc.) The user needs to connect the service.
+- **MCP servers** — Does the agent need browser testing (Playwright MCP), database access, or other MCP tools to test effectively during the build?
+- **Domain/DNS** — Does the project need a custom domain?
+- **Third-party accounts** — Any services the user needs to sign up for?
+- **Local tooling** — Does the user need to install anything locally? (Docker, specific runtimes, etc.)
+
+Present the checklist like this:
+
+```
+BEFORE I GO HEADS-DOWN, please set up:
+
+[ ] Polymarket API key → add as POLYMARKET_API_KEY to .env
+[ ] Supabase project → add SUPABASE_URL and SUPABASE_ANON_KEY to .env
+[ ] GitHub repo created → share the URL so I can init git
+[ ] Vercel connected (if you want auto-deploy)
+[ ] Playwright MCP installed (so I can visually test the frontend)
+
+Once these are done, say "ready" and I'll start building.
+```
+
+<HARD-GATE>
+In interactive mode: DO NOT proceed past Phase 0 until the user confirms prerequisites are handled (or explicitly says to skip some).
+In autonomous mode: Log the prerequisites checklist to `docs/plans/build-log.md`. Create `.env.example` with all required keys listed. Proceed — but if a key is missing during build, log it as a blocker rather than stalling.
+</HARD-GATE>
+
+### Step 0.3 — Initialize
+
+1. Create a TodoWrite checklist with Phases 0-5.
+2. Create `docs/plans/.build-state.md` with: "Phase: 0 — Starting. Input: [build request]. Prerequisites: [status]."
 3. Go to Phase 1.
-
-**Resuming after compaction?** Read `docs/plans/.build-state.md`, re-read this file and `commands/protocols/metric-loop.md`, check TodoWrite, resume from saved state.
 
 ---
 
@@ -53,7 +104,9 @@ The metric is NOT predefined — you decide what to measure based on the project
 
 ### Step 1.1 — Explore (existing codebase only)
 
-Call the Agent tool — description: "Explore codebase" — prompt: "Explore this codebase. Map architecture layers, file conventions, testing patterns, existing features. Report findings."
+If there is existing code in the project, call the Agent tool — description: "Explore codebase" — prompt: "Explore this codebase. Map architecture layers, file conventions, testing patterns, existing features. Report findings."
+
+If greenfield, skip to Step 1.2.
 
 ### Step 1.2 — Architecture Design (4 agents in parallel, ONE message)
 
