@@ -20,11 +20,22 @@ Input: $ARGUMENTS
 
 If the input contains `--autonomous` or `--auto`, this build runs **unattended**. The user will not be present to approve quality gates. In autonomous mode:
 - Quality gates auto-approve. Do NOT pause and wait for user input.
-- If a task fails 3 retries, SKIP it (log to `.build-state.md`) instead of escalating.
+- Metric loops that stall accept at >= 60% of target, skip below that.
 - Log every decision to `docs/plans/build-log.md` so the user can review later.
-- At the end, write a summary of all decisions, skipped items, and issues to `docs/plans/build-log.md`.
 
 If `--autonomous` is NOT present, all quality gates require user approval as described below.
+
+### Metric Loop
+
+Every phase uses a **metric-driven iteration loop** to drive quality. Read the full protocol at `commands/protocols/metric-loop.md`. The short version:
+
+1. YOU define a metric for this phase based on context (what you're building, what matters)
+2. Spawn a measurement agent to score the artifact 0-100
+3. Pick the ONE highest-impact issue, spawn a fix agent
+4. Re-measure. Repeat until target met, stalled (2 consecutive no-improvement iterations), or max iterations reached
+5. Track all scores in `.build-state.md`
+
+The metric is NOT predefined — you decide what to measure based on the project, the phase, and what the user is building. A security-heavy API needs different metrics than a static site.
 
 ---
 
@@ -34,7 +45,7 @@ If `--autonomous` is NOT present, all quality gates require user approval as des
 2. Create `docs/plans/.build-state.md` with: "Phase: 0 — Starting. Input: [build request]."
 3. Go to Phase 1.
 
-**Resuming after compaction?** Read `docs/plans/.build-state.md`, re-read this file, check TodoWrite, resume from saved state.
+**Resuming after compaction?** Read `docs/plans/.build-state.md`, re-read this file and `commands/protocols/metric-loop.md`, check TodoWrite, resume from saved state.
 
 ---
 
@@ -58,7 +69,11 @@ Call the Agent tool 4 times in a single message:
 
 After all 4 return, YOU synthesize their outputs into one Architecture Document. Save to `docs/plans/architecture.md`. This synthesis is the ONE thing you write directly.
 
-### Step 1.3 — Sprint Planning (2 sequential Agent tool calls)
+### Step 1.3 — Metric Loop: Architecture Quality
+
+Run the Metric Loop Protocol (`commands/protocols/metric-loop.md`) on the Architecture Document. Define a metric appropriate to this project — e.g., completeness of requirements coverage, specificity of data models, consistency between agents' outputs. Max 3 iterations.
+
+### Step 1.4 — Sprint Planning (2 sequential Agent tool calls)
 
 Call the Agent tool — description: "Sprint breakdown" — prompt: "Break this architecture into ordered, atomic tasks. Each task needs: description, acceptance criteria, dependencies, size (S/M/L). Architecture: [paste architecture doc]."
 
@@ -86,13 +101,15 @@ Call the Agent tool — description: "Project scaffolding" — mode: "bypassPerm
 
 Call the Agent tool — description: "Design system setup" — mode: "bypassPermissions" — prompt: "Implement design system foundation from this architecture: [paste frontend section]. Create CSS tokens, base layout components, core UI primitives. Commit: 'feat: design system'."
 
-### Quality Gate 2
+### Step 2.3 — Metric Loop: Scaffold Health
 
-Verify: project builds, tests pass, lint clean. Fix before proceeding. Update TodoWrite and state.
+Run the Metric Loop Protocol on the scaffold. Define a metric based on what matters — builds clean, tests pass, lint clean, dependencies resolve, structure matches architecture. Max 3 iterations.
+
+Update TodoWrite and state.
 
 ---
 
-## Phase 3: Build — Dev→QA Loops
+## Phase 3: Build — Metric-Driven Dev Loops
 
 <HARD-GATE>
 Before starting: Phase 1 must be approved (user-approved or auto-approved in autonomous mode), Phase 2 must pass. You MUST call the Agent tool for EVERY task below. No exceptions.
@@ -100,7 +117,7 @@ Before starting: Phase 1 must be approved (user-approved or auto-approved in aut
 
 Expand TodoWrite with each sprint task.
 
-**For EACH task, run this 3-step loop:**
+**For EACH task:**
 
 ### 3.1 — Implement
 
@@ -108,69 +125,74 @@ Call the Agent tool — description: "[task name]" — mode: "bypassPermissions"
 
 Pick the right developer framing: frontend, backend, AI, etc.
 
-### 3.2 — Verify
+### 3.2 — Metric Loop: Task Quality
 
-Call the Agent tool — description: "Verify [task]" — prompt: "Verify implementation of [task]. Acceptance criteria: [paste]. Run tests. Check each criterion. Report PASS or FAIL with evidence."
+Run the Metric Loop Protocol (`commands/protocols/metric-loop.md`) on the task implementation. Define a metric based on the task's acceptance criteria — the measurement agent checks each criterion, runs tests, checks for regressions. Max 5 iterations.
 
-### 3.3 — Review
+This replaces the old binary pass/fail retry loop. Now you track whether the score is improving, stop if it stalls, and give targeted feedback (fix ONE thing per iteration, not "try again").
 
-Call the Agent tool — description: "Review [task]" — prompt: "Code review [task]. Check for bugs, security issues, code quality, silent failures. Report APPROVE or REQUEST CHANGES with specifics."
+### 3.3 — Loop Exit
 
-### Loop Decision
+On target met: mark task complete in TodoWrite, report "Task X/N: [name] — COMPLETE (score: [final], iterations: [count])".
 
-- PASS + APPROVE → mark complete in TodoWrite, next task.
-- Issues → call Agent tool with developer + feedback, re-verify (max 3 retries).
-- 3 failures → **interactive:** escalate to user. **autonomous:** skip task, log to `docs/plans/build-log.md`, continue.
+On stall or max iterations:
+- **Interactive:** present score history + top remaining issue to user.
+- **Autonomous:** accept if score >= 60% of target, skip otherwise. Log to `docs/plans/build-log.md`.
 
-After each task: update TodoWrite, report "Task X/N: [name] — COMPLETE", update `.build-state.md`.
+After each task: update TodoWrite and `.build-state.md`.
 
 ---
 
-## Phase 4: Harden
+## Phase 4: Harden — Metric-Driven Hardening
 
-### Step 4.1 — Audit (4 agents in parallel, ONE message)
+### Step 4.1 — Initial Audit (4 agents in parallel, ONE message)
 
 Call the Agent tool 4 times in one message:
 
-1. Description: "API testing" — Prompt: "Comprehensive API validation: all endpoints, edge cases, error responses, auth flows. Report findings."
+1. Description: "API testing" — Prompt: "Comprehensive API validation: all endpoints, edge cases, error responses, auth flows. Report findings with counts."
 
 2. Description: "Performance audit" — Prompt: "Measure response times, identify bottlenecks, flag performance issues. Report benchmarks."
 
-3. Description: "Accessibility audit" — Prompt: "WCAG compliance audit on all interfaces. Check screen reader, keyboard nav, contrast. Report issues."
+3. Description: "Accessibility audit" — Prompt: "WCAG compliance audit on all interfaces. Check screen reader, keyboard nav, contrast. Report issues with counts."
 
 4. Description: "Security audit" — Prompt: "Security review: auth, input validation, data exposure, dependency vulnerabilities. Report findings with severity."
 
-### Step 4.2 — Fix Critical Issues
+### Step 4.2 — Metric Loop: Hardening Quality
 
-For each critical finding: call Agent tool with developer + fix instructions, mode: "bypassPermissions". Then re-audit.
+Run the Metric Loop Protocol on the full codebase using the audit findings as initial input. Define a composite metric based on what this project needs — API reliability, security posture, accessibility compliance, code quality, performance. The weight of each dimension depends on what you're building. Max 4 iterations.
 
-### Step 4.3 — Code Quality (2 agents in parallel)
+IMPORTANT: When fixing, dispatch to the RIGHT specialist. Security issues → security-focused agent. Accessibility → frontend agent with a11y context. Don't send everything to one agent.
 
-1. Description: "Code cleanup" — mode: "bypassPermissions" — Prompt: "Simplify complex code. Preserve functionality. Commit improvements."
-2. Description: "Type review" — mode: "bypassPermissions" — Prompt: "Review types and comments. Fix issues. Commit."
+### Step 4.3 — Reality Check
 
-### Step 4.4 — Reality Check
-
-Call the Agent tool — description: "Final verdict" — prompt: "You are the Reality Checker. Default: NEEDS WORK. Review all test results, QA evidence, acceptance criteria. Verdict: PRODUCTION READY (overwhelming evidence only) or NEEDS WORK (list specifics)."
+Call the Agent tool — description: "Final verdict" — prompt: "You are the Reality Checker. Default: NEEDS WORK. The hardening loop reached score [final_score] after [iterations] iterations. Score history: [paste table]. Review all evidence. Verdict: PRODUCTION READY or NEEDS WORK with specifics."
 
 <HARD-GATE>Do NOT self-approve. Reality Checker must give the verdict.</HARD-GATE>
 
-**If autonomous mode:** Log Reality Checker verdict and all audit results to `docs/plans/build-log.md`. Continue to Phase 5.
-
-**If interactive:** Present all results to user. Update state.
+**If autonomous mode:** Log verdict to `docs/plans/build-log.md`. Continue.
+**If interactive:** Present score history + verdict to user. Update state.
 
 ---
 
 ## Phase 5: Ship
 
+### Step 5.1 — Documentation
+
 Call the Agent tool — description: "Documentation" — mode: "bypassPermissions" — prompt: "Write project docs: README with setup/architecture/usage, API docs if applicable, deployment notes. Commit: 'docs: project documentation'."
 
-Create final commit. Present completion report:
+### Step 5.2 — Metric Loop: Documentation Quality
+
+Run the Metric Loop Protocol on the documentation. Define a metric based on completeness, accuracy, and whether a new developer could follow the README to get the project running. Max 3 iterations.
+
+### Completion Report
+
+Create final commit. Present:
 
 ```
 BUILD COMPLETE
 Project: [name] | Tasks: [done]/[total] | Tests: [count] passing
 Agents used: [list] | Verdict: [Reality Checker result]
+Metric loops run: [count] | Avg iterations: [N]
 Remaining: [any NEEDS WORK items]
 ```
 

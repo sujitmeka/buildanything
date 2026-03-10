@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 # buildanything: SessionStart hook
 # Re-injects orchestrator identity after context compaction, resume, or clear.
-# Modeled after superpowers' session-start pattern.
 
 # Check if a build pipeline is active by looking for .build-state.md
 BUILD_STATE=""
@@ -13,16 +12,27 @@ fi
 if [ -z "$BUILD_STATE" ]; then
   CONTEXT="buildanything plugin is installed. Use /buildanything:build to start a full product pipeline, or /buildanything:idea-sweep for parallel research."
 else
+  # Check if there's an active metric loop
+  METRIC_LOOP=""
+  if echo "$BUILD_STATE" | grep -q "Active Metric Loop"; then
+    METRIC_LOOP="
+ACTIVE METRIC LOOP DETECTED — You were mid-iteration when context compacted.
+1. Read commands/protocols/metric-loop.md to reload the loop protocol
+2. Find the 'Active Metric Loop' section in .build-state.md for your metric definition and score history
+3. Resume from the iteration indicated in the score log table
+4. Do NOT restart the loop from scratch — continue where you left off"
+  fi
+
   # Active build detected — re-inject full orchestrator context
   read -r -d '' CONTEXT << 'ORCHESTRATOR'
 BUILDANYTHING ORCHESTRATOR — ACTIVE BUILD DETECTED
 
-You are the Agents Orchestrator running the buildanything pipeline. You are NOT a solo developer. You coordinate specialist agents.
+You are the Agents Orchestrator running the buildanything pipeline. You are NOT a solo developer. You coordinate specialist agents using the Agent tool.
 
 CRITICAL RULES:
-1. You do NOT write implementation code yourself — you dispatch to specialist agents
+1. You do NOT write implementation code yourself — you call the Agent tool to dispatch to specialist agents
 2. You follow phase gates — no advancing without quality gate approval
-3. Every task goes through Dev→Test→Review loops
+3. Every phase uses metric-driven iteration loops (commands/protocols/metric-loop.md)
 4. You must re-read commands/build.md if you are unsure of the process
 
 YOUR CURRENT STATE (from docs/plans/.build-state.md):
@@ -30,12 +40,14 @@ ORCHESTRATOR
 
   CONTEXT="${CONTEXT}
 ${BUILD_STATE}
+${METRIC_LOOP}
 
 NEXT ACTIONS:
 1. Re-read commands/build.md to reload the full orchestrator process
-2. Resume from the phase and step indicated in your state above
-3. Use TodoWrite to track task progress
-4. Dispatch work to specialist agents — do not implement directly"
+2. Re-read commands/protocols/metric-loop.md if you are mid-loop
+3. Resume from the phase and step indicated in your state above
+4. Use TodoWrite to track task progress
+5. Dispatch work to specialist agents — do not implement directly"
 fi
 
 # Output as additional_context for Claude Code

@@ -18,7 +18,7 @@
         "hooks": [
           {
             "type": "prompt",
-            "prompt": "ORCHESTRATOR STATE SAVE — Context is about to be compacted. If you are running the /buildanything:build pipeline, you MUST do these things NOW before your context is lost:\n\n1. Use TodoWrite to update all task statuses (complete, in-progress, pending)\n2. Write `docs/plans/.build-state.md` with: current phase, step, task progress, retry counter, agents used, pending quality gate results\n3. The next thing that will happen after compaction is the SessionStart hook will fire and re-inject your orchestrator identity. But you MUST save state NOW or your progress tracking is lost."
+            "prompt": "ORCHESTRATOR STATE SAVE — Context is about to be compacted. If you are running the /buildanything:build pipeline, you MUST do these things NOW before your context is lost:\n\n1. Use TodoWrite to update all task statuses (complete, in-progress, pending)\n2. Write `docs/plans/.build-state.md` with ALL of the following:\n   - Current phase and step\n   - Task progress (which tasks done, which in progress)\n   - If you are in a metric loop: the Active Metric Loop section with metric definition, current iteration, full score history table, and what action to take next\n   - Agents used so far\n   - Whether running in autonomous mode\n3. The next thing after compaction is the SessionStart hook re-injecting your state. Save EVERYTHING or you lose your metric loop progress."
           }
         ]
       }
