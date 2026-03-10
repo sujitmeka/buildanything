@@ -8,6 +8,11 @@ if [ -f "docs/plans/.build-state.md" ]; then
   BUILD_STATE=$(cat "docs/plans/.build-state.md")
 fi
 
+# Skip if the build is already complete
+if echo "$BUILD_STATE" | grep -q "Phase: 6 COMPLETE"; then
+  BUILD_STATE=""
+fi
+
 # If no active build, just provide a minimal reminder
 if [ -z "$BUILD_STATE" ]; then
   CONTEXT="buildanything plugin is installed. Use /buildanything:build to start a full product pipeline, or /buildanything:idea-sweep for parallel research."
@@ -23,11 +28,33 @@ ACTIVE METRIC LOOP DETECTED — You were mid-iteration when context compacted.
 4. Do NOT restart the loop from scratch — continue where you left off"
   fi
 
-  # Active build detected — re-inject full orchestrator context
+  # Check for resume point
+  RESUME_POINT=""
+  if echo "$BUILD_STATE" | grep -q "Resume Point"; then
+    RESUME_POINT="
+RESUME POINT DETECTED — This build can be continued with /buildanything:build --resume.
+The state file contains a structured Resume Point with phase, step, and task progress.
+Reset dispatches_since_save to 0 (fresh context window)."
+  fi
+
+  # Active build detected — inject orchestrator identity and rules directly
+  # These are inlined so they survive context compaction (no file re-read required)
   read -r -d '' CONTEXT << 'ORCHESTRATOR'
 BUILDANYTHING ORCHESTRATOR — ACTIVE BUILD DETECTED
 
-You are the Agents Orchestrator running the buildanything pipeline. You are NOT a solo developer. You coordinate specialist agents using the Agent tool.
+<HARD-GATE>
+YOU ARE AN ORCHESTRATOR. YOU COORDINATE AGENTS. YOU DO NOT WRITE CODE.
+Every step below tells you to call the Agent tool. DO IT. Do not role-play as the agent. Do not write implementation code yourself. Do not skip the Agent tool call "because it's faster."
+"Launch an agent" = call the Agent tool (the actual tool in your toolbar, the one that spawns a subprocess).
+For implementation agents, set mode: "bypassPermissions".
+For parallel work, put multiple Agent tool calls in ONE message.
+</HARD-GATE>
+
+ORCHESTRATOR DISCIPLINE:
+YOU ARE A DISPATCHER, NOT A DOER. Your context is precious — protect it.
+- TWO agent types: Research/analysis agents (keep full output — it's your decision-making input). Implementation agents (keep summary only — the code is in the repo).
+- NEVER read source code, write code, or debug yourself — spawn agents for all implementation work.
+- Save research outputs to docs/plans/ so you can reference files later instead of holding everything in context.
 
 CRITICAL RULES:
 1. You do NOT write implementation code yourself — you call the Agent tool to dispatch to specialist agents
@@ -41,13 +68,18 @@ ORCHESTRATOR
   CONTEXT="${CONTEXT}
 ${BUILD_STATE}
 ${METRIC_LOOP}
+${RESUME_POINT}
 
 NEXT ACTIONS:
 1. Re-read commands/build.md to reload the full orchestrator process
 2. Re-read commands/protocols/metric-loop.md if you are mid-loop
-3. Resume from the phase and step indicated in your state above
-4. Use TodoWrite to track task progress
-5. Dispatch work to specialist agents — do not implement directly"
+3. Re-read docs/plans/sprint-tasks.md for task list and acceptance criteria
+4. Re-read docs/plans/architecture.md for architecture context
+5. Re-read CLAUDE.md for build decisions
+6. Re-read docs/plans/learnings.md if it exists (patterns and pitfalls from previous builds)
+7. Rebuild TodoWrite from docs/plans/.build-state.md (TodoWrite does NOT survive compaction)
+8. Resume from the phase and step indicated in your state above
+9. Dispatch work to specialist agents — do not implement directly"
 fi
 
 # Output as additional_context for Claude Code
