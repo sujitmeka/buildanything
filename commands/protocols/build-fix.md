@@ -4,7 +4,7 @@ You are the orchestrator. A build, type-check, or lint check has failed. Do NOT 
 
 ## When to Use
 
-When the Verification Protocol reports FAIL on Build, Type-Check, or Lint checks. Also usable during Phase 3 scaffolding or Phase 4 implementation when builds break.
+When the Verification Protocol reports FAIL on Build, Type-Check, or Lint checks. Also usable during Phase 4 scaffolding or Phase 5 implementation when builds break.
 
 ## Step 1: Extract First Error
 

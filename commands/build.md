@@ -91,7 +91,7 @@ When spawning agents in sequence (e.g., architect → implementer → reviewer),
 2. **Previous agent's output** — what the upstream agent produced (if any)
 3. **Acceptance criteria** — what "done" looks like for THIS agent
 
-For implementation agents (Phase 4+): Do NOT paste the entire Design Document or Architecture Document. Extract the relevant sections only. For research and architecture agents (Phases 1-2): pass the full document — these agents need complete context to do their analysis.
+For implementation agents (Phase 5+): Do NOT paste the entire Design Document or Architecture Document. Extract the relevant sections only. For research and architecture agents (Phases 1-2): pass the full document — these agents need complete context to do their analysis.
 
 ### Complexity Routing (Advisory)
 
@@ -169,7 +169,7 @@ Autonomous mode: Log checklist to `docs/plans/build-log.md`. Create `.env.exampl
 ### Step 0.3 — Initialize
 
 0. Create `docs/plans/` directory if it doesn't exist (greenfield projects won't have it).
-1. Create a TodoWrite checklist with Phases 0-6.
+1. Create a TodoWrite checklist with Phases 0-7.
 2. Create `docs/plans/.build-state.md` as a single write with ALL of the following: phase and step (`Phase: 0 — Starting`), input (`[build request]`), context level (`[classification]`), prerequisites (`[status]`), dispatch counter (`dispatches_since_save: 0, last_save: Phase 0`), and a `## Resume Point` section with: phase, step, autonomous mode flag, completed tasks (none), git branch name.
 3. Go to Phase 1 (or Phase 2 if context level is "Full design").
 
@@ -294,21 +294,79 @@ Update TodoWrite and `docs/plans/.build-state.md`.
 
 ---
 
-## Phase 3: Foundation
+## Phase 3: Design & Visual Identity
 
-### Step 3.1 — Scaffolding
+**Goal**: Transform architecture into a research-backed visual design system, proven with Playwright screenshots. Fully autonomous — agents research, decide, and iterate without user input.
+
+**Skip if** the project has no user-facing frontend (CLI tools, pure APIs, backend services).
+
+<HARD-GATE>
+UI/UX IS THE PRODUCT. This phase is a full peer to Architecture and Build — not a footnote, not an afterthought, not a "nice to have." Do NOT skip, compress, or rush this phase for any reason. The agents must research real competitors and award-winning sites, make deliberate visual choices backed by that research, build proof screens, and iterate with Playwright-verified visual QA before a single line of product code is written.
+
+Phase 4 (Foundation) WILL NOT START without `docs/plans/visual-design-spec.md`. If it does not exist, return here.
+</HARD-GATE>
+
+### Step 3.1 — Design Research (2 agents, parallel, both use Playwright)
+
+Follow the Design Protocol (`commands/protocols/design.md`), Step 3.1.
+
+Call the Agent tool 2 times in one message:
+
+1. Description: "Competitive visual audit" — Prompt: "Research the top 5-8 competitors/analogues for: [product description]. Use Playwright to screenshot each site (desktop 1920x1080 + mobile 375x812). Screenshot standout components (hero, cards, forms, nav, CTAs). Save to docs/plans/design-references/competitors/. Analyze visual language: colors, typography, spacing, what feels premium vs cheap. Rank by visual quality. DESIGN DOC: [paste]."
+
+2. Description: "Design inspiration mining" — Prompt: "Search Awwwards.com, Godly.website, SiteInspire for award-winning sites in category: [product category]. Use Playwright to screenshot top 5-8 results + standout components. Save to docs/plans/design-references/inspiration/. Identify visual trends, what separates best-in-class from generic. DESIGN DOC: [paste]."
+
+After both return, synthesize a **Design Research Brief** to `docs/plans/design-research.md`. Include all screenshot paths.
+
+### Step 3.2 — Design Direction (2 agents, sequential)
+
+Follow the Design Protocol (`commands/protocols/design.md`), Step 3.2.
+
+1. Call the Agent tool — description: "UX architecture" — Prompt: "Create structural design foundation. INPUTS: frontend architecture section from architecture.md [paste], Design Research Brief [paste], reference screenshot paths [list], user persona [paste]. OUTPUT: information architecture, layout strategy, component hierarchy, responsive approach, interaction patterns. Base decisions on competitive research, not generic patterns."
+
+2. Call the Agent tool — description: "Visual design spec" — Prompt: "Create the Visual Design Spec with AUTONOMOUS decisions — pick the single best direction, do not present options. INPUTS: UX foundation [paste previous output], Design Research Brief [paste], reference screenshot paths [list], user persona [paste]. OUTPUT: color system (with hex, light+dark), typography (Google Fonts, mathematical scale), 8px spacing system, tinted shadow system, border radius, animation/motion, component styles with ALL states. Every choice must cite the research. Apply anti-AI-template rules from the Design Protocol. Save to docs/plans/visual-design-spec.md."
+
+### Step 3.3 — Proof Screens (1 implementation agent)
+
+Call the Agent tool — description: "Build proof screens" — mode: "bypassPermissions" — prompt: "[COMPLEXITY: L] Implement 2-3 proof screens (landing/hero, main app view, key form). INPUTS: Visual Design Spec [paste], UX foundation [paste relevant sections], reference screenshots [list paths — these are your visual targets]. Use EXACT colors, fonts, spacing from spec. Real styled responsive pages, not wireframes. Include hover/focus states, transitions. Commit: 'feat: proof screens for design validation'."
+
+### Step 3.4 — Visual QA Loop (Playwright + Metric Loop)
+
+Run the Metric Loop Protocol (`commands/protocols/metric-loop.md`) using the measurement criteria from the Design Protocol (`commands/protocols/design.md`, Step 3.4).
+
+Measurement: Playwright screenshots of proof screens (desktop + mobile). Design critic agent scores 0-100 across 6 dimensions: spacing/alignment, typography hierarchy, color harmony, component polish, responsive quality, originality (anti-AI-template check). Receives screenshots + Visual Design Spec + reference screenshots.
+
+**Target: 80. Max 5 iterations.** On stall: accept if >= 65, log warning below 65.
+
+### Step 3.5 — Autonomous Quality Gate
+
+Log to `docs/plans/build-log.md`: final screenshot paths, score history table, design decisions, originality score. No user pause. Proceed to Phase 4.
+
+**Compaction checkpoint:** Check `dispatches_since_save` in `docs/plans/.build-state.md`. If >= 8: save ALL state (current phase, task statuses, metric loop scores, decisions) to `docs/plans/.build-state.md`. Reset `dispatches_since_save` to 0. TodoWrite does NOT survive compaction — rebuild it from this state file on resume.
+
+---
+
+## Phase 4: Foundation
+
+<HARD-GATE>
+Before starting Phase 4: Phase 2 must be approved AND Phase 3 must have produced `docs/plans/visual-design-spec.md`.
+If visual-design-spec.md does not exist, DO NOT PROCEED. Return to Phase 3.
+Step 4.2 (Design System) MUST implement from visual-design-spec.md — not generic architecture tokens.
+</HARD-GATE>
+
+### Step 4.1 — Scaffolding
 
 Call the Agent tool — description: "Project scaffolding" — mode: "bypassPermissions" — prompt: "[COMPLEXITY: M] Set up the project from this architecture: [paste]. Create directory structure, dependencies, build tooling, linting config, test framework with one passing test, .gitignore, .env.example. Commit: 'feat: initial scaffolding'."
 
-### Step 3.2 — Design System (frontend only)
+### Step 4.2 — Design System (frontend only)
 
-Call the Agent tool — description: "Design system setup" — mode: "bypassPermissions" — prompt: "Implement design system foundation from this architecture: [paste frontend section]. Create CSS tokens, base layout components, core UI primitives. Commit: 'feat: design system'."
+Call the Agent tool — description: "Design system setup" — mode: "bypassPermissions" — prompt: "Implement the design system from the Visual Design Spec: [paste from docs/plans/visual-design-spec.md]. Create CSS tokens matching the spec's color system, typography scale, spacing system, shadow/elevation tokens, and base layout components. Reference the proof screens from Phase 3 as implementation targets. Commit: 'feat: design system'."
 
-### Step 3.3 — Metric Loop: Scaffold Health
+### Step 4.3 — Metric Loop: Scaffold Health
 
 Run the Metric Loop Protocol. Define a metric: builds clean, tests pass, lint clean, structure matches architecture. Max 3 iterations.
 
-### Step 3.4 — Verification Gate
+### Step 4.4 — Verification Gate
 
 Run the Verification Protocol (`commands/protocols/verify.md`). Critical rules (survive compaction):
 - ONE agent runs all 6 checks sequentially: Build → Type-Check → Lint → Test → Security → Diff Review. Stop on first FAIL.
@@ -318,7 +376,7 @@ Run the Verification Protocol (`commands/protocols/verify.md`). Critical rules (
 
 Call the Agent tool — description: "Verify scaffolding" — mode: "bypassPermissions" — prompt: "Run the Verification Protocol. Execute all 6 checks sequentially, stop on first failure. Report: VERIFY: PASS or VERIFY: FAIL with details."
 
-Do not proceed to Phase 4 until verification passes.
+Do not proceed to Phase 5 until verification passes.
 
 Update TodoWrite and state.
 
@@ -326,23 +384,23 @@ Update TodoWrite and state.
 
 ---
 
-## Phase 4: Build — Metric-Driven Dev Loops
+## Phase 5: Build — Metric-Driven Dev Loops
 
 <HARD-GATE>
-Before starting: Phase 2 must be approved, Phase 3 must pass. You MUST call the Agent tool for EVERY task. No exceptions.
+Before starting: Phase 2 must be approved, Phase 3 must produce docs/plans/visual-design-spec.md, Phase 4 must pass. You MUST call the Agent tool for EVERY task. No exceptions.
 </HARD-GATE>
 
 Expand TodoWrite with each sprint task.
 
 **For EACH task:**
 
-### Step 4.1 — Implement
+### Step 5.1 — Implement
 
 Call the Agent tool — description: "[task name]" — mode: "bypassPermissions" — prompt: "TASK: [task description + acceptance criteria]. HANDOFF — Architecture section: [paste ONLY the relevant section from architecture.md]. Design section: [paste ONLY the relevant section from the design doc]. Previous task output: [what the last completed task produced, if relevant]. Implement fully with real code and tests. Commit: 'feat: [task]'. Report what you built, files changed, and test results."
 
 Pick the right developer framing: frontend, backend, AI, etc. Set `[COMPLEXITY: S/M/L]` based on the task's Size from sprint-tasks.md.
 
-### Step 4.1b — Cleanup (De-Sloppify)
+### Step 5.1b — Cleanup (De-Sloppify)
 
 Follow the Cleanup Protocol (`commands/protocols/cleanup.md`). Critical rules (survive compaction):
 [COMPLEXITY: S]
@@ -354,11 +412,11 @@ Follow the Cleanup Protocol (`commands/protocols/cleanup.md`). Critical rules (s
 
 Call the Agent tool — description: "Cleanup [task name]" — mode: "bypassPermissions" — with the list of files changed and the task's acceptance criteria.
 
-### Step 4.2 — Metric Loop: Task Quality
+### Step 5.2 — Metric Loop: Task Quality
 
 Run the Metric Loop Protocol on the task implementation. Define a metric based on the task's acceptance criteria. Max 5 iterations.
 
-### Step 4.3 — Loop Exit
+### Step 5.3 — Loop Exit
 
 On target met: mark task complete in TodoWrite, report "Task X/N: [name] — COMPLETE (score: [final], iterations: [count])".
 
@@ -368,7 +426,7 @@ On stall or max iterations:
 
 After each task: update TodoWrite and `docs/plans/.build-state.md`.
 
-### Step 4.4 — Post-Task Verification
+### Step 5.4 — Post-Task Verification
 
 Run the Verification Protocol (`commands/protocols/verify.md`) to catch regressions. If FAIL, fix before starting the next task.
 
@@ -376,13 +434,13 @@ Run the Verification Protocol (`commands/protocols/verify.md`) to catch regressi
 
 ---
 
-## Phase 5: Harden — Metric-Driven Hardening
+## Phase 6: Harden — Metric-Driven Hardening
 
-### Step 5.0 — Pre-Hardening Verification
+### Step 6.0 — Pre-Hardening Verification
 
 Run the Verification Protocol (`commands/protocols/verify.md`). ONE agent, 6 sequential checks (Build → Type → Lint → Test → Security → Diff), stop on first FAIL. Max 3 fix attempts. All checks must pass before starting expensive audit agents — do not waste audit agents on code that doesn't build or pass tests.
 
-### Step 5.1 — Initial Audit (4 agents in parallel, ONE message)
+### Step 6.1 — Initial Audit (4 agents in parallel, ONE message)
 
 Call the Agent tool 4 times in one message:
 
@@ -394,23 +452,108 @@ Call the Agent tool 4 times in one message:
 
 4. Description: "Security audit" — Prompt: "Security review: auth, input validation, data exposure, dependency vulnerabilities. Report findings with severity."
 
-### Step 5.1b — Eval Harness
+### Step 6.1b — Eval Harness
 
-Run the Eval Harness Protocol (`commands/protocols/eval-harness.md`). Define 8-15 concrete, executable eval cases from the audit findings and architecture doc. Run the eval agent. Record baseline pass rate. CRITICAL and HIGH failures feed into the metric loop in Step 5.2 as specific issues to fix.
+Run the Eval Harness Protocol (`commands/protocols/eval-harness.md`). Define 8-15 concrete, executable eval cases from the audit findings and architecture doc. Run the eval agent. Record baseline pass rate. CRITICAL and HIGH failures feed into the metric loop in Step 6.2 as specific issues to fix.
 
-### Step 5.2 — Metric Loop: Hardening Quality
+### Step 6.2 — Metric Loop: Hardening Quality
 
 Run the Metric Loop Protocol on the full codebase using audit findings as initial input. Define a composite metric based on what this project needs. Max 4 iterations.
 
 When fixing, dispatch to the RIGHT specialist. Security → security agent. Accessibility → frontend agent. Don't send everything to one agent.
 
-### Step 5.2b — Eval Re-run
+### Step 6.2b — Eval Re-run
 
 Re-run the Eval Harness after the metric loop exits. All CRITICAL eval cases must now pass. If any CRITICAL case still fails, include it as evidence for the Reality Checker.
 
-### Step 5.3 — Reality Check
+### Step 6.2c — E2E Testing (3 mandatory iterations)
 
-Call the Agent tool — description: "Final verdict" — prompt: "You are the Reality Checker. Default: NEEDS WORK. The hardening loop reached score [final_score] after [iterations] iterations. Score history: [paste table]. Review all evidence. Eval harness results: [baseline pass rate] → [final pass rate]. CRITICAL failures remaining: [list or none]. Verdict: PRODUCTION READY or NEEDS WORK with specifics."
+<HARD-GATE>
+ALL 3 ITERATIONS ARE MANDATORY. Do NOT stop after iteration 1 even if all tests pass. The purpose of 3 runs is to catch flaky tests, timing-dependent failures, and race conditions that only surface on repeated execution. Skip this step ONLY if the project has no user-facing frontend.
+</HARD-GATE>
+
+Generate and execute end-to-end tests using Playwright against the running application. Tests cover critical user journeys derived from the design doc and architecture.
+
+**Iteration 1 — Generate & Run:**
+
+Call the Agent tool — description: "E2E test generation" — mode: "bypassPermissions" — prompt:
+
+"[COMPLEXITY: L] Generate and run end-to-end Playwright tests for this application.
+
+INPUTS:
+- Architecture doc (user flows and API contracts): [paste relevant sections from docs/plans/architecture.md]
+- Design doc (core user journeys): [paste relevant sections]
+- Visual Design Spec (component selectors and page structure): [paste relevant sections from docs/plans/visual-design-spec.md]
+
+REQUIREMENTS:
+1. Identify 5-10 critical user journeys from the design doc (auth flows, core feature flows, data entry, navigation)
+2. Use Page Object Model pattern — one page object per major view
+3. Use data-testid selectors (add them to components if missing)
+4. Wait for API responses, NEVER use arbitrary timeouts (no waitForTimeout)
+5. Capture screenshots at critical verification points
+6. Configure multi-browser: Chromium + Firefox + WebKit
+7. Set up playwright.config.ts with: fullyParallel, retries: 0 (we handle retries ourselves), screenshot: 'only-on-failure', video: 'retain-on-failure', trace: 'on-first-retry'
+8. Run all tests. Report: total, passed, failed, with failure details and screenshot paths.
+9. Commit: 'test: e2e test suite for critical user journeys'
+
+Test priority:
+- CRITICAL: Auth, core feature happy path, data submission, payment/transaction flows
+- HIGH: Search, filtering, navigation, error states
+- MEDIUM: Responsive layout, animations, edge cases"
+
+Record results: total tests, pass count, fail count, failure details. Log to `docs/plans/.build-state.md` under `## E2E Testing`:
+
+```
+| Iter | Total | Passed | Failed | Flaky | Top Failure |
+|------|-------|--------|--------|-------|-------------|
+| 1    | ...   | ...    | ...    | ...   | ...         |
+```
+
+**Iteration 2 — Fix & Re-run:**
+
+Call the Agent tool — description: "E2E fix iteration 2" — mode: "bypassPermissions" — prompt:
+
+"[COMPLEXITY: M] Fix E2E test failures and re-run the full suite.
+
+ITERATION 1 RESULTS: [paste failure details — test names, error messages, screenshot paths]
+
+For each failure:
+1. Diagnose: Is this a real bug, a flaky test, or a missing data-testid?
+2. Real bugs: Fix the application code
+3. Flaky tests: Add proper waits, fix race conditions, improve selectors
+4. Missing selectors: Add data-testid attributes to components
+5. Do NOT delete or skip failing tests — fix them
+
+Re-run ALL tests (not just previously failing ones). Report results.
+Commit fixes: 'fix: e2e test failures iteration 2'"
+
+Record results in the E2E table. Identify any tests that passed in iteration 1 but failed in iteration 2 — these are flaky candidates.
+
+**Iteration 3 — Final Stability Run:**
+
+Call the Agent tool — description: "E2E stability run" — mode: "bypassPermissions" — prompt:
+
+"[COMPLEXITY: M] Final E2E stability run — iteration 3 of 3.
+
+PREVIOUS RESULTS:
+- Iteration 1: [pass/fail counts]
+- Iteration 2: [pass/fail counts]
+- Flaky candidates: [tests that had inconsistent results across iterations]
+
+REQUIREMENTS:
+1. Run ALL tests with --repeat-each=3 to detect flakiness (each test runs 3 times within this iteration)
+2. Any test failing inconsistently across the 3 sub-runs: quarantine with test.fixme() and file path + reason
+3. Fix any remaining consistent failures
+4. Generate final report with: total journeys, pass rate, flaky count, quarantined tests
+5. Commit: 'test: e2e stability fixes iteration 3'
+
+PASS CRITERIA: 95%+ pass rate across all tests. Quarantined flaky tests do not count against pass rate but must be logged."
+
+Record final results. Include in Reality Checker evidence.
+
+### Step 6.3 — Reality Check
+
+Call the Agent tool — description: "Final verdict" — prompt: "You are the Reality Checker. Default: NEEDS WORK. The hardening loop reached score [final_score] after [iterations] iterations. Score history: [paste table]. Review all evidence. Eval harness results: [baseline pass rate] → [final pass rate]. E2E test results: [paste E2E table — 3 iterations, final pass rate, quarantined count]. CRITICAL failures remaining: [list or none]. Verdict: PRODUCTION READY or NEEDS WORK with specifics."
 
 <HARD-GATE>Do NOT self-approve. Reality Checker must give the verdict.</HARD-GATE>
 
@@ -421,21 +564,21 @@ Call the Agent tool — description: "Final verdict" — prompt: "You are the Re
 
 ---
 
-## Phase 6: Ship
+## Phase 7: Ship
 
-### Step 6.0 — Pre-Ship Verification
+### Step 7.0 — Pre-Ship Verification
 
-Final verification gate. Run the Verification Protocol (`commands/protocols/verify.md`). ONE agent, 6 sequential checks (Build → Type → Lint → Test → Security → Diff), stop on first FAIL. Max 3 fix attempts. All checks must pass before documenting and shipping. If FAIL persists, return to Phase 5 for targeted fixes.
+Final verification gate. Run the Verification Protocol (`commands/protocols/verify.md`). ONE agent, 6 sequential checks (Build → Type → Lint → Test → Security → Diff), stop on first FAIL. Max 3 fix attempts. All checks must pass before documenting and shipping. If FAIL persists, return to Phase 6 for targeted fixes.
 
-### Step 6.1 — Documentation
+### Step 7.1 — Documentation
 
 Call the Agent tool — description: "Documentation" — mode: "bypassPermissions" — prompt: "Write project docs: README with setup/architecture/usage, API docs if applicable, deployment notes. Commit: 'docs: project documentation'."
 
-### Step 6.2 — Metric Loop: Documentation Quality
+### Step 7.2 — Metric Loop: Documentation Quality
 
 Run the Metric Loop Protocol on documentation. Define a metric based on completeness and whether a new developer could follow the README. Max 3 iterations.
 
-### Step 6.3 — Record Learnings
+### Step 7.3 — Record Learnings
 
 Append to `docs/plans/learnings.md` (create if it doesn't exist). Review the build and record 3-5 learnings:
 
@@ -457,4 +600,4 @@ Metric loops run: [count] | Avg iterations: [N]
 Remaining: [any NEEDS WORK items]
 ```
 
-Mark all TodoWrite items complete. Update `docs/plans/.build-state.md`: "Phase: 6 COMPLETE."
+Mark all TodoWrite items complete. Update `docs/plans/.build-state.md`: "Phase: 7 COMPLETE."

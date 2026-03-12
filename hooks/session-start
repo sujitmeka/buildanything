@@ -9,8 +9,19 @@ if [ -f "docs/plans/.build-state.md" ]; then
 fi
 
 # Skip if the build is already complete
-if echo "$BUILD_STATE" | grep -q "Phase: 6 COMPLETE"; then
+if echo "$BUILD_STATE" | grep -q "Phase: 7 COMPLETE"; then
   BUILD_STATE=""
+fi
+
+# Check if we're past Phase 3 but missing design artifacts
+if [ -n "$BUILD_STATE" ]; then
+  CURRENT_PHASE=$(echo "$BUILD_STATE" | grep -oP 'Phase: \K[0-9]+' | head -1)
+  if [ "$CURRENT_PHASE" -ge 4 ] 2>/dev/null && [ ! -f "docs/plans/visual-design-spec.md" ]; then
+    DESIGN_WARNING="
+DESIGN GATE VIOLATION: Current phase is ${CURRENT_PHASE} but docs/plans/visual-design-spec.md does not exist.
+Phase 3 (Design & Visual Identity) may have been skipped. DO NOT proceed with Foundation or Build.
+Return to Phase 3 and produce visual-design-spec.md before continuing."
+  fi
 fi
 
 # If no active build, just provide a minimal reminder
@@ -69,17 +80,19 @@ ORCHESTRATOR
 ${BUILD_STATE}
 ${METRIC_LOOP}
 ${RESUME_POINT}
+${DESIGN_WARNING}
 
 NEXT ACTIONS:
 1. Re-read commands/build.md to reload the full orchestrator process
 2. Re-read commands/protocols/metric-loop.md if you are mid-loop
-3. Re-read docs/plans/sprint-tasks.md for task list and acceptance criteria
-4. Re-read docs/plans/architecture.md for architecture context
-5. Re-read CLAUDE.md for build decisions
-6. Re-read docs/plans/learnings.md if it exists (patterns and pitfalls from previous builds)
-7. Rebuild TodoWrite from docs/plans/.build-state.md (TodoWrite does NOT survive compaction)
-8. Resume from the phase and step indicated in your state above
-9. Dispatch work to specialist agents — do not implement directly"
+3. Re-read commands/protocols/design.md if you are in Phase 3 (Design & Visual Identity)
+4. Re-read docs/plans/sprint-tasks.md for task list and acceptance criteria
+5. Re-read docs/plans/architecture.md for architecture context
+6. Re-read CLAUDE.md for build decisions
+7. Re-read docs/plans/learnings.md if it exists (patterns and pitfalls from previous builds)
+8. Rebuild TodoWrite from docs/plans/.build-state.md (TodoWrite does NOT survive compaction)
+9. Resume from the phase and step indicated in your state above
+10. Dispatch work to specialist agents — do not implement directly"
 fi
 
 # Output as additional_context for Claude Code

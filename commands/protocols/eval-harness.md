@@ -1,6 +1,6 @@
 # Eval Harness Protocol
 
-You are the orchestrator. Phase 5.1 audits are complete. Before running the metric loop, define formal eval cases that are concrete, executable, and reproducible. This replaces subjective narrative audits with deterministic pass/fail tests.
+You are the orchestrator. Phase 6.1 audits are complete. Before running the metric loop, define formal eval cases that are concrete, executable, and reproducible. This replaces subjective narrative audits with deterministic pass/fail tests.
 
 ## How This Differs from the Metric Loop
 
@@ -12,7 +12,7 @@ They are complementary: eval harness failures become specific issues for the met
 ## Step 0: Define Eval Cases
 
 YOU (the orchestrator) define eval cases based on:
-- Audit findings from Phase 5.1 (highest-severity items first)
+- Audit findings from Phase 6.1 (highest-severity items first)
 - Architecture doc (API contracts, auth model, data validation rules)
 - Design doc (core user flows, edge cases)
 
@@ -46,11 +46,11 @@ Count PASS cases / total cases. This is the eval baseline. Record to `docs/plans
 
 ## Step 3: Feed into Metric Loop
 
-Any FAIL case with severity CRITICAL or HIGH becomes a candidate issue for the Phase 5.2 metric loop. Pass the failure details (case name, action, expected vs actual) as context when defining the metric loop's metric.
+Any FAIL case with severity CRITICAL or HIGH becomes a candidate issue for the Phase 6.2 metric loop. Pass the failure details (case name, action, expected vs actual) as context when defining the metric loop's metric.
 
 ## Step 4: Re-evaluate After Metric Loop
 
-After the Phase 5.2 metric loop exits, re-run the eval harness. All CRITICAL cases must now pass. If any CRITICAL case still fails, flag it for the Reality Checker in Step 5.3.
+After the Phase 6.2 metric loop exits, re-run the eval harness. All CRITICAL cases must now pass. If any CRITICAL case still fails, flag it for the Reality Checker in Step 6.3.
 
 ---
 

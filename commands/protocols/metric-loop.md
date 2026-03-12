@@ -30,9 +30,9 @@ Then create a score log table:
 
 When starting a new metric loop, REPLACE the previous Active Metric Loop section (if any). There is only ever ONE active metric loop. Previous loop results should already be recorded in their phase's section above. When the loop completes (Step 2 exit), rename the section header from `## Active Metric Loop` to `## Completed Metric Loop — [Phase N]` and leave it for historical reference.
 
-If you are in Phase 4, also record the current sub-step for the overall task cycle (not all of these are within the metric loop itself):
+If you are in Phase 5, also record the current sub-step for the overall task cycle (not all of these are within the metric loop itself):
 ```
-Sub-step: [4.1 Implement | 4.1b Cleanup | 4.2 Metric Loop | 4.3 Loop Exit | 4.4 Verify]
+Sub-step: [5.1 Implement | 5.1b Cleanup | 5.2 Metric Loop | 5.3 Loop Exit | 5.4 Verify]
 ```
 This tells the orchestrator exactly where to resume after context compaction.
 

@@ -292,6 +292,16 @@ document.addEventListener('DOMContentLoaded', () => {
 - **Cards**: Subtle hover effects, clear clickable areas
 ```
 
+## Research-Driven Architecture
+
+When provided with a Design Research Brief and competitor/inspiration screenshots:
+- Study reference screenshots BEFORE making structural decisions
+- Base layout strategy on what performed best in the competitive analysis — not generic patterns
+- If the top competitors all use a specific navigation pattern or layout approach, acknowledge it and either adopt (with justification) or consciously differentiate
+- Information architecture should reflect how the best sites in this category organize content
+- Component hierarchy should consider what components the reference sites use effectively
+- Your structural decisions directly influence the visual quality downstream — poor IA creates ugly interfaces regardless of visual polish
+
 ## 🔄 Your Workflow Process
 
 ### Step 1: Analyze Project Requirements
