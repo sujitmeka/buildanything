@@ -12,6 +12,7 @@ const OFFICIAL_PLUGINS = [
   { name: "pr-review-toolkit", desc: "silent-failure-hunter, code-simplifier, type-design-analyzer" },
   { name: "code-review", desc: "final code review passes" },
   { name: "commit-commands", desc: "clean git commits" },
+  { name: "playwright", desc: "browser automation for design research and visual QA" },
 ];
 
 function run(command, args) {

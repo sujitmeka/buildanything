@@ -1,9 +1,17 @@
 {
   "name": "buildanything",
-  "version": "1.5.0",
+  "version": "1.6.0",
   "description": "One command to build an entire product. 73 specialist agents orchestrated into a full engineering pipeline — from idea to shipped, tested, reviewed code.",
   "author": {
     "name": "Sujit"
   },
-  "keywords": ["orchestration", "agents", "full-stack", "one-shot", "build", "testing", "architecture"]
+  "keywords": [
+    "orchestration",
+    "agents",
+    "full-stack",
+    "one-shot",
+    "build",
+    "testing",
+    "architecture"
+  ]
 }
