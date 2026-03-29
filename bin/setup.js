@@ -86,27 +86,45 @@ function main() {
   }
 
   // Install agent-browser for behavioral verification
-  console.log("  Installing agent-browser (behavioral testing)...");
-  process.stdout.write("    agent-browser... ");
+  console.log("\n  Installing agent-browser (behavioral testing)...");
+
+  // 1. Install the CLI globally
+  process.stdout.write("    CLI... ");
   const abCheck = run("which", ["agent-browser"]);
   if (abCheck) {
     console.log("already installed");
   } else {
     const abResult = run("npm", ["install", "-g", "agent-browser"]);
     if (abResult === null) {
-      console.log("failed (optional — install manually: npm i -g agent-browser)");
+      console.log("failed (install manually: npm i -g agent-browser)");
     } else {
-      // Install browser binary
-      run("agent-browser", ["install"]);
       console.log("installed");
     }
   }
 
-  // Install dogfood skill for autonomous exploratory testing
+  // 2. Download Chrome for Testing (first time only)
+  process.stdout.write("    Chrome browser... ");
+  const chromeResult = run("agent-browser", ["install"]);
+  if (chromeResult === null) {
+    console.log("skipped (run manually: agent-browser install)");
+  } else {
+    console.log("ready");
+  }
+
+  // 3. Install the agent-browser skill for AI coding assistants
+  process.stdout.write("    agent-browser skill... ");
+  const skillResult = run("npx", ["skills", "add", "vercel-labs/agent-browser"]);
+  if (skillResult === null) {
+    console.log("skipped (install manually: npx skills add vercel-labs/agent-browser)");
+  } else {
+    console.log("installed");
+  }
+
+  // 4. Install dogfood skill for autonomous exploratory testing
   process.stdout.write("    dogfood skill... ");
   const dfResult = run("npx", ["skills", "add", "vercel-labs/agent-browser", "--skill", "dogfood"]);
   if (dfResult === null) {
-    console.log("skipped (optional — install manually: npx skills add vercel-labs/agent-browser --skill dogfood)");
+    console.log("skipped (install manually: npx skills add vercel-labs/agent-browser --skill dogfood)");
   } else {
     console.log("installed");
   }
