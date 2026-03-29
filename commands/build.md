@@ -420,7 +420,7 @@ Expand TodoWrite with each sprint task.
 
 ### Step 5.1 — Implement
 
-Call the Agent tool — description: "[task name]" — mode: "bypassPermissions" — prompt: "TASK: [task description + acceptance criteria]. HANDOFF — Architecture section: [paste ONLY the relevant section from architecture.md]. Design section: [paste ONLY the relevant section from the design doc]. Previous task output: [what the last completed task produced, if relevant]. Implement fully with real code and tests. Commit: 'feat: [task]'. Report what you built, files changed, and test results."
+Call the Agent tool — description: "[task name]" — mode: "bypassPermissions" — prompt: "TASK: [task description + acceptance criteria]. HANDOFF — Architecture section: [paste ONLY the relevant section from architecture.md]. Design section: [paste ONLY the relevant section from the design doc]. Previous task output: [what the last completed task produced, if relevant]. For UI tasks: the living style guide at /design-system shows every component's exact styling and states — match it. Implement fully with real code and tests. Commit: 'feat: [task]'. Report what you built, files changed, and test results."
 
 Pick the right developer framing: frontend, backend, AI, etc. Set `[COMPLEXITY: S/M/L]` based on the task's Size from sprint-tasks.md.
 
@@ -490,7 +490,7 @@ Call the Agent tool 5 times in one message:
 
 4. Description: "Security audit" — Prompt: "Security review: auth, input validation, data exposure, dependency vulnerabilities. NFR targets: [paste security NFRs]. Report findings with severity."
 
-5. Description: "UX quality audit" — Prompt: "UX quality review of every user-facing page. NFR targets: [paste accessibility NFRs]. Check: loading states (every async action must show a loading indicator), error states (every form and API call must show user-friendly error feedback), empty states (every list/table must handle zero items gracefully), mobile responsiveness (test at 375px viewport — touch targets >= 44px, no horizontal scroll, readable text), form validation (inline feedback, not just alert()), transition smoothness (no layout shifts, no janky animations), visual consistency with docs/plans/visual-design-spec.md. Report issues with page, severity, and screenshot."
+5. Description: "UX quality audit" — Prompt: "UX quality review of every user-facing page. NFR targets: [paste accessibility NFRs]. First, screenshot the living style guide at /design-system as your reference for how components should look. Then review every product page and check: loading states (every async action must show a loading indicator), error states (every form and API call must show user-friendly error feedback), empty states (every list/table must handle zero items gracefully), mobile responsiveness (test at 375px viewport — touch targets >= 44px, no horizontal scroll, readable text), form validation (inline feedback, not just alert()), transition smoothness (no layout shifts, no janky animations), visual consistency (compare each page's components against the style guide — buttons, inputs, cards, colors, spacing should match). Report issues with page, severity, and screenshot."
 
 ### Step 6.1b — Eval Harness
 
