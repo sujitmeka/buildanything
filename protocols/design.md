@@ -173,7 +173,7 @@ Commit: 'feat: living style guide'
 
 ## Step 3.4 — Visual QA Loop (Playwright + Metric Loop)
 
-Run the Metric Loop Protocol (`commands/protocols/metric-loop.md`).
+Run the Metric Loop Protocol (`protocols/metric-loop.md`).
 
 **Metric definition for `.build-state.md`:**
 

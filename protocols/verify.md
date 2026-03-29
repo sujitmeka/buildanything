@@ -51,7 +51,7 @@ ONE AGENT, ONE PASS: The orchestrator spawns exactly ONE agent for the entire ve
 
 | Failed Check | Fix Strategy |
 |-------------|-------------|
-| Build / Type-Check / Lint | Run the Build-Fix Protocol (`commands/protocols/build-fix.md`). It isolates the first error, fixes it, rebuilds, detects cascade resolution, and reverts bad fixes automatically. |
+| Build / Type-Check / Lint | Run the Build-Fix Protocol (`protocols/build-fix.md`). It isolates the first error, fixes it, rebuilds, detects cascade resolution, and reverts bad fixes automatically. |
 | Test | Spawn fix agent: "Fix the failing test: [test name]. Read the test, read the implementation, fix the implementation — not the test — unless the test is wrong." |
 | Security | Spawn fix agent: "Resolve vulnerability: [advisory]. Update the dependency or apply the recommended remediation." |
 | Diff Review | Spawn fix agent: "Remove debug code / hardcoded secrets / regressions found in diff review: [details]." |

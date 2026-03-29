@@ -20,7 +20,7 @@ The reviewer must NEVER share a context window with the implementer. When the me
 ### 3. Verification Loop (6-Phase Gate)
 ECC runs Build → Type-Check → Lint → Test → Security-Scan → Diff-Review as a single compound check producing READY / NOT READY. Fast, deterministic, catches regressions before expensive audit agents run.
 
-**Where it applies:** After Phase 4 scaffolding, after every Phase 5 task, before Phase 6, before Phase 7. Could be a protocol file: `commands/protocols/verify.md`.
+**Where it applies:** After Phase 4 scaffolding, after every Phase 5 task, before Phase 6, before Phase 7. Could be a protocol file: `protocols/verify.md`.
 
 ### 4. Structured Handoff Documents
 ECC's orchestrate command passes scoped handoff docs between agents in a chain — not the full architecture dump, but only: (a) relevant architecture section, (b) results from the previous agent, (c) specific acceptance criteria. Reduces noise, improves agent focus.
@@ -39,7 +39,7 @@ ECC tracks tool call count and suggests compaction at phase boundaries rather th
 ### 6. Build-Fix Protocol (One Error at a Time)
 When builds break, don't dump all errors on a fix agent. Fix the FIRST error, rebuild, check if others cascade-resolved. Most build errors are cascading — fixing the root clears 5-10 downstream errors.
 
-**Where it applies:** Phase 4 scaffolding, Phase 5 when builds break mid-task. Could be a protocol: `commands/protocols/build-fix.md`.
+**Where it applies:** Phase 4 scaffolding, Phase 5 when builds break mid-task. Could be a protocol: `protocols/build-fix.md`.
 
 ### 7. Eval Harness Pattern
 Instead of subjective "audit" agents, define formal eval cases with pass@k metrics. "Does endpoint X return 401 without auth? Run 5 times, pass@5 required." More rigorous and reproducible than narrative audits.

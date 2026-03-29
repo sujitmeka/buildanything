@@ -69,7 +69,7 @@ When combining `--resume` with `--autonomous`: the current invocation's flags ta
 
 ### Metric Loop
 
-Every phase uses a **metric-driven iteration loop** to drive quality. Read the full protocol at `commands/protocols/metric-loop.md`. Critical rules (survive compaction):
+Every phase uses a **metric-driven iteration loop** to drive quality. Read the full protocol at `protocols/metric-loop.md`. Critical rules (survive compaction):
 
 1. YOU define a metric for this phase based on context (what you're building, what matters). The metric is NOT predefined.
 2. Spawn a **measurement agent** to score the artifact 0-100. Read its full output — it's analysis.
@@ -106,7 +106,7 @@ Tag agent prompts with `[COMPLEXITY: S/M/L]` based on task size from `docs/plans
 **Resuming?** If the input contains `--resume` OR if context was just compacted (SessionStart hook fired with active state):
 1. Read `docs/plans/.build-state.md` — verify it exists and has a Resume Point section.
    If `docs/plans/.build-state.md` does not exist or has no Resume Point, warn the user: 'No previous build state found. Starting fresh.' Then proceed to Step 0.1 as a new build.
-2. Re-read this file and all protocol files in `commands/protocols/`.
+2. Re-read this file and all protocol files in `protocols/`.
 3. Re-read `docs/plans/sprint-tasks.md`, `docs/plans/architecture.md`, and `CLAUDE.md`.
 4. Rebuild TodoWrite from the state file (TodoWrite does NOT survive compaction or session breaks).
 5. Reset `dispatches_since_save` to 0 (fresh context window).
@@ -177,7 +177,7 @@ Autonomous mode: Log checklist to `docs/plans/build-log.md`. Create `.env.exampl
 
 ### Step 1.1 — Brainstorming
 
-Follow the Brainstorm Protocol (`commands/protocols/brainstorm.md`).
+Follow the Brainstorm Protocol (`protocols/brainstorm.md`).
 
 In interactive mode: this is a conversation. Ask questions one at a time, propose approaches with trade-offs, let the user decide. Output: Design Document saved to `docs/plans/`.
 
@@ -288,11 +288,11 @@ After all 4 return, YOU synthesize into one Architecture Document. Save to `docs
 
 ### Step 2.3 — Metric Loop: Architecture Quality
 
-Run the Metric Loop Protocol (`commands/protocols/metric-loop.md`) on the Architecture Document. Define a metric based on: coverage of design doc requirements, specificity, consistency between agents, and **simplicity** — is this the simplest architecture that meets the requirements? Could any service, abstraction, or dependency be eliminated without losing functionality? Penalize over-engineering (microservices for a simple app, Kubernetes for a static site, complex state management for a 3-page app). Max 3 iterations.
+Run the Metric Loop Protocol (`protocols/metric-loop.md`) on the Architecture Document. Define a metric based on: coverage of design doc requirements, specificity, consistency between agents, and **simplicity** — is this the simplest architecture that meets the requirements? Could any service, abstraction, or dependency be eliminated without losing functionality? Penalize over-engineering (microservices for a simple app, Kubernetes for a static site, complex state management for a 3-page app). Max 3 iterations.
 
 ### Step 2.4 — Sprint Planning
 
-Follow the Planning Protocol (`commands/protocols/planning.md`). Use 2 sequential Agent tool calls:
+Follow the Planning Protocol (`protocols/planning.md`). Use 2 sequential Agent tool calls:
 
 Call the Agent tool — description: "Sprint breakdown" — prompt: "Break this architecture into ordered, atomic tasks. Each task needs: description, acceptance criteria, dependencies, size (S/M/L). Include a `**Behavioral Test:**` field for every task that has UI — a concrete interaction test: 'Navigate to [page], click [element], verify [expected outcome]'. API-only tasks should have curl-based acceptance tests instead. ARCHITECTURE: [paste]. DESIGN DOC: [paste]. Scope to MVP only."
 
@@ -326,7 +326,7 @@ Phase 4 (Foundation) WILL NOT START without `docs/plans/visual-design-spec.md`. 
 
 ### Step 3.1 — Design Research (2 agents, parallel, both use Playwright)
 
-Follow the Design Protocol (`commands/protocols/design.md`), Step 3.1.
+Follow the Design Protocol (`protocols/design.md`), Step 3.1.
 
 Call the Agent tool 2 times in one message:
 
@@ -338,7 +338,7 @@ After both return, synthesize a **Design Research Brief** to `docs/plans/design-
 
 ### Step 3.2 — Design Direction (2 agents, sequential)
 
-Follow the Design Protocol (`commands/protocols/design.md`), Step 3.2.
+Follow the Design Protocol (`protocols/design.md`), Step 3.2.
 
 1. Call the Agent tool — description: "UX architecture" — Prompt: "Create structural design foundation. INPUTS: frontend architecture section from architecture.md [paste], Design Research Brief [paste], reference screenshot paths [list], user persona [paste]. OUTPUT: information architecture, layout strategy, component hierarchy, responsive approach, interaction patterns. Base decisions on competitive research, not generic patterns."
 
@@ -346,13 +346,13 @@ Follow the Design Protocol (`commands/protocols/design.md`), Step 3.2.
 
 ### Step 3.3 — Living Style Guide (1 implementation agent)
 
-Follow the Design Protocol (`commands/protocols/design.md`), Step 3.3.
+Follow the Design Protocol (`protocols/design.md`), Step 3.3.
 
 Call the Agent tool — description: "Build living style guide" — mode: "bypassPermissions" — prompt: "[COMPLEXITY: L] Build a living style guide page (/design-system route or standalone HTML). INPUTS: Visual Design Spec [paste], UX foundation [paste relevant sections], reference screenshots [list paths — these are your quality targets]. Must include rendered, interactive examples of: color swatches, typography scale, spacing scale, buttons (all states), form elements (all states), cards, navigation, feedback components (alerts, toasts, spinners, empty states), modals/overlays, and layout grid examples. Every component interactive (hover, focus, transitions work). Mobile-responsive. This ships with the product. Commit: 'feat: living style guide'."
 
 ### Step 3.4 — Visual QA Loop (Playwright + Metric Loop)
 
-Run the Metric Loop Protocol (`commands/protocols/metric-loop.md`) using the measurement criteria from the Design Protocol (`commands/protocols/design.md`, Step 3.4).
+Run the Metric Loop Protocol (`protocols/metric-loop.md`) using the measurement criteria from the Design Protocol (`protocols/design.md`, Step 3.4).
 
 Measurement: Playwright screenshots of the living style guide sections (desktop + mobile). Design critic agent scores 0-100 across 6 dimensions: spacing/alignment, typography hierarchy, color harmony, component polish, responsive quality, originality (anti-AI-template check). Receives screenshots + Visual Design Spec + reference screenshots.
 
@@ -392,10 +392,10 @@ Run the Metric Loop Protocol. Define a metric: builds clean, tests pass, lint cl
 
 ### Step 4.4 — Verification Gate
 
-Run the Verification Protocol (`commands/protocols/verify.md`). Critical rules (survive compaction):
+Run the Verification Protocol (`protocols/verify.md`). Critical rules (survive compaction):
 - ONE agent runs all 6 checks sequentially: Build → Type-Check → Lint → Test → Security → Diff Review. Stop on first FAIL.
 - Agent auto-detects stack from manifest files (package.json → Node, go.mod → Go, etc.).
-- On FAIL: for build/type/lint errors, use the Build-Fix Protocol (`commands/protocols/build-fix.md`) — fixes one error at a time with cascade detection. For test/security/diff failures, spawn a targeted fix agent. Re-verify. Max 3 fix attempts.
+- On FAIL: for build/type/lint errors, use the Build-Fix Protocol (`protocols/build-fix.md`) — fixes one error at a time with cascade detection. For test/security/diff failures, spawn a targeted fix agent. Re-verify. Max 3 fix attempts.
 - On PASS: log `VERIFY: PASS (6/6)` to `docs/plans/.build-state.md`. Proceed.
 
 Call the Agent tool — description: "Verify scaffolding" — mode: "bypassPermissions" — prompt: "Run the Verification Protocol. Execute all 6 checks sequentially, stop on first failure. Report: VERIFY: PASS or VERIFY: FAIL with details."
@@ -426,7 +426,7 @@ Pick the right developer framing: frontend, backend, AI, etc. Set `[COMPLEXITY: 
 
 ### Step 5.1b — Cleanup (De-Sloppify)
 
-Follow the Cleanup Protocol (`commands/protocols/cleanup.md`). Critical rules (survive compaction):
+Follow the Cleanup Protocol (`protocols/cleanup.md`). Critical rules (survive compaction):
 [COMPLEXITY: S]
 - Skip if trivial (< 20 lines, single file).
 - Cleanup agent is a SEPARATE agent from the implementer — no cleaning your own mess.
@@ -454,7 +454,7 @@ After each task: update TodoWrite and `docs/plans/.build-state.md`.
 
 Skip if this task has no Behavioral Test criteria (API-only, config, infrastructure tasks).
 
-Run the Smoke Test Protocol (`commands/protocols/smoke-test.md`). This uses agent-browser to open the app, execute the task's behavioral acceptance criteria, and verify the feature actually works.
+Run the Smoke Test Protocol (`protocols/smoke-test.md`). This uses agent-browser to open the app, execute the task's behavioral acceptance criteria, and verify the feature actually works.
 
 Evidence saved to `docs/plans/evidence/[task-name]/`: annotated screenshot, snapshot diff, error log, network log, HAR file.
 
@@ -464,7 +464,7 @@ On PASS: proceed to Step 5.4.
 
 ### Step 5.4 — Post-Task Verification
 
-Run the Verification Protocol (`commands/protocols/verify.md`). If FAIL, fix before starting the next task.
+Run the Verification Protocol (`protocols/verify.md`). If FAIL, fix before starting the next task.
 
 **Compaction checkpoint.** Update `docs/plans/.build-state.md` per the format above.
 
@@ -474,7 +474,7 @@ Run the Verification Protocol (`commands/protocols/verify.md`). If FAIL, fix bef
 
 ### Step 6.0 — Pre-Hardening Verification
 
-Run the Verification Protocol (`commands/protocols/verify.md`). All checks must pass before starting expensive audit agents.
+Run the Verification Protocol (`protocols/verify.md`). All checks must pass before starting expensive audit agents.
 
 ### Step 6.1 — Initial Audit (5 agents in parallel, ONE message)
 
@@ -494,7 +494,7 @@ Call the Agent tool 5 times in one message:
 
 ### Step 6.1b — Eval Harness
 
-Run the Eval Harness Protocol (`commands/protocols/eval-harness.md`). Define 8-15 concrete, executable eval cases from the audit findings and architecture doc. For UI flows, eval cases should use agent-browser: "agent-browser open /dashboard -> agent-browser click @submit -> agent-browser wait --text Success -> expect text contains confirmation ID". Run the eval agent. Record baseline pass rate. CRITICAL and HIGH failures feed into the metric loop in Step 6.2 as specific issues to fix.
+Run the Eval Harness Protocol (`protocols/eval-harness.md`). Define 8-15 concrete, executable eval cases from the audit findings and architecture doc. For UI flows, eval cases should use agent-browser: "agent-browser open /dashboard -> agent-browser click @submit -> agent-browser wait --text Success -> expect text contains confirmation ID". Run the eval agent. Record baseline pass rate. CRITICAL and HIGH failures feed into the metric loop in Step 6.2 as specific issues to fix.
 
 ### Step 6.2 — Metric Loop: Hardening Quality
 
@@ -579,7 +579,7 @@ MEDIUM/LOW issues: log to `docs/plans/build-log.md` for the Reality Checker.
 
 ### Step 6.2e — Fake Data Detector
 
-Call the Agent tool — description: "Fake data audit" — mode: "bypassPermissions" — prompt: "Run the Fake Data Detector Protocol (commands/protocols/fake-data-detector.md). Check for mock/hardcoded data in production paths. Static analysis: grep for Math.random() business data, hardcoded API responses, setTimeout faking async, placeholder text. Dynamic analysis: inspect HAR files from docs/plans/evidence/ for missing real API calls, static responses, absent WebSocket traffic. Report findings with file:line references and severity."
+Call the Agent tool — description: "Fake data audit" — mode: "bypassPermissions" — prompt: "Run the Fake Data Detector Protocol (protocols/fake-data-detector.md). Check for mock/hardcoded data in production paths. Static analysis: grep for Math.random() business data, hardcoded API responses, setTimeout faking async, placeholder text. Dynamic analysis: inspect HAR files from docs/plans/evidence/ for missing real API calls, static responses, absent WebSocket traffic. Report findings with file:line references and severity."
 
 **Fix loop:** For each CRITICAL finding:
 1. Spawn a fix agent with: the finding (file:line, what's fake, what it should be), and the relevant source files.
@@ -620,7 +620,7 @@ Do not loop forever.
 
 ### Step 7.0 — Pre-Ship Verification
 
-Run the Verification Protocol (`commands/protocols/verify.md`). All checks must pass before documenting and shipping. If FAIL persists after 3 fix attempts, return to Phase 6.
+Run the Verification Protocol (`protocols/verify.md`). All checks must pass before documenting and shipping. If FAIL persists after 3 fix attempts, return to Phase 6.
 
 ### Step 7.0b — Requirements Coverage Report
 

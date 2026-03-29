@@ -33,7 +33,7 @@ else
   if echo "$BUILD_STATE" | grep -q "Active Metric Loop"; then
     METRIC_LOOP="
 ACTIVE METRIC LOOP DETECTED — You were mid-iteration when context compacted.
-1. Read commands/protocols/metric-loop.md to reload the loop protocol
+1. Read protocols/metric-loop.md to reload the loop protocol
 2. Find the 'Active Metric Loop' section in .build-state.md for your metric definition and score history
 3. Resume from the iteration indicated in the score log table
 4. Do NOT restart the loop from scratch — continue where you left off"
@@ -81,8 +81,8 @@ ${DESIGN_WARNING}
 
 NEXT ACTIONS:
 1. Re-read commands/build.md to reload the full orchestrator process
-2. Re-read commands/protocols/metric-loop.md if you are mid-loop
-3. Re-read commands/protocols/design.md if you are in Phase 3 (Design & Visual Identity)
+2. Re-read protocols/metric-loop.md if you are mid-loop
+3. Re-read protocols/design.md if you are in Phase 3 (Design & Visual Identity)
 4. Re-read docs/plans/sprint-tasks.md for task list and acceptance criteria
 5. Re-read docs/plans/architecture.md for architecture context
 6. Re-read CLAUDE.md for build decisions
