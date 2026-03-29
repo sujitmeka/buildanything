@@ -85,6 +85,23 @@ function main() {
     }
   }
 
+  // Install agent-browser for behavioral verification
+  console.log("  Installing agent-browser (behavioral testing)...");
+  process.stdout.write("    agent-browser... ");
+  const abCheck = run("which", ["agent-browser"]);
+  if (abCheck) {
+    console.log("already installed");
+  } else {
+    const abResult = run("npm", ["install", "-g", "agent-browser"]);
+    if (abResult === null) {
+      console.log("failed (optional — install manually: npm i -g agent-browser)");
+    } else {
+      // Install browser binary
+      run("agent-browser", ["install"]);
+      console.log("installed");
+    }
+  }
+
   console.log(
     "\n  Setup complete! Start Claude Code and use:\n" +
       "    /buildanything:build <your idea>       — full product pipeline\n" +
