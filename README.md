@@ -2,16 +2,17 @@
 
 **One command to build an entire product.**
 
-buildanything is a Claude Code plugin that orchestrates 73 specialist AI agents into a full engineering pipeline. You describe what you want to build. buildanything handles architecture, implementation, testing, code review, security audit, accessibility, and documentation — the same process that teams at Meta, Google, and Stripe run, compressed into one session.
+buildanything is a Claude Code plugin that orchestrates 55 specialist AI agents into a full engineering pipeline — from idea to shipped, tested, reviewed code. You describe what you want to build. buildanything handles research, design, architecture, implementation, behavioral testing, and hardening.
 
 No agent expertise required. No manual coordination. Just `/build`.
 
 ## Install
 
-**One command:**
 ```
 npx buildanything
 ```
+
+This installs the plugin, companion plugins, and [agent-browser](https://github.com/vercel-labs/agent-browser) for behavioral testing.
 
 **Or manually in Claude Code:**
 ```
@@ -23,95 +24,104 @@ npx buildanything
 
 ### `/build` — Full Product Pipeline
 
-Takes a brainstormed idea and builds it. Runs 5 phases with quality gates between each:
+Takes an idea and builds it through 8 phases with quality gates, metric-driven iteration loops, and behavioral verification:
 
-1. **Architecture** — Backend Architect, UX Architect, Security Engineer, and code-architect design the system. Sprint Prioritizer and Senior Project Manager break it into ordered tasks with acceptance criteria.
-
-2. **Foundation** — DevOps Automator and Frontend Developer scaffold the project. UX Architect lays down the design system.
-
-3. **Build** — Each task goes through Dev→Test→Review loops. Frontend Developer, Backend Architect, or AI Engineer implement. Evidence Collector verifies. code-reviewer and silent-failure-hunter review. Failed tasks loop back with feedback, max 3 retries before escalating to you.
-
-4. **Harden** — API Tester, Performance Benchmarker, Accessibility Auditor, and Security Engineer stress-test the full product. code-simplifier and type-design-analyzer clean up. Reality Checker gives the final verdict (defaults to NEEDS WORK).
-
-5. **Ship** — Technical Writer documents everything. Clean commits. Completion report.
+0. **Context & Pre-Flight** — Scans for existing work, checks prerequisites, initializes state.
+1. **Brainstorm & Research** — Interactive brainstorming + 5 parallel research agents (market, tech, user, business, risk). Writes CLAUDE.md as the product brain.
+2. **Architecture & Planning** — 4 parallel architecture agents + sprint planning with user journeys, NFRs, and behavioral acceptance criteria per task.
+3. **Design & Visual Identity** — Competitive research via Playwright, living style guide with every component rendered and interactive, visual QA scoring at 80/100. Anti-AI-template detection.
+4. **Foundation** — Scaffolding, design system from style guide, acceptance test stubs (TDD-style — tests fail until features are built).
+5. **Build** — Per-task: implement → cleanup → metric loop → behavioral smoke test (agent-browser) → 7-check verification. Each task verified before the next starts.
+6. **Harden** — 5 parallel audits (API, performance, accessibility, security, UX quality) → eval harness → metric loop → E2E tests from user journeys → autonomous dogfooding → fake data detector → Reality Checker with fix-and-retest loops.
+7. **Ship** — Requirements coverage report, documentation, learnings capture.
 
 ```
-/build autonomous prediction market maker for Polymarket
-/build docs/plans/2025-06-15-my-idea-design.md
+/build a prediction market maker for Polymarket
+/build docs/plans/my-design.md --autonomous
 ```
 
 ### `/idea-sweep` — Parallel Research Sweep
 
-Takes a raw idea and runs 5 research teams in parallel to decide if it's worth building:
-
-- **market-intel** — TAM/SAM/SOM, competitive landscape, timing
-- **tech-feasibility** — Architecture sketch, hard problems, build vs buy, MVP scope
-- **user-research** — Persona, JTBD, current alternatives, behavioral barriers
-- **business-model** — Revenue model, unit economics, growth loops, moat
-- **risk-analysis** — Regulatory, security, dependencies, failure modes
-
-Outputs a decision brief: GO / PIVOT / INVESTIGATE / KILL.
+5 research agents evaluate an idea in parallel. Outputs a decision brief: GO / PIVOT / INVESTIGATE / KILL.
 
 ```
 /idea-sweep AI-powered building code compliance checker
 ```
 
-## The 73 Agents
+### Post-Build Commands
 
-buildanything includes agents from [agency-agents](https://github.com/msitarzewski/agency-agents) and custom research agents, organized into specialist divisions:
+| Command | Use case |
+|---|---|
+| `/fix` | "The submit button doesn't work" — scoped bug fixing with agent-browser verification |
+| `/ux-review` | "The dashboard feels cramped" — UX audit against the living style guide, mobile checks |
+| `/add-feature` | "Add a pause button" — mini build cycle using existing design system and architecture |
+| `/dogfood` | "Test everything" — autonomous exploratory testing of the running app |
+| `/verify` | "Does it all pass?" — quick 7-check health check |
+| `/refactor` | "Change the auth to OAuth" — architect plans the change, then incremental execution |
+
+All commands are argument-driven — they scope themselves to what you describe.
+
+## How It Works
+
+### Behavioral Verification (agent-browser)
+
+Every UI task is smoke tested after implementation. [agent-browser](https://github.com/vercel-labs/agent-browser) opens the app, clicks buttons, fills forms, and collects evidence:
+
+- **Snapshot diffs** — verifies DOM actually changes when you click something
+- **Network inspection** — catches failed API calls and missing endpoints
+- **Console errors** — catches uncaught JS exceptions
+- **Annotated screenshots** — labeled visual evidence (Claude is multimodal)
+- **HAR capture** — full network traffic for fake data analysis
+
+If a button doesn't work, the smoke test catches it immediately — not in Phase 6.
+
+### Living Style Guide
+
+Phase 3 builds a rendered, interactive style guide at `/design-system` with every component in every state. This ships with the product and is referenced at every stage:
+
+- Phase 4: Design system tokens match the style guide
+- Phase 5: Implementation agents reference it for UI tasks
+- Phase 6: UX audit compares every page against it
+
+### Feedback Loops
+
+Every testing step feeds back into development:
+
+- Smoke test fails → fix agent + re-test (max 2 cycles)
+- Dogfood finds issues → classify + fix + re-dogfood (max 3 cycles)
+- Fake data detected → fix agent replaces with real API calls (max 2 cycles)
+- Reality Checker says NEEDS WORK → classify issues + fix + re-verify + re-check (max 2 cycles)
+
+Nothing gets logged and ignored.
+
+## The 55 Agents
 
 ### Design (8)
 Brand Guardian · Image Prompt Engineer · Inclusive Visuals Specialist · UI Designer · UX Architect · UX Researcher · Visual Storyteller · Whimsy Injector
 
-### Engineering (11)
+### Engineering (9)
 AI Engineer · Autonomous Optimization Architect · Backend Architect · Data Engineer · DevOps Automator · Frontend Developer · Mobile App Builder · Rapid Prototyper · Security Engineer · Senior Developer · Technical Writer
 
-### Marketing (11)
-App Store Optimizer · Content Creator · Growth Hacker · Instagram Curator · Reddit Community Builder · Social Media Strategist · TikTok Strategist · Twitter Engager · WeChat Official Account Manager · Xiaohongshu Specialist · Zhihu Strategist
+### Marketing (8)
+App Store Optimizer · Instagram Curator · Reddit Community Builder · Social Media Strategist · TikTok Strategist · Twitter Engager · WeChat Official Account Manager · Xiaohongshu Specialist · Zhihu Strategist
 
-### Product (4)
-Behavioral Nudge Engine · Feedback Synthesizer · Sprint Prioritizer · Trend Researcher
+### Product (2)
+Behavioral Nudge Engine · Feedback Synthesizer
 
-### Project Management (5)
-Experiment Tracker · Project Shepherd · Senior Project Manager · Studio Operations · Studio Producer
+### Project Management (1)
+Experiment Tracker
 
-### Spatial Computing (6)
-macOS Spatial/Metal Engineer · Terminal Integration Specialist · visionOS Spatial Engineer · XR Cockpit Interaction Specialist · XR Immersive Developer · XR Interface Architect
+### Specialized (4)
+Agentic Identity & Trust Architect · Cultural Intelligence Strategist · Developer Advocate · Data Consolidation Agent · Report Distribution Agent · Sales Data Extraction Agent
 
-### Specialized (9)
-Agentic Identity & Trust Architect · Agents Orchestrator · Cultural Intelligence Strategist · Data Analytics Reporter · Data Consolidation Agent · Developer Advocate · LSP/Index Engineer · Report Distribution Agent · Sales Data Extraction Agent
+### Support (5)
+Analytics Reporter · Executive Summary Generator · Finance Tracker · Legal Compliance Checker · Support Responder
 
-### Support (6)
-Analytics Reporter · Executive Summary Generator · Finance Tracker · Infrastructure Maintainer · Legal Compliance Checker · Support Responder
-
-### Testing (8)
+### Testing (7)
 Accessibility Auditor · API Tester · Evidence Collector · Performance Benchmarker · Reality Checker · Test Results Analyzer · Tool Evaluator · Workflow Optimizer
 
 ### Research (5)
 market-intel · tech-feasibility · user-research · business-model · risk-analysis
-
-## Works With
-
-buildanything is designed to work alongside Claude Code's built-in plugins:
-
-- **feature-dev** — buildanything's `/build` command invokes `code-architect`, `code-explorer`, and `code-reviewer` from this plugin
-- **pr-review-toolkit** — `silent-failure-hunter`, `code-simplifier`, `type-design-analyzer`, `comment-analyzer` are used in hardening
-- **code-review** — Used for final code review passes
-- **commit-commands** — Used for clean git commits during the pipeline
-
-Install these from the official Anthropic marketplace for the full experience:
-```
-/plugin install feature-dev@claude-plugin-directory
-/plugin install pr-review-toolkit@claude-plugin-directory
-/plugin install code-review@claude-plugin-directory
-/plugin install commit-commands@claude-plugin-directory
-```
-
-## Credits
-
-- Agent definitions from [agency-agents](https://github.com/msitarzewski/agency-agents) by Mike Sitarzewski
-- Orchestration patterns inspired by [agency-agents](https://github.com/msitarzewski/agency-agents)
-- Claude Code plugin architecture by [Anthropic](https://github.com/anthropics/claude-code)
 
 ## License
 
