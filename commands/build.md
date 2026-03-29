@@ -558,15 +558,25 @@ Call the Agent tool — description: "E2E stability run" — mode: "bypassPermis
 
 Record final results. Include in Reality Checker evidence.
 
-### Step 6.2d — Fake Data Detector
+### Step 6.2d — Autonomous Dogfooding
+
+Run the agent-browser dogfood skill against the running app. Unlike the per-task smoke tests (which verify specific acceptance criteria), dogfooding is **exploratory** — it autonomously navigates every reachable page, clicks buttons, fills forms, checks console errors, and finds issues we didn't think to test.
+
+Start the dev server if not running. Then invoke the dogfood skill:
+
+Call the Agent tool — description: "Dogfood the app" — mode: "bypassPermissions" — prompt: "Run the agent-browser dogfood skill against the running app at http://localhost:[port]. Explore every reachable page. Click every button. Fill every form. Check console for errors. Report a structured list of issues with severity ratings (critical/high/medium/low), screenshots, and repro steps. If dogfood skill is not available, use agent-browser manually: snapshot each page, click all interactive elements, check errors and network requests."
+
+Any CRITICAL or HIGH issues: spawn fix agents before proceeding. MEDIUM/LOW issues: log to `docs/plans/build-log.md` for the Reality Checker.
+
+### Step 6.2e — Fake Data Detector
 
 Call the Agent tool — description: "Fake data audit" — mode: "bypassPermissions" — prompt: "Run the Fake Data Detector Protocol (commands/protocols/fake-data-detector.md). Check for mock/hardcoded data in production paths. Static analysis: grep for Math.random() business data, hardcoded API responses, setTimeout faking async, placeholder text. Dynamic analysis: inspect HAR files from docs/plans/evidence/ for missing real API calls, static responses, absent WebSocket traffic. Report findings with file:line references and severity."
 
-CRITICAL findings feed into the Reality Checker in Step 6.3.
+CRITICAL findings feed into the Reality Checker in Step 6.4.
 
-### Step 6.3 — Reality Check
+### Step 6.4 — Reality Check
 
-Call the Agent tool — description: "Final verdict" — prompt: "You are the Reality Checker. Default: NEEDS WORK. The hardening loop reached score [final_score] after [iterations] iterations. Score history: [paste table]. Review all evidence. Eval harness results: [baseline pass rate] → [final pass rate]. E2E test results: [paste E2E table — 3 iterations, final pass rate, quarantined count]. Fake data audit results: [paste findings or 'clean — no fake data detected']. CRITICAL failures remaining: [list or none]. Verdict: PRODUCTION READY or NEEDS WORK with specifics."
+Call the Agent tool — description: "Final verdict" — prompt: "You are the Reality Checker. Default: NEEDS WORK. The hardening loop reached score [final_score] after [iterations] iterations. Score history: [paste table]. Review all evidence. Eval harness results: [baseline pass rate] → [final pass rate]. E2E test results: [paste E2E table — 3 iterations, final pass rate, quarantined count]. Dogfood results: [paste issue count and any CRITICAL/HIGH findings, or 'clean — no issues found']. Fake data audit results: [paste findings or 'clean — no fake data detected']. CRITICAL failures remaining: [list or none]. Verdict: PRODUCTION READY or NEEDS WORK with specifics."
 
 <HARD-GATE>Do NOT self-approve. Reality Checker must give the verdict.</HARD-GATE>
 

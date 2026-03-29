@@ -102,6 +102,15 @@ function main() {
     }
   }
 
+  // Install dogfood skill for autonomous exploratory testing
+  process.stdout.write("    dogfood skill... ");
+  const dfResult = run("npx", ["skills", "add", "vercel-labs/agent-browser", "--skill", "dogfood"]);
+  if (dfResult === null) {
+    console.log("skipped (optional — install manually: npx skills add vercel-labs/agent-browser --skill dogfood)");
+  } else {
+    console.log("installed");
+  }
+
   console.log(
     "\n  Setup complete! Start Claude Code and use:\n" +
       "    /buildanything:build <your idea>       — full product pipeline\n" +
