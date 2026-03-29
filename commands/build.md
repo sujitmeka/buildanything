@@ -566,13 +566,23 @@ Start the dev server if not running. Then invoke the dogfood skill:
 
 Call the Agent tool — description: "Dogfood the app" — mode: "bypassPermissions" — prompt: "Run the agent-browser dogfood skill against the running app at http://localhost:[port]. Explore every reachable page. Click every button. Fill every form. Check console for errors. Report a structured list of issues with severity ratings (critical/high/medium/low), screenshots, and repro steps. If dogfood skill is not available, use agent-browser manually: snapshot each page, click all interactive elements, check errors and network requests."
 
-Any CRITICAL or HIGH issues: spawn fix agents before proceeding. MEDIUM/LOW issues: log to `docs/plans/build-log.md` for the Reality Checker.
+**Fix loop:** For each CRITICAL or HIGH issue found:
+1. Classify: is this a code bug (fix in Phase 5 style — spawn implementation fix agent) or a structural problem (needs architecture change — spawn architect agent to propose a fix plan, then implementation agent to execute)?
+2. Spawn the appropriate fix agent with: the issue description, repro steps, screenshot, affected page/component.
+3. After fixes, re-run dogfood on the affected pages only (not the full app). If new CRITICAL/HIGH issues appear, repeat. Max 3 fix cycles.
+
+MEDIUM/LOW issues: log to `docs/plans/build-log.md` for the Reality Checker.
 
 ### Step 6.2e — Fake Data Detector
 
 Call the Agent tool — description: "Fake data audit" — mode: "bypassPermissions" — prompt: "Run the Fake Data Detector Protocol (commands/protocols/fake-data-detector.md). Check for mock/hardcoded data in production paths. Static analysis: grep for Math.random() business data, hardcoded API responses, setTimeout faking async, placeholder text. Dynamic analysis: inspect HAR files from docs/plans/evidence/ for missing real API calls, static responses, absent WebSocket traffic. Report findings with file:line references and severity."
 
-CRITICAL findings feed into the Reality Checker in Step 6.4.
+**Fix loop:** For each CRITICAL finding:
+1. Spawn a fix agent with: the finding (file:line, what's fake, what it should be), and the relevant source files.
+2. The fix agent replaces fake data with real API calls, real WebSocket connections, real data sources. If real data sources aren't available (missing API keys, no backend), the fix agent must flag this as a blocker — not paper over it with better-looking fake data.
+3. After fixes, re-run the fake data detector (static checks only — fast). Max 2 fix cycles.
+
+Remaining findings feed into the Reality Checker in Step 6.4.
 
 ### Step 6.4 — Reality Check
 
@@ -580,8 +590,23 @@ Call the Agent tool — description: "Final verdict" — prompt: "You are the Re
 
 <HARD-GATE>Do NOT self-approve. Reality Checker must give the verdict.</HARD-GATE>
 
-**Autonomous:** Log verdict to `docs/plans/build-log.md`. Continue.
-**Interactive:** Present score history + verdict to user. Update state.
+**On PRODUCTION READY:** Log verdict. Proceed to Phase 7.
+
+**On NEEDS WORK:** The Reality Checker returns specific issues. These must be fixed — not logged and ignored.
+
+1. Read the Reality Checker's specific findings. Classify each:
+   - **Code bug** (broken feature, failing test, fake data) → spawn implementation fix agent with the finding + affected files.
+   - **Structural issue** (missing feature, wrong architecture, data flow problem) → spawn architect agent to produce a fix plan, then implementation agent to execute it. This is a mini Phase 5 loop for the specific issue.
+   - **Blocker** (missing API key, no backend, needs human action) → log to `docs/plans/build-log.md` and present to user. Cannot be auto-fixed.
+2. After fixes, re-run verification (7 checks) + the specific failing gate (E2E, dogfood, or fake data — whichever surfaced the issue).
+3. Re-run the Reality Checker with updated evidence.
+
+<HARD-GATE>
+Max 2 NEEDS WORK cycles. If the Reality Checker returns NEEDS WORK a third time:
+- **Interactive:** Present all remaining issues to user. Ask for direction.
+- **Autonomous:** Log remaining issues to `docs/plans/build-log.md`. Proceed to Phase 7 with a warning in the completion report.
+Do not loop forever.
+</HARD-GATE>
 
 **Compaction checkpoint.** Update `docs/plans/.build-state.md` per the format above.
 
