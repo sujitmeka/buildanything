@@ -135,28 +135,38 @@ Save output to docs/plans/visual-design-spec.md.
 
 ---
 
-## Step 3.3 — Proof Screens (1 implementation agent)
+## Step 3.3 — Living Style Guide (1 implementation agent)
+
+Build a real, rendered style guide page that serves as the single source of truth for the entire product's visual language. This is what a design agency would deliver — not throwaway proof screens, but a reusable reference that every implementation agent can view and every QA check can compare against.
 
 ```
-[COMPLEXITY: L] Implement 2-3 proof screens — the most visually demanding pages in this product:
-
-1. Landing page / hero section (the first impression)
-2. Main app view (dashboard, feed, workspace — the core experience)
-3. A form or interactive component (sign up, settings, creation flow)
+[COMPLEXITY: L] Build a living style guide at /design-system (or a standalone HTML file if no routing exists).
 
 INPUTS:
 - Visual Design Spec: [paste from docs/plans/visual-design-spec.md]
-- UX Foundation: [paste relevant layout and component sections]
-- Reference screenshots: [list paths from docs/plans/design-references/ — these are your visual targets]
+- UX Foundation: [paste relevant component and interaction sections]
+- Reference screenshots: [list paths from docs/plans/design-references/ — these are your quality targets]
+
+The style guide MUST include rendered, interactive examples of:
+
+1. **Colors** — Every color from the palette rendered as swatches with hex/variable names. Light and dark mode side by side.
+2. **Typography** — Every heading level (h1-h6), body text, captions, labels, code text. Showing font family, size, weight, line height.
+3. **Spacing** — Visual scale showing 4px through 128px with labeled examples.
+4. **Buttons** — Primary, secondary, ghost, destructive. Every state: default, hover, active, focus-visible, disabled, loading. All rendered and interactive (hover them, click them).
+5. **Form Elements** — Text input, textarea, select, checkbox, radio, toggle, date picker. Every state: empty, filled, focused, error, disabled, loading.
+6. **Cards** — Content card, interactive card, stat card. With hover elevation, transitions.
+7. **Navigation** — Header, sidebar, breadcrumb, tabs, pagination. Active/inactive states.
+8. **Feedback** — Alerts (success, warning, error, info), toasts, loading spinners, skeleton screens, empty states, progress bars.
+9. **Modals & Overlays** — Modal, sheet, dropdown, tooltip, popover. Open/close transitions.
+10. **Layout Examples** — A sample section showing the grid system, responsive behavior at 375px/768px/1024px/1280px.
 
 REQUIREMENTS:
-- Real, styled, responsive pages. NOT wireframes or skeletons.
-- Use the EXACT colors, fonts, spacing, shadows from the Visual Design Spec. Do not deviate.
-- Include hover states, focus states, transitions, loading states.
-- Mobile-responsive at 375px, 768px, 1024px, 1280px breakpoints.
-- These screens PROVE the design system works. They must look like they belong next to the Awwwards references from the research.
+- Use EXACT values from the Visual Design Spec. Do not deviate.
+- Every component must be interactive — hover states work, focus rings show, transitions animate.
+- Mobile-responsive — the style guide itself must be readable on mobile.
+- This page ships with the product as developer documentation.
 
-Commit: 'feat: proof screens for design validation'
+Commit: 'feat: living style guide'
 ```
 
 ---
@@ -170,9 +180,9 @@ Run the Metric Loop Protocol (`commands/protocols/metric-loop.md`).
 ```
 ## Active Metric Loop
 Phase: 3
-Artifact: Proof screens (landing page, main app view, form/interaction)
-Metric: Visual design quality — implementation fidelity to Visual Design Spec + competitive quality relative to Awwwards/competitor references
-How to measure: Playwright screenshots of proof screens (desktop 1920x1080 + mobile 375x812), scored by design critic agent across 6 dimensions
+Artifact: Living style guide (/design-system or standalone)
+Metric: Design system quality — component completeness, visual fidelity to spec, interactive states, competitive quality relative to research references
+How to measure: Playwright screenshots of style guide sections (desktop 1920x1080 + mobile 375x812), scored by design critic agent across 6 dimensions
 Target: 80
 Max iterations: 5
 ```
@@ -180,10 +190,10 @@ Max iterations: 5
 **Measurement agent prompt:**
 
 ```
-You are a senior design critic at a top-tier agency (Pentagram, Work & Co). You are reviewing a product's visual implementation for quality.
+You are a senior design critic at a top-tier agency (Pentagram, Work & Co). You are reviewing a product's design system / living style guide for quality.
 
 INPUTS:
-- Screenshots of current proof screens: [Playwright captures — desktop + mobile]
+- Screenshots of the style guide page: [Playwright captures — desktop + mobile, each section]
 - The Visual Design Spec the implementation should follow: [paste from docs/plans/visual-design-spec.md]
 - Reference screenshots from competitors and Awwwards winners: [paths in docs/plans/design-references/]
 
@@ -234,7 +244,7 @@ FINDINGS: [detailed list of specific issues, each with the file path and line/co
 ## Step 3.5 — Autonomous Quality Gate
 
 Log to `docs/plans/build-log.md`:
-- Final proof screen screenshot paths
+- Final style guide screenshot paths
 - Score history table from the metric loop
 - Key design decisions and their research rationale
 - Anti-AI-template dimension score
@@ -254,6 +264,6 @@ If Playwright is unavailable: log as blocker, use web search to find and describ
 - The UI Designer agent makes ALL visual decisions autonomously. No "pick A or B" presentations. The research provides the evidence; the agent makes the call.
 - The Visual Design Spec MUST include research rationale for every major decision. Unjustified defaults are a design failure.
 - The anti-AI-template checklist is a SCORING DIMENSION (Originality), not a hard blocker. The goal is awareness and intentional differentiation, not rigid prohibition of any single element.
-- Proof screens are REAL implementations with real CSS/components, not mockups or wireframes. They must work responsively.
+- The living style guide is a REAL implementation with real CSS/components, not mockups or wireframes. Every component must be interactive and responsive. It ships with the product.
 - The Visual QA loop is the primary quality control — no human reviews the design. The 80/100 threshold IS the taste arbiter. Treat it seriously.
 - Screenshot data stays in measurement agents' context (separate subprocess). Do NOT load screenshots into the orchestrator's context — receive only the SCORE and TOP ISSUE as text.

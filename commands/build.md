@@ -319,7 +319,7 @@ Update TodoWrite and `docs/plans/.build-state.md`.
 **Skip if** the project has no user-facing frontend (CLI tools, pure APIs, backend services).
 
 <HARD-GATE>
-UI/UX IS THE PRODUCT. This phase is a full peer to Architecture and Build — not a footnote, not an afterthought, not a "nice to have." Do NOT skip, compress, or rush this phase for any reason. The agents must research real competitors and award-winning sites, make deliberate visual choices backed by that research, build proof screens, and iterate with Playwright-verified visual QA before a single line of product code is written.
+UI/UX IS THE PRODUCT. This phase is a full peer to Architecture and Build — not a footnote, not an afterthought, not a "nice to have." Do NOT skip, compress, or rush this phase for any reason. The agents must research real competitors and award-winning sites, make deliberate visual choices backed by that research, build a living style guide with every component rendered and interactive, and iterate with Playwright-verified visual QA before a single line of product code is written.
 
 Phase 4 (Foundation) WILL NOT START without `docs/plans/visual-design-spec.md`. If it does not exist, return here.
 </HARD-GATE>
@@ -344,15 +344,17 @@ Follow the Design Protocol (`commands/protocols/design.md`), Step 3.2.
 
 2. Call the Agent tool — description: "Visual design spec" — Prompt: "Create the Visual Design Spec with AUTONOMOUS decisions — pick the single best direction, do not present options. INPUTS: UX foundation [paste previous output], Design Research Brief [paste], reference screenshot paths [list], user persona [paste]. OUTPUT: color system (with hex, light+dark), typography (Google Fonts, mathematical scale), 8px spacing system, tinted shadow system, border radius, animation/motion, component styles with ALL states. Every choice must cite the research. Apply anti-AI-template rules from the Design Protocol. Save to docs/plans/visual-design-spec.md."
 
-### Step 3.3 — Proof Screens (1 implementation agent)
+### Step 3.3 — Living Style Guide (1 implementation agent)
 
-Call the Agent tool — description: "Build proof screens" — mode: "bypassPermissions" — prompt: "[COMPLEXITY: L] Implement 2-3 proof screens (landing/hero, main app view, key form). INPUTS: Visual Design Spec [paste], UX foundation [paste relevant sections], reference screenshots [list paths — these are your visual targets]. Use EXACT colors, fonts, spacing from spec. Real styled responsive pages, not wireframes. Include hover/focus states, transitions. Commit: 'feat: proof screens for design validation'."
+Follow the Design Protocol (`commands/protocols/design.md`), Step 3.3.
+
+Call the Agent tool — description: "Build living style guide" — mode: "bypassPermissions" — prompt: "[COMPLEXITY: L] Build a living style guide page (/design-system route or standalone HTML). INPUTS: Visual Design Spec [paste], UX foundation [paste relevant sections], reference screenshots [list paths — these are your quality targets]. Must include rendered, interactive examples of: color swatches, typography scale, spacing scale, buttons (all states), form elements (all states), cards, navigation, feedback components (alerts, toasts, spinners, empty states), modals/overlays, and layout grid examples. Every component interactive (hover, focus, transitions work). Mobile-responsive. This ships with the product. Commit: 'feat: living style guide'."
 
 ### Step 3.4 — Visual QA Loop (Playwright + Metric Loop)
 
 Run the Metric Loop Protocol (`commands/protocols/metric-loop.md`) using the measurement criteria from the Design Protocol (`commands/protocols/design.md`, Step 3.4).
 
-Measurement: Playwright screenshots of proof screens (desktop + mobile). Design critic agent scores 0-100 across 6 dimensions: spacing/alignment, typography hierarchy, color harmony, component polish, responsive quality, originality (anti-AI-template check). Receives screenshots + Visual Design Spec + reference screenshots.
+Measurement: Playwright screenshots of the living style guide sections (desktop + mobile). Design critic agent scores 0-100 across 6 dimensions: spacing/alignment, typography hierarchy, color harmony, component polish, responsive quality, originality (anti-AI-template check). Receives screenshots + Visual Design Spec + reference screenshots.
 
 **Target: 80. Max 5 iterations.** On stall: accept if >= 65, log warning below 65.
 
@@ -378,7 +380,7 @@ Call the Agent tool — description: "Project scaffolding" — mode: "bypassPerm
 
 ### Step 4.2 — Design System (frontend only)
 
-Call the Agent tool — description: "Design system setup" — mode: "bypassPermissions" — prompt: "Implement the design system from the Visual Design Spec: [paste from docs/plans/visual-design-spec.md]. Create CSS tokens matching the spec's color system, typography scale, spacing system, shadow/elevation tokens, and base layout components. Reference the proof screens from Phase 3 as implementation targets. Commit: 'feat: design system'."
+Call the Agent tool — description: "Design system setup" — mode: "bypassPermissions" — prompt: "Implement the design system from the Visual Design Spec: [paste from docs/plans/visual-design-spec.md]. Create CSS tokens matching the spec's color system, typography scale, spacing system, shadow/elevation tokens, and base layout components. The living style guide from Phase 3 is the reference implementation — components must match. Commit: 'feat: design system'."
 
 ### Step 4.2b — Acceptance Test Scaffolding
 
