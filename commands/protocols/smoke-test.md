@@ -56,6 +56,21 @@ agent-browser screenshot --annotate
 agent-browser network har stop
 ```
 
+For UI tasks, also capture a mobile viewport screenshot:
+
+```
+agent-browser resize 375 812
+agent-browser screenshot --annotate
+```
+
+Save the mobile screenshot to the evidence directory as `[task-name]-mobile.png`.
+
+```
+agent-browser resize 1920 1080
+```
+
+If the mobile screenshot shows horizontal scrolling, overlapping elements, or text smaller than 14px, flag as a UX issue in the smoke test results.
+
 Save all evidence to `docs/plans/evidence/[task-name]/`:
 
 | File | Content | Format |

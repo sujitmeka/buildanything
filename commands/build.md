@@ -288,7 +288,7 @@ After all 4 return, YOU synthesize into one Architecture Document. Save to `docs
 
 ### Step 2.3 — Metric Loop: Architecture Quality
 
-Run the Metric Loop Protocol (`commands/protocols/metric-loop.md`) on the Architecture Document. Define a metric based on this project — coverage of design doc requirements, specificity, consistency between agents. Max 3 iterations.
+Run the Metric Loop Protocol (`commands/protocols/metric-loop.md`) on the Architecture Document. Define a metric based on: coverage of design doc requirements, specificity, consistency between agents, and **simplicity** — is this the simplest architecture that meets the requirements? Could any service, abstraction, or dependency be eliminated without losing functionality? Penalize over-engineering (microservices for a simple app, Kubernetes for a static site, complex state management for a 3-page app). Max 3 iterations.
 
 ### Step 2.4 — Sprint Planning
 
@@ -474,11 +474,11 @@ Run the Verification Protocol (`commands/protocols/verify.md`). If FAIL, fix bef
 
 Run the Verification Protocol (`commands/protocols/verify.md`). All checks must pass before starting expensive audit agents.
 
-### Step 6.1 — Initial Audit (4 agents in parallel, ONE message)
+### Step 6.1 — Initial Audit (5 agents in parallel, ONE message)
 
 Read the NFRs from `docs/plans/sprint-tasks.md`. Pass the relevant NFR thresholds to each audit agent so they have concrete targets, not generic checks.
 
-Call the Agent tool 4 times in one message:
+Call the Agent tool 5 times in one message:
 
 1. Description: "API testing" — Prompt: "Comprehensive API validation: all endpoints, edge cases, error responses, auth flows. NFR targets: [paste performance and reliability NFRs]. Report findings with counts."
 
@@ -487,6 +487,8 @@ Call the Agent tool 4 times in one message:
 3. Description: "Accessibility audit" — Prompt: "WCAG compliance audit on all interfaces. NFR target: [paste accessibility NFR — e.g., WCAG AA]. Check screen reader, keyboard nav, contrast. Report issues with counts."
 
 4. Description: "Security audit" — Prompt: "Security review: auth, input validation, data exposure, dependency vulnerabilities. NFR targets: [paste security NFRs]. Report findings with severity."
+
+5. Description: "UX quality audit" — Prompt: "UX quality review of every user-facing page. NFR targets: [paste accessibility NFRs]. Check: loading states (every async action must show a loading indicator), error states (every form and API call must show user-friendly error feedback), empty states (every list/table must handle zero items gracefully), mobile responsiveness (test at 375px viewport — touch targets >= 44px, no horizontal scroll, readable text), form validation (inline feedback, not just alert()), transition smoothness (no layout shifts, no janky animations), visual consistency with docs/plans/visual-design-spec.md. Report issues with page, severity, and screenshot."
 
 ### Step 6.1b — Eval Harness
 
@@ -564,7 +566,7 @@ Run the agent-browser dogfood skill against the running app. Unlike the per-task
 
 Start the dev server if not running. Then invoke the dogfood skill:
 
-Call the Agent tool — description: "Dogfood the app" — mode: "bypassPermissions" — prompt: "Run the agent-browser dogfood skill against the running app at http://localhost:[port]. Explore every reachable page. Click every button. Fill every form. Check console for errors. Report a structured list of issues with severity ratings (critical/high/medium/low), screenshots, and repro steps. If dogfood skill is not available, use agent-browser manually: snapshot each page, click all interactive elements, check errors and network requests."
+Call the Agent tool — description: "Dogfood the app" — mode: "bypassPermissions" — prompt: "Run the agent-browser dogfood skill against the running app at http://localhost:[port]. Explore every reachable page. Click every button. Fill every form. Check console for errors. Report a structured list of issues with severity ratings (critical/high/medium/low), screenshots, and repro steps. If dogfood skill is not available, use agent-browser manually: snapshot each page, click all interactive elements, check errors and network requests. Also evaluate UX quality: missing loading states, poor error messages, broken mobile layouts (resize to 375px), visual inconsistencies, missing empty states, form validation gaps. Report UX issues separately from functional issues."
 
 **Fix loop:** For each CRITICAL or HIGH issue found:
 1. Classify: is this a code bug (fix in Phase 5 style — spawn implementation fix agent) or a structural problem (needs architecture change — spawn architect agent to propose a fix plan, then implementation agent to execute)?
@@ -617,6 +619,17 @@ Do not loop forever.
 ### Step 7.0 — Pre-Ship Verification
 
 Run the Verification Protocol (`commands/protocols/verify.md`). All checks must pass before documenting and shipping. If FAIL persists after 3 fix attempts, return to Phase 6.
+
+### Step 7.0b — Requirements Coverage Report
+
+Call the Agent tool — description: "Requirements coverage check" — prompt: "Re-read the original Design Document (docs/plans/*.md design doc) and the user journeys + NFRs from docs/plans/sprint-tasks.md. For EVERY feature listed in the MVP scope, verify: (1) it has a corresponding implemented task, (2) it has a passing test or behavioral verification, (3) it is reachable and functional in the running app. Produce a coverage table:
+
+| MVP Feature | Task | Test | Verified | Status |
+|-------------|------|------|----------|--------|
+
+Mark each as COVERED, PARTIAL (implemented but untested), or MISSING. Any MISSING feature is a blocker — report it immediately."
+
+If any features are MISSING: spawn implementation agents to build them, then re-run verification. This is the final safety net before shipping — it catches requirements that were planned but somehow never built.
 
 ### Step 7.1 — Documentation
 
