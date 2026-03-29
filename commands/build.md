@@ -51,6 +51,8 @@ If you catch yourself typing code or reading source files: STOP. You are wasting
 - `last_save: [Phase.Step]`
 Increment after each agent returns (parallel dispatch of 4 agents = +4). Reset to 0 after each compaction save.
 
+**Compaction checkpoint format:** At every phase boundary, check `dispatches_since_save` in `docs/plans/.build-state.md`. If >= 8: save ALL state (current phase, task statuses, metric loop scores, decisions) to `docs/plans/.build-state.md`. Reset `dispatches_since_save` to 0. TodoWrite does NOT survive compaction — rebuild it from this state file on resume.
+
 Input: $ARGUMENTS
 
 ### Autonomous Mode
@@ -95,15 +97,7 @@ For implementation agents (Phase 5+): Do NOT paste the entire Design Document or
 
 ### Complexity Routing (Advisory)
 
-When composing agent prompts, prefix with `[COMPLEXITY: S/M/L]` to hint at the appropriate model tier:
-
-| Complexity | Task Types | Preferred Tier |
-|-----------|-----------|----------------|
-| S | Build-fix, cleanup, lint fix, single-error fix | Haiku-class (fastest) |
-| M | Measurement, eval, testing, single-feature impl | Sonnet-class (balanced) |
-| L | Architecture, research, multi-file impl, debugging | Opus-class (deepest reasoning) |
-
-For sprint tasks, use the Size field from `docs/plans/sprint-tasks.md`. This is advisory — the tag documents intent for future model routing support.
+Tag agent prompts with `[COMPLEXITY: S/M/L]` based on task size from `docs/plans/sprint-tasks.md`. This is advisory — the tag documents intent for future model routing support.
 
 ---
 
@@ -195,15 +189,15 @@ Skip if context level is "Decision brief" (research already done).
 
 Call the Agent tool 5 times in a single message. Pass each agent the build request AND the Design Document draft.
 
-1. Description: "Market research" — Prompt: "Research market size (TAM/SAM/SOM), competitive landscape (5-10 players), timing, and market structure for: [build request]. Design context: [paste design doc]. Use web search extensively. Report with a Market Verdict: GREEN/AMBER/RED."
+1. Description: "Market research" — Prompt: "Research market size (TAM/SAM/SOM), competitive landscape (5-10 players), timing, and market structure for: [build request]. Design context: [paste design doc]. Report with a Market Verdict: GREEN/AMBER/RED."
 
-2. Description: "Tech feasibility" — Prompt: "Evaluate hard technical problems (Solved/Hard/Unsolved), build-vs-buy decisions, MVP scope, and stack validation for: [build request]. Design context: [paste design doc]. Search for APIs and libraries mentioned in the design to verify they exist and are maintained. Report with a Technical Verdict."
+2. Description: "Tech feasibility" — Prompt: "Evaluate hard technical problems (Solved/Hard/Unsolved), build-vs-buy decisions, MVP scope, and stack validation for: [build request]. Design context: [paste design doc]. Verify APIs and libraries from the design exist and are maintained. Report with a Technical Verdict."
 
-3. Description: "User research" — Prompt: "Analyze target persona, jobs-to-be-done, current alternatives, behavioral barriers to adoption for: [build request]. Design context: [paste design doc]. Search for real user complaints and communities discussing this problem. Report with a User Verdict."
+3. Description: "User research" — Prompt: "Analyze target persona, jobs-to-be-done, current alternatives, and behavioral barriers to adoption for: [build request]. Design context: [paste design doc]. Report with a User Verdict."
 
-4. Description: "Business model" — Prompt: "Evaluate revenue models, unit economics, growth loops, first-1000-users strategy for: [build request]. Design context: [paste design doc]. Search for comparable pricing and growth data. Report with a Business Verdict."
+4. Description: "Business model" — Prompt: "Evaluate revenue models, unit economics, growth loops, and first-1000-users strategy for: [build request]. Design context: [paste design doc]. Report with a Business Verdict."
 
-5. Description: "Risk analysis" — Prompt: "Adversarial review: regulatory risk, security concerns, dependency risks, competitive response, top 3 failure modes for: [build request]. Design context: [paste design doc]. Search for enforcement actions and comparable failures. Report with a Risk Verdict."
+5. Description: "Risk analysis" — Prompt: "Adversarial review: regulatory risk, security concerns, dependency risks, competitive response, top 3 failure modes for: [build request]. Design context: [paste design doc]. Report with a Risk Verdict."
 
 After all 5 return, synthesize a **Research Brief** with a verdict table. Save to `docs/plans/research-brief.md`.
 
@@ -218,17 +212,41 @@ Read the Design Document and Research Brief together. Check for contradictions:
 
 Update the Design Document with corrections. Save final version.
 
-### Step 1.4 — Persist Decisions
+### Step 1.4 — Write CLAUDE.md
 
-Append key decisions to the project's `CLAUDE.md` (create if needed) under `## Build Decisions`:
+Create (or overwrite) the project's `CLAUDE.md`. This is the product brain — every agent spawned during the build reads it automatically. Write it from the Design Document and Research Brief. It must give any agent enough context to make smart product, UX, and technical decisions without needing the full design doc.
 
-- Project name and one-line description
-- Primary user and core value prop
-- Tech stack (with rationale)
-- Key constraints or risks
-- MVP scope boundary (in vs. deferred)
+<HARD-GATE>
+CLAUDE.md must be under 200 lines. It is not a wiki, not a conventions doc, not a dump of everything you know. It is the minimum context an agent needs to make correct decisions about this specific product.
+</HARD-GATE>
 
-This ensures decisions survive context compaction.
+Structure:
+
+```
+## Product
+[1-3 sentences: what this is, core value prop, what success looks like]
+
+## User
+[Primary persona: who they are, what they care about, pain points,
+technical sophistication. This drives every UX decision.]
+
+## Tech Stack
+[Stack choices with 1-line rationale for each. Framework, DB, auth,
+key libraries, deployment target.]
+
+## Scope
+[What's in MVP vs. deferred. Hard boundaries. This prevents agents
+from building features that aren't scoped.]
+
+## Rules
+[Project-specific hard rules derived from the product and user context.
+Examples: "All data must be real-time — no simulated/fake data",
+"User must be able to pause/stop any automated process at any time",
+"Every interactive element must have visible feedback within 200ms".
+Only include rules this specific project needs — not generic best practices.]
+```
+
+Keep it product-focused. An implementation agent reading this should understand WHO the user is and WHAT matters enough to make the right call when the handoff prompt doesn't cover an edge case.
 
 ### Quality Gate 1
 
@@ -238,7 +256,7 @@ This ensures decisions survive context compaction.
 
 Update TodoWrite and `docs/plans/.build-state.md`.
 
-**Compaction checkpoint:** Check `dispatches_since_save` in `docs/plans/.build-state.md`. If >= 8: save ALL state (current phase, task statuses, metric loop scores, decisions) to `docs/plans/.build-state.md`. Reset `dispatches_since_save` to 0. TodoWrite does NOT survive compaction — rebuild it from this state file on resume.
+**Compaction checkpoint.** Update `docs/plans/.build-state.md` per the format above.
 
 ---
 
@@ -276,7 +294,7 @@ Run the Metric Loop Protocol (`commands/protocols/metric-loop.md`) on the Archit
 
 Follow the Planning Protocol (`commands/protocols/planning.md`). Use 2 sequential Agent tool calls:
 
-Call the Agent tool — description: "Sprint breakdown" — prompt: "Break this architecture into ordered, atomic tasks. Each task needs: description, acceptance criteria, dependencies, size (S/M/L). ARCHITECTURE: [paste]. DESIGN DOC: [paste]. Scope to MVP only."
+Call the Agent tool — description: "Sprint breakdown" — prompt: "Break this architecture into ordered, atomic tasks. Each task needs: description, acceptance criteria, dependencies, size (S/M/L). Include a `**Behavioral Test:**` field for every task that has UI — a concrete interaction test: 'Navigate to [page], click [element], verify [expected outcome]'. API-only tasks should have curl-based acceptance tests instead. ARCHITECTURE: [paste]. DESIGN DOC: [paste]. Scope to MVP only."
 
 Then call the Agent tool — description: "Validate task list" — prompt: "Validate this task list: [paste]. Check scope is realistic, no missing tasks, descriptions specific enough for a developer agent to execute, all tasks within MVP boundary."
 
@@ -290,7 +308,7 @@ Save to `docs/plans/sprint-tasks.md`.
 
 Update TodoWrite and `docs/plans/.build-state.md`.
 
-**Compaction checkpoint:** Check `dispatches_since_save` in `docs/plans/.build-state.md`. If >= 8: save ALL state (current phase, task statuses, metric loop scores, decisions) to `docs/plans/.build-state.md`. Reset `dispatches_since_save` to 0. TodoWrite does NOT survive compaction — rebuild it from this state file on resume.
+**Compaction checkpoint.** Update `docs/plans/.build-state.md` per the format above.
 
 ---
 
@@ -342,7 +360,7 @@ Measurement: Playwright screenshots of proof screens (desktop + mobile). Design 
 
 Log to `docs/plans/build-log.md`: final screenshot paths, score history table, design decisions, originality score. No user pause. Proceed to Phase 4.
 
-**Compaction checkpoint:** Check `dispatches_since_save` in `docs/plans/.build-state.md`. If >= 8: save ALL state (current phase, task statuses, metric loop scores, decisions) to `docs/plans/.build-state.md`. Reset `dispatches_since_save` to 0. TodoWrite does NOT survive compaction — rebuild it from this state file on resume.
+**Compaction checkpoint.** Update `docs/plans/.build-state.md` per the format above.
 
 ---
 
@@ -362,6 +380,10 @@ Call the Agent tool — description: "Project scaffolding" — mode: "bypassPerm
 
 Call the Agent tool — description: "Design system setup" — mode: "bypassPermissions" — prompt: "Implement the design system from the Visual Design Spec: [paste from docs/plans/visual-design-spec.md]. Create CSS tokens matching the spec's color system, typography scale, spacing system, shadow/elevation tokens, and base layout components. Reference the proof screens from Phase 3 as implementation targets. Commit: 'feat: design system'."
 
+### Step 4.2b — Acceptance Test Scaffolding
+
+Call the Agent tool — description: "Scaffold acceptance tests" — mode: "bypassPermissions" — prompt: "Read docs/plans/sprint-tasks.md. For every task with a Behavioral Test field, create a Playwright test stub in tests/e2e/acceptance/. Use Page Object Model. Each test should: navigate to the page, perform the interaction, assert the expected outcome. Tests should FAIL right now (features aren't built yet) — that's correct. Also ensure agent-browser is available (run `which agent-browser`). Commit: 'test: scaffold acceptance tests from sprint tasks'."
+
 ### Step 4.3 — Metric Loop: Scaffold Health
 
 Run the Metric Loop Protocol. Define a metric: builds clean, tests pass, lint clean, structure matches architecture. Max 3 iterations.
@@ -380,7 +402,7 @@ Do not proceed to Phase 5 until verification passes.
 
 Update TodoWrite and state.
 
-**Compaction checkpoint:** Check `dispatches_since_save` in `docs/plans/.build-state.md`. If >= 8: save ALL state (current phase, task statuses, metric loop scores, decisions) to `docs/plans/.build-state.md`. Reset `dispatches_since_save` to 0. TodoWrite does NOT survive compaction — rebuild it from this state file on resume.
+**Compaction checkpoint.** Update `docs/plans/.build-state.md` per the format above.
 
 ---
 
@@ -414,7 +436,7 @@ Call the Agent tool — description: "Cleanup [task name]" — mode: "bypassPerm
 
 ### Step 5.2 — Metric Loop: Task Quality
 
-Run the Metric Loop Protocol on the task implementation. Define a metric based on the task's acceptance criteria. Max 5 iterations.
+Run the Metric Loop Protocol on the task implementation. Define a metric based on the task's acceptance criteria. For UI-facing tasks, include behavioral verification: the measurement agent should use agent-browser to verify the feature renders and responds to interaction, not just read the code. Max 5 iterations.
 
 ### Step 5.3 — Loop Exit
 
@@ -426,11 +448,23 @@ On stall or max iterations:
 
 After each task: update TodoWrite and `docs/plans/.build-state.md`.
 
+### Step 5.3b — Behavioral Smoke Test
+
+Skip if this task has no Behavioral Test criteria (API-only, config, infrastructure tasks).
+
+Run the Smoke Test Protocol (`commands/protocols/smoke-test.md`). This uses agent-browser to open the app, execute the task's behavioral acceptance criteria, and verify the feature actually works.
+
+Evidence saved to `docs/plans/evidence/[task-name]/`: annotated screenshot, snapshot diff, error log, network log, HAR file.
+
+On FAIL: spawn fix agent with the evidence. The fix agent receives: what was expected (from acceptance criteria), what actually happened (snapshot diff + errors + screenshot), and the relevant source files. Max 2 fix-and-retest cycles.
+
+On PASS: proceed to Step 5.4.
+
 ### Step 5.4 — Post-Task Verification
 
-Run the Verification Protocol (`commands/protocols/verify.md`) to catch regressions. If FAIL, fix before starting the next task.
+Run the Verification Protocol (`commands/protocols/verify.md`). If FAIL, fix before starting the next task.
 
-**Compaction checkpoint:** Check `dispatches_since_save` in `docs/plans/.build-state.md`. If >= 8: save ALL state (current phase, task statuses, metric loop scores, decisions) to `docs/plans/.build-state.md`. Reset `dispatches_since_save` to 0. TodoWrite does NOT survive compaction — rebuild it from this state file on resume.
+**Compaction checkpoint.** Update `docs/plans/.build-state.md` per the format above.
 
 ---
 
@@ -438,23 +472,25 @@ Run the Verification Protocol (`commands/protocols/verify.md`) to catch regressi
 
 ### Step 6.0 — Pre-Hardening Verification
 
-Run the Verification Protocol (`commands/protocols/verify.md`). ONE agent, 6 sequential checks (Build → Type → Lint → Test → Security → Diff), stop on first FAIL. Max 3 fix attempts. All checks must pass before starting expensive audit agents — do not waste audit agents on code that doesn't build or pass tests.
+Run the Verification Protocol (`commands/protocols/verify.md`). All checks must pass before starting expensive audit agents.
 
 ### Step 6.1 — Initial Audit (4 agents in parallel, ONE message)
 
+Read the NFRs from `docs/plans/sprint-tasks.md`. Pass the relevant NFR thresholds to each audit agent so they have concrete targets, not generic checks.
+
 Call the Agent tool 4 times in one message:
 
-1. Description: "API testing" — Prompt: "Comprehensive API validation: all endpoints, edge cases, error responses, auth flows. Report findings with counts."
+1. Description: "API testing" — Prompt: "Comprehensive API validation: all endpoints, edge cases, error responses, auth flows. NFR targets: [paste performance and reliability NFRs]. Report findings with counts."
 
-2. Description: "Performance audit" — Prompt: "Measure response times, identify bottlenecks, flag performance issues. Report benchmarks."
+2. Description: "Performance audit" — Prompt: "Measure response times, identify bottlenecks, flag performance issues. NFR targets: [paste performance NFRs — e.g., API < 200ms, page load < 3s]. Report benchmarks AGAINST these targets."
 
-3. Description: "Accessibility audit" — Prompt: "WCAG compliance audit on all interfaces. Check screen reader, keyboard nav, contrast. Report issues with counts."
+3. Description: "Accessibility audit" — Prompt: "WCAG compliance audit on all interfaces. NFR target: [paste accessibility NFR — e.g., WCAG AA]. Check screen reader, keyboard nav, contrast. Report issues with counts."
 
-4. Description: "Security audit" — Prompt: "Security review: auth, input validation, data exposure, dependency vulnerabilities. Report findings with severity."
+4. Description: "Security audit" — Prompt: "Security review: auth, input validation, data exposure, dependency vulnerabilities. NFR targets: [paste security NFRs]. Report findings with severity."
 
 ### Step 6.1b — Eval Harness
 
-Run the Eval Harness Protocol (`commands/protocols/eval-harness.md`). Define 8-15 concrete, executable eval cases from the audit findings and architecture doc. Run the eval agent. Record baseline pass rate. CRITICAL and HIGH failures feed into the metric loop in Step 6.2 as specific issues to fix.
+Run the Eval Harness Protocol (`commands/protocols/eval-harness.md`). Define 8-15 concrete, executable eval cases from the audit findings and architecture doc. For UI flows, eval cases should use agent-browser: "agent-browser open /dashboard -> agent-browser click @submit -> agent-browser wait --text Success -> expect text contains confirmation ID". Run the eval agent. Record baseline pass rate. CRITICAL and HIGH failures feed into the metric loop in Step 6.2 as specific issues to fix.
 
 ### Step 6.2 — Metric Loop: Hardening Quality
 
@@ -472,7 +508,7 @@ Re-run the Eval Harness after the metric loop exits. All CRITICAL eval cases mus
 ALL 3 ITERATIONS ARE MANDATORY. Do NOT stop after iteration 1 even if all tests pass. The purpose of 3 runs is to catch flaky tests, timing-dependent failures, and race conditions that only surface on repeated execution. Skip this step ONLY if the project has no user-facing frontend.
 </HARD-GATE>
 
-Generate and execute end-to-end tests using Playwright against the running application. Tests cover critical user journeys derived from the design doc and architecture.
+Generate and execute end-to-end tests using Playwright against the running application. Tests cover the **User Journeys** defined in `docs/plans/sprint-tasks.md` (Step 0 of the Planning Protocol). Each journey = one E2E test file.
 
 **Iteration 1 — Generate & Run:**
 
@@ -481,12 +517,13 @@ Call the Agent tool — description: "E2E test generation" — mode: "bypassPerm
 "[COMPLEXITY: L] Generate and run end-to-end Playwright tests for this application.
 
 INPUTS:
-- Architecture doc (user flows and API contracts): [paste relevant sections from docs/plans/architecture.md]
-- Design doc (core user journeys): [paste relevant sections]
-- Visual Design Spec (component selectors and page structure): [paste relevant sections from docs/plans/visual-design-spec.md]
+- User Journeys from docs/plans/sprint-tasks.md: [paste the User Journeys section — each journey becomes one E2E test]
+- Architecture doc (API contracts): [paste relevant sections from docs/plans/architecture.md]
+- NFRs from docs/plans/sprint-tasks.md: [paste — use performance thresholds as test assertions]
+- Visual Design Spec (component selectors): [paste relevant sections from docs/plans/visual-design-spec.md]
 
 REQUIREMENTS:
-1. Identify 5-10 critical user journeys from the design doc (auth flows, core feature flows, data entry, navigation)
+1. One E2E test per User Journey from sprint-tasks.md (each journey = one test file covering the full flow)
 2. Use Page Object Model pattern — one page object per major view
 3. Use data-testid selectors (add them to components if missing)
 4. Wait for API responses, NEVER use arbitrary timeouts (no waitForTimeout)
@@ -511,56 +548,32 @@ Record results: total tests, pass count, fail count, failure details. Log to `do
 
 **Iteration 2 — Fix & Re-run:**
 
-Call the Agent tool — description: "E2E fix iteration 2" — mode: "bypassPermissions" — prompt:
+Call the Agent tool — description: "E2E fix iteration 2" — mode: "bypassPermissions" — prompt: "[COMPLEXITY: M] Fix E2E test failures from iteration 1: [paste failure details — test names, error messages, screenshot paths]. Diagnose each as real bug, flaky test, or missing selector. Fix accordingly — do NOT delete or skip tests. Re-run ALL tests. Commit: 'fix: e2e test failures iteration 2'."
 
-"[COMPLEXITY: M] Fix E2E test failures and re-run the full suite.
-
-ITERATION 1 RESULTS: [paste failure details — test names, error messages, screenshot paths]
-
-For each failure:
-1. Diagnose: Is this a real bug, a flaky test, or a missing data-testid?
-2. Real bugs: Fix the application code
-3. Flaky tests: Add proper waits, fix race conditions, improve selectors
-4. Missing selectors: Add data-testid attributes to components
-5. Do NOT delete or skip failing tests — fix them
-
-Re-run ALL tests (not just previously failing ones). Report results.
-Commit fixes: 'fix: e2e test failures iteration 2'"
-
-Record results in the E2E table. Identify any tests that passed in iteration 1 but failed in iteration 2 — these are flaky candidates.
+Record results in the E2E table. Identify flaky candidates (passed iter 1, failed iter 2 or vice versa).
 
 **Iteration 3 — Final Stability Run:**
 
-Call the Agent tool — description: "E2E stability run" — mode: "bypassPermissions" — prompt:
-
-"[COMPLEXITY: M] Final E2E stability run — iteration 3 of 3.
-
-PREVIOUS RESULTS:
-- Iteration 1: [pass/fail counts]
-- Iteration 2: [pass/fail counts]
-- Flaky candidates: [tests that had inconsistent results across iterations]
-
-REQUIREMENTS:
-1. Run ALL tests with --repeat-each=3 to detect flakiness (each test runs 3 times within this iteration)
-2. Any test failing inconsistently across the 3 sub-runs: quarantine with test.fixme() and file path + reason
-3. Fix any remaining consistent failures
-4. Generate final report with: total journeys, pass rate, flaky count, quarantined tests
-5. Commit: 'test: e2e stability fixes iteration 3'
-
-PASS CRITERIA: 95%+ pass rate across all tests. Quarantined flaky tests do not count against pass rate but must be logged."
+Call the Agent tool — description: "E2E stability run" — mode: "bypassPermissions" — prompt: "[COMPLEXITY: M] Final E2E stability run (3 of 3). Previous results — Iter 1: [pass/fail counts], Iter 2: [pass/fail counts], Flaky candidates: [list]. Run ALL tests with --repeat-each=3. Quarantine inconsistent tests with test.fixme(). Fix remaining consistent failures. PASS CRITERIA: 95%+ pass rate (quarantined flaky tests excluded but logged). Commit: 'test: e2e stability fixes iteration 3'."
 
 Record final results. Include in Reality Checker evidence.
 
+### Step 6.2d — Fake Data Detector
+
+Call the Agent tool — description: "Fake data audit" — mode: "bypassPermissions" — prompt: "Run the Fake Data Detector Protocol (commands/protocols/fake-data-detector.md). Check for mock/hardcoded data in production paths. Static analysis: grep for Math.random() business data, hardcoded API responses, setTimeout faking async, placeholder text. Dynamic analysis: inspect HAR files from docs/plans/evidence/ for missing real API calls, static responses, absent WebSocket traffic. Report findings with file:line references and severity."
+
+CRITICAL findings feed into the Reality Checker in Step 6.3.
+
 ### Step 6.3 — Reality Check
 
-Call the Agent tool — description: "Final verdict" — prompt: "You are the Reality Checker. Default: NEEDS WORK. The hardening loop reached score [final_score] after [iterations] iterations. Score history: [paste table]. Review all evidence. Eval harness results: [baseline pass rate] → [final pass rate]. E2E test results: [paste E2E table — 3 iterations, final pass rate, quarantined count]. CRITICAL failures remaining: [list or none]. Verdict: PRODUCTION READY or NEEDS WORK with specifics."
+Call the Agent tool — description: "Final verdict" — prompt: "You are the Reality Checker. Default: NEEDS WORK. The hardening loop reached score [final_score] after [iterations] iterations. Score history: [paste table]. Review all evidence. Eval harness results: [baseline pass rate] → [final pass rate]. E2E test results: [paste E2E table — 3 iterations, final pass rate, quarantined count]. Fake data audit results: [paste findings or 'clean — no fake data detected']. CRITICAL failures remaining: [list or none]. Verdict: PRODUCTION READY or NEEDS WORK with specifics."
 
 <HARD-GATE>Do NOT self-approve. Reality Checker must give the verdict.</HARD-GATE>
 
 **Autonomous:** Log verdict to `docs/plans/build-log.md`. Continue.
 **Interactive:** Present score history + verdict to user. Update state.
 
-**Compaction checkpoint:** Check `dispatches_since_save` in `docs/plans/.build-state.md`. If >= 8: save ALL state (current phase, task statuses, metric loop scores, decisions) to `docs/plans/.build-state.md`. Reset `dispatches_since_save` to 0. TodoWrite does NOT survive compaction — rebuild it from this state file on resume.
+**Compaction checkpoint.** Update `docs/plans/.build-state.md` per the format above.
 
 ---
 
@@ -568,7 +581,7 @@ Call the Agent tool — description: "Final verdict" — prompt: "You are the Re
 
 ### Step 7.0 — Pre-Ship Verification
 
-Final verification gate. Run the Verification Protocol (`commands/protocols/verify.md`). ONE agent, 6 sequential checks (Build → Type → Lint → Test → Security → Diff), stop on first FAIL. Max 3 fix attempts. All checks must pass before documenting and shipping. If FAIL persists, return to Phase 6 for targeted fixes.
+Run the Verification Protocol (`commands/protocols/verify.md`). All checks must pass before documenting and shipping. If FAIL persists after 3 fix attempts, return to Phase 6.
 
 ### Step 7.1 — Documentation
 

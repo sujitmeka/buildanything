@@ -58,39 +58,15 @@ Initial request: $ARGUMENTS
 
 2. Generate questions across all 5 dimensions. Think about what each team needs:
 
-   **Market Intel might need to know:**
-   - Are there specific competitors you already know about or are tracking?
-   - What geographies are in scope? (Global, US-only, specific markets?)
-   - Is there an adjacent market or category you see this fitting into?
-   - Do you have any existing data, reports, or market sizing you've already done?
+   **Market Intel** — e.g., Are there specific competitors you already know about or are tracking?
 
-   **Tech Feasibility might need to know:**
-   - Do you have a preferred tech stack, language, or platform? Any hard constraints?
-   - Are there existing systems, codebases, or infrastructure this needs to integrate with?
-   - What's your technical background / what can you build yourself vs. need to hire for?
-   - Are there specific APIs, data sources, or third-party services you're already planning to use?
-   - Any performance, latency, or uptime requirements that are non-negotiable?
+   **Tech Feasibility** — e.g., Do you have a preferred tech stack, language, or platform? Any hard constraints?
 
-   **User Research might need to know:**
-   - Who do you think the target user is? (Even a rough guess helps focus the search)
-   - Have you talked to any potential users? What did they say?
-   - Are you building for consumers, developers, businesses, or a specific niche?
-   - Is there a specific user pain point or moment that inspired this idea?
-   - Do you have access to a community where target users congregate?
+   **User Research** — e.g., Who do you think the target user is? (Even a rough guess helps focus the search)
 
-   **Business Model might need to know:**
-   - Do you have a monetization model in mind, or is that open?
-   - What's your funding situation? (Bootstrapped, looking for VC, have runway?)
-   - Is this a side project, a startup, or an extension of existing work?
-   - What does success look like in 6 months? In 2 years?
-   - Are there comparable businesses whose model you admire?
+   **Business Model** — e.g., What does success look like in 6 months? In 2 years?
 
-   **Risk Analysis might need to know:**
-   - Are there regulatory constraints you're already aware of? (Especially for crypto, health, finance)
-   - Are you operating under any legal entity or jurisdiction constraints?
-   - Are there platform dependencies you're worried about? (App Store, specific APIs, etc.)
-   - Have you seen similar ideas fail? What do you think went wrong?
-   - Any ethical concerns or sensitive user data involved?
+   **Risk Analysis** — e.g., Are there regulatory constraints you're already aware of? (Especially for crypto, health, finance)
 
 3. **Do NOT ask all of the above.** Select only the questions that are:
    - **High-impact**: The answer would materially change what an agent researches or concludes
@@ -118,7 +94,7 @@ organized by theme. Include direct quotes where the user's exact words matter.]
 
 ## Phase 2: Parallel Intelligence Sweep
 
-**Goal**: Run 5 research teams simultaneously. Launch ALL 5 as parallel subagents using the Task tool.
+**Goal**: Run 5 research teams simultaneously. Launch ALL 5 as parallel subagents using the Agent tool.
 
 **CRITICAL**: Launch all 5 agents at the same time. Do not wait for one to complete before starting the next. Pass each agent the full SCQA frame PLUS the Context Brief from Phase 1. Pass the kill criteria to the risk-analysis agent.
 
@@ -172,55 +148,16 @@ After all 5 agents return, do the following yourself (no subagents):
 
 **Goal**: Produce the final document.
 
-Write a markdown document with this structure:
+Write a markdown document titled `# [IDEA NAME] — Decision Brief` with these sections:
 
-```
-# [IDEA NAME] — Decision Brief
-
-## The Bet
-[Refined hypothesis — one sentence]
-
-## SCQA
-- Situation: [one line]
-- Complication: [one line]  
-- Question: [one line]
-- Answer: [one line]
-
-## Verdict Matrix
-| Dimension | Verdict | Key Finding |
-|-----------|---------|-------------|
-| Market | G/A/R | ... |
-| Technical | G/A/R | ... |
-| User | G/A/R | ... |
-| Business | G/A/R | ... |
-| Risk | G/A/R | ... |
-
-## The Opportunity
-[2-3 sentences: what, who, why now — only if proceeding]
-
-## Critical Tensions
-[2-3 contradictions that must be resolved during build]
-
-## Kill Criteria Status
-| Criterion | Status | Evidence |
-|-----------|--------|----------|
-| ... | CLEAR/AMBER/RED | ... |
-
-## Recommended Action
-- GO: Proceed to brainstorming → writing-plans
-- PIVOT: Pursue [adjacent opportunity] instead  
-- INVESTIGATE: Need answers on [specific questions]
-- KILL: Do not proceed — [reason]
-
-## If GO: MVP Definition
-- Core value prop: [one sentence]
-- Primary user: [one sentence]
-- MVP scope: [under 50 words]
-- Revenue model: [one sentence]
-- First 1,000 users: [channel strategy]
-- Tech stack: [recommendation]
-- First milestone: [activation metric]
-```
+- **The Bet** — Refined hypothesis in one sentence
+- **SCQA** — Situation, Complication, Question, Answer (one line each)
+- **Verdict Matrix** — Table: Dimension | Verdict (G/A/R) | Key Finding (one line each for Market, Technical, User, Business, Risk)
+- **The Opportunity** — 2-3 sentences: what, who, why now (only if proceeding)
+- **Critical Tensions** — 2-3 contradictions that must be resolved during build
+- **Kill Criteria Status** — Table: Criterion | Status (CLEAR/AMBER/RED) | Evidence
+- **Recommended Action** — One of: GO (proceed to brainstorming), PIVOT (adjacent opportunity), INVESTIGATE (specific questions), KILL (reason)
+- **If GO: MVP Definition** — Core value prop, primary user, MVP scope (under 50 words), revenue model, first 1,000 users channel, tech stack, first milestone
 
 Save this document to `docs/briefs/` with today's date and a slug of the idea name.
 

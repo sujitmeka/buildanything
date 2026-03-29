@@ -86,7 +86,6 @@ AUTHOR-BIAS ELIMINATION: The measurement agent and the fix agent must NEVER shar
 - They MUST be separate Agent tool calls (separate subprocesses, separate context windows).
 - The fix agent receives ONLY: (a) the single top issue diagnosed in Step 3, (b) the relevant file paths, (c) the acceptance criteria. It does NOT receive the measurement agent's full findings, score breakdown, or other issues.
 - The measurement agent in the next iteration does NOT know what the fix agent did — it measures the artifact fresh.
-- Rationale: When a reviewer shares context with an implementer, the implementer unconsciously optimizes for the reviewer's framing rather than actual quality.
 </HARD-GATE>
 - One fix per iteration. Measure its impact before fixing the next thing.
 - Track ALL scores in `docs/plans/.build-state.md` so the history survives context compaction.

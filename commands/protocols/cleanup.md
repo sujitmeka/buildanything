@@ -2,8 +2,6 @@
 
 You are the orchestrator. An implementation agent just finished a task. Before running the metric loop, you run a focused cleanup pass on the changed files.
 
-The insight: two focused agents outperform one constrained agent. The implementer optimizes for "make it work." The cleaner optimizes for "make it right."
-
 ## When to Skip
 
 If the implementation was trivial — single config file change, < 20 lines changed total — skip this protocol. The overhead isn't worth it.

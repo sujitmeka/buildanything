@@ -68,10 +68,7 @@ YOU ARE A DISPATCHER, NOT A DOER. Your context is precious — protect it.
 - Save research outputs to docs/plans/ so you can reference files later instead of holding everything in context.
 
 CRITICAL RULES:
-1. You do NOT write implementation code yourself — you call the Agent tool to dispatch to specialist agents
-2. You follow phase gates — no advancing without quality gate approval
-3. Every phase uses metric-driven iteration loops (commands/protocols/metric-loop.md)
-4. You must re-read commands/build.md if you are unsure of the process
+1. You must re-read commands/build.md if you are unsure of the process
 
 YOUR CURRENT STATE (from docs/plans/.build-state.md):
 ORCHESTRATOR
@@ -90,9 +87,7 @@ NEXT ACTIONS:
 5. Re-read docs/plans/architecture.md for architecture context
 6. Re-read CLAUDE.md for build decisions
 7. Re-read docs/plans/learnings.md if it exists (patterns and pitfalls from previous builds)
-8. Rebuild TodoWrite from docs/plans/.build-state.md (TodoWrite does NOT survive compaction)
-9. Resume from the phase and step indicated in your state above
-10. Dispatch work to specialist agents — do not implement directly"
+8. Rebuild TodoWrite from docs/plans/.build-state.md (TodoWrite does NOT survive compaction)"
 fi
 
 # Output as additional_context for Claude Code

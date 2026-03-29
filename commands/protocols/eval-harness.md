@@ -4,10 +4,7 @@ You are the orchestrator. Phase 6.1 audits are complete. Before running the metr
 
 ## How This Differs from the Metric Loop
 
-The metric loop answers "how good is this?" (qualitative score 0-100, iterative improvement).
-The eval harness answers "does this specific behavior work reliably?" (binary pass/fail, deterministic).
-
-They are complementary: eval harness failures become specific issues for the metric loop to fix.
+The metric loop scores quality 0-100; the eval harness tests specific behaviors as binary pass/fail. Eval failures feed into the metric loop as concrete issues.
 
 ## Step 0: Define Eval Cases
 
@@ -30,11 +27,13 @@ Aim for 8-15 eval cases. Cover: auth boundaries, input validation, error handlin
 
 **Eval cases must be concrete and executable** — actual commands (curl, function calls, UI interactions), not descriptions. Bad: "Auth should work." Good: "curl -X GET /api/recipes without Authorization header → expect 401."
 
+For UI flows, use agent-browser: "agent-browser open http://localhost:3000/dashboard → agent-browser click @e3 (Submit button) → agent-browser wait --text \"Order confirmed\" → expect page contains confirmation ID". These are concrete and executable via agent-browser CLI.
+
 ## Step 1: Run Eval
 
 Call the Agent tool — description: "Run eval harness" — mode: "bypassPermissions" — prompt:
 
-"[COMPLEXITY: M] Run these eval cases. For each case, execute the action the specified number of times (k). Report per case: PASS (N/k passed, meets threshold) or FAIL (N/k passed, below threshold). Include the actual result on failures. [paste eval case table]"
+"[COMPLEXITY: M] Run these eval cases. For each case, execute the action the specified number of times (k). Report per case: PASS (N/k passed, meets threshold) or FAIL (N/k passed, below threshold). Include the actual result on failures. For eval cases that specify agent-browser commands, start the dev server first, then execute the agent-browser sequence. Capture annotated screenshots on failure. [paste eval case table]"
 
 <HARD-GATE>
 The eval agent RUNS cases. It does NOT define them. Case definition is the orchestrator's job.

@@ -2,11 +2,20 @@
 
 You are the orchestrator. Phase 2 (Architecture) is complete. Before building anything, you must establish a research-backed visual design system. This phase is a FULL PEER to Architecture and Build — not a footnote.
 
-## Why This Phase Exists
+## Anti-AI-Template Checklist
 
-UI/UX is the first thing a user experiences. A structurally sound app with ugly UI fails. A beautiful app with minor bugs succeeds. Design is not decoration — it is the product.
+Penalize if 3+ of these appear together:
+- Purple-to-blue or purple-to-pink gradient hero backgrounds
+- Floating mesh/blob gradient decorative elements
+- Inter or Plus Jakarta Sans as the font choice (unless research specifically justifies it)
+- 3-column icon + heading + paragraph feature grids as the primary content pattern
+- Glassmorphism/frosted glass as the primary design language
+- Bento grid as default layout
+- Dark mode + neon accents as the "premium" look
+- Generic illustration pack imagery (Undraw, Humaaans style)
+- Perfect symmetry everywhere with no visual tension or personality
 
-Top design firms (Pentagram, Work & Co, Clay, Metalab) treat design as its own phase with its own research, iteration, and quality gates. This protocol replicates that process: Discovery → Direction → Prototyping → Visual QA.
+One or two in isolation is fine IF the research supports it. Three or more together = AI template smell. Every visual choice must be justified by the research.
 
 ---
 
@@ -119,19 +128,7 @@ OUTPUT a Visual Design Spec covering:
 
 8. **Design Rationale** — For EVERY major decision, cite the research. "The top 3 Awwwards sites in this category use geometric sans-serifs with high x-heights. Competitor Y uses Inter which is ubiquitous. We chose Space Grotesk to differentiate while maintaining the same readability characteristics."
 
-ANTI-AI-TEMPLATE RULES:
-Your design MUST NOT fall into the generic AI aesthetic. Penalize yourself if 3+ of these appear together:
-- Purple-to-blue or purple-to-pink gradient hero backgrounds
-- Floating mesh/blob gradient decorative elements
-- Inter or Plus Jakarta Sans as the font choice (unless research specifically justifies it)
-- 3-column icon + heading + paragraph feature grids as the primary content pattern
-- Glassmorphism/frosted glass as the primary design language
-- Bento grid as default layout
-- Dark mode + neon accents as the "premium" look
-- Generic illustration pack imagery (Undraw, Humaaans style)
-- Perfect symmetry everywhere with no visual tension or personality
-
-ONE or two of these in isolation is fine IF the research supports it. THREE or more together = AI template smell. Every visual choice must be JUSTIFIED by the research, not by framework defaults.
+Apply the Anti-AI-Template Checklist above. Every visual choice must be JUSTIFIED by the research, not by framework defaults.
 
 Save output to docs/plans/visual-design-spec.md.
 ```
@@ -193,53 +190,28 @@ INPUTS:
 Score 0-100 across these 6 dimensions (weight equally, average for final score):
 
 1. **Spacing & Alignment (0-100)**
-   - Is the 8px grid respected consistently?
-   - Do elements breathe? Generous whitespace between sections (hero padding 120-200px, not 40px)?
-   - Internal component padding < external margin between components (Gestalt proximity)?
-   - Visual grouping through whitespace, not just borders?
+   - 8px grid respected? Hero padding 120-200px, not 40px?
+   - Internal component padding < external margin (Gestalt proximity)?
 
 2. **Typography Hierarchy (0-100)**
-   - Clear 3-4 levels of visual hierarchy?
+   - Line heights: body 1.5-1.6x, headings 1.1-1.3x?
    - Consistent type scale from the spec applied?
-   - Proper line heights (body: 1.5-1.6x, headings: 1.1-1.3x)?
-   - Font weight contrast used effectively (not just size)?
-   - Letter spacing appropriate for context?
 
 3. **Color Harmony (0-100)**
-   - Cohesive palette matching the spec?
    - 60-30-10 rule (60% neutral, 30% secondary, 10% accent)?
-   - WCAG AA contrast ratios (4.5:1 body, 3:1 large text)?
-   - Shadows tinted not pure black?
-   - Colors slightly desaturated (refined, not garish)?
+   - WCAG AA contrast (4.5:1 body, 3:1 large text)? Shadows tinted not pure black?
 
 4. **Component Polish (0-100)**
-   - Hover states present and smooth?
-   - Focus-visible indicators for keyboard nav?
-   - Consistent border radius throughout?
-   - Shadow/elevation system applied per spec?
-   - Transitions feel intentional (not instant, not sluggish)?
-   - Loading/empty states considered?
+   - All states present (hover, focus-visible, disabled, loading)?
+   - Shadow/elevation and border radius per spec?
 
 5. **Responsive Quality (0-100)**
-   - Mobile layout functional and readable at 375px?
-   - No horizontal scroll on any breakpoint?
-   - Touch targets 44px+ on mobile?
-   - Layout ADAPTS (not just stacks) — different patterns per breakpoint?
-   - Images and media scale properly?
+   - Touch targets 44px+ on mobile? No horizontal scroll?
+   - Layout adapts per breakpoint (not just stacks)?
 
 6. **Originality (0-100)**
    - Does this look DESIGNED or GENERATED?
-   - Penalize heavily if 3+ of these appear together:
-     * Purple/blue gradient hero background
-     * Floating blob/mesh gradient decorations
-     * Inter or Plus Jakarta Sans as the only font
-     * 3-column icon+heading+paragraph feature grids
-     * Glassmorphism cards as primary style
-     * Bento grid as default layout
-     * Dark mode + neon accents aesthetic
-     * Generic illustration pack imagery
-     * Perfect symmetry everywhere, no visual tension
-   - One or two in isolation is fine. Three+ together = "AI template" smell.
+   - Apply the Anti-AI-Template Checklist above. Penalize heavily if 3+ items appear together.
    - The test: would a human designer say "this was made by AI"?
    - Does the design have personality and point of view?
 
