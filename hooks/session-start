@@ -2,6 +2,17 @@
 # buildanything: SessionStart hook
 # Re-injects orchestrator identity after context compaction, resume, or clear.
 
+# Dep check: warn if plugin deps (installed via bin/setup.js) are missing.
+DEPS_WARNING=""
+MISSING=()
+command -v agent-browser >/dev/null 2>&1 || MISSING+=("agent-browser CLI")
+{ [ -e "$HOME/.claude/skills/agent-browser" ] || [ -e "$HOME/.claude/skills/agent-browser.md" ]; } || MISSING+=("agent-browser skill")
+{ [ -e "$HOME/.claude/skills/dogfood" ] || [ -e "$HOME/.claude/skills/dogfood.md" ]; } || MISSING+=("dogfood skill")
+if [ ${#MISSING[@]} -gt 0 ]; then
+  JOINED=$(IFS=,; echo "${MISSING[*]}"); JOINED=${JOINED//,/, }
+  DEPS_WARNING="buildanything: missing deps (${JOINED}). Run /buildanything:setup to complete install."
+fi
+
 # Check if a build pipeline is active by looking for .build-state.md
 BUILD_STATE=""
 if [ -f "docs/plans/.build-state.md" ]; then
@@ -15,7 +26,7 @@ fi
 
 # Check if we're past Phase 3 but missing design artifacts
 if [ -n "$BUILD_STATE" ]; then
-  CURRENT_PHASE=$(echo "$BUILD_STATE" | grep -oP 'Phase: \K[0-9]+' | head -1)
+  CURRENT_PHASE=$(echo "$BUILD_STATE" | sed -n 's/.*Phase: *\([0-9][0-9]*\).*/\1/p' | head -1)
   if [ "$CURRENT_PHASE" -ge 4 ] 2>/dev/null && [ ! -f "docs/plans/visual-design-spec.md" ]; then
     DESIGN_WARNING="
 DESIGN GATE VIOLATION: Current phase is ${CURRENT_PHASE} but docs/plans/visual-design-spec.md does not exist.
@@ -88,6 +99,12 @@ NEXT ACTIONS:
 6. Re-read CLAUDE.md for build decisions
 7. Re-read docs/plans/learnings.md if it exists (patterns and pitfalls from previous builds)
 8. Rebuild TodoWrite from docs/plans/.build-state.md (TodoWrite does NOT survive compaction)"
+fi
+
+# Prepend deps warning (if any) to the context — applies to both branches.
+if [ -n "$DEPS_WARNING" ]; then
+  CONTEXT="${DEPS_WARNING}
+${CONTEXT}"
 fi
 
 # Output as additional_context for Claude Code
