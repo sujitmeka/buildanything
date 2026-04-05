@@ -9,6 +9,15 @@ Input: $ARGUMENTS
 
 ---
 
+## Project-type branching
+
+Read `docs/plans/.build-state.md` → `project_type`.
+
+- **If `project_type=web`** (or unset): continue with the web flow below (Steps 1-5, unchanged).
+- **If `project_type=ios`**: jump to **§ iOS Fix (project_type=ios)** at the bottom of this file and run that twin instead. Do not run the web steps.
+
+---
+
 ## Step 1: Scope the Bug
 
 Parse the user's description. Identify:
@@ -87,3 +96,59 @@ State concisely:
 - **Cause**: why it was broken (one sentence)
 - **Fix**: what was changed and in which files
 - **Evidence**: before and after screenshots taken in Steps 2 and 4
+
+---
+
+## iOS Fix (project_type=ios)
+
+Load `protocols/ios-context.md` as your persona. Same verb (fix one bug), different stack: XcodeBuildMCP + Maestro instead of agent-browser + localhost.
+
+### i1. Preflight
+**Run iOS preflight:** see `protocols/ios-preflight.md`. If any check fails, stop and report — do not try to scaffold.
+
+### i2. Reproduce
+- Boot the target simulator via XcodeBuildMCP.
+- Install + launch the app (`BuildProject` if needed, then install the `.app`).
+- Trigger the bug via ONE of:
+  1. **Existing Maestro flow** — replay the failing flow in `maestro/` if one exists.
+  2. **Ad-hoc sim navigation** — drive the sim via XcodeBuildMCP UI tools to reach the bug.
+  3. **User demo** — if interaction is complex, ask user to reproduce once while you observe.
+- Capture evidence: sim screenshot (`before-fix.png`) + crash log / console output (if any) via XcodeBuildMCP.
+- If the bug cannot be reproduced: save screenshot, report observed state, stop.
+
+### i3. Classify
+Match the symptom to exactly one row. Dispatch the skill in the rightmost column.
+
+| Symptom | Classification | Fix skill / agent |
+|---|---|---|
+| View renders wrong, modifier order, missing `@State`/`@Binding`, layout broken | SwiftUI bug | `skills/ios/swiftui-pro` |
+| Data race, actor isolation warning, `Sendable` violation, hang on main | Concurrency | `skills/ios/swift-concurrency` |
+| `@Query` not updating, predicate wrong, migration failure, CloudKit sync | SwiftData | `skills/ios/swiftdata-pro` |
+| VoiceOver silent/wrong, Dynamic Type clipping, contrast fail, Reduce Motion ignored | Accessibility | `skills/ios/swift-accessibility` |
+| Touch target <44pt, no dark mode, hard-coded padding, HIG violation | HIG | `skills/ios/ios-hig` |
+| Build fails, signing error, entitlement / Info.plist / provisioning | Build/infra | dispatch `build-error-resolver` agent |
+| Keychain/Crypto misuse, ATS exception, insecure storage, secret leak | Security | `skills/ios/swift-security-expert` |
+
+If symptom doesn't match any row, pick the closest and note the gap in the fix report.
+
+### i4. Fix
+Dispatch the classified skill with mode "bypassPermissions". Pass as input:
+- Bug description (from `$ARGUMENTS`)
+- Reproduction evidence (screenshot path, crash log excerpt)
+- Affected file(s) — scope tightly, do not dump the whole project
+- Expected behavior (one sentence)
+
+### i5. Verify loop
+1. `BuildProject` via XcodeBuildMCP — must succeed with zero warnings/errors.
+2. Re-install on sim, re-run the Maestro flow OR re-trigger via sim nav.
+3. Capture `after-fix.png` sim screenshot.
+4. Visual diff: compare before/after against expected.
+5. Spot-check one adjacent screen/flow for regression.
+6. If still failing → return to **i3. Classify** (bug may be mis-classified). **Max 3 fix-verify iterations** per locked plan; after that, report what's fixed, what remains, stop.
+
+### i6. Output
+Append to `docs/plans/.build-state.md`:
+- **Bug**: what was broken
+- **Classification**: which row from i3
+- **Fix**: files changed + skill used
+- **Evidence**: `before-fix.png`, `after-fix.png`, build status

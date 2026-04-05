@@ -1,0 +1,16 @@
+# Onboarding: launch -> splash -> sign up -> main screen
+appId: com.acme.HabitForge
+---
+- launchApp
+- assertVisible: "Welcome"
+- tapOn: "Sign Up"
+- assertVisible: "Create your account"
+- tapOn:
+    id: "emailField"
+- inputText: "alice@example.com"
+- tapOn:
+    id: "passwordField"
+- inputText: "hunter2hunter2"
+- hideKeyboard
+- tapOn: "Continue"
+- assertVisible: "Your Habits"

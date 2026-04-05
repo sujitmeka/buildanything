@@ -1,0 +1,9 @@
+# Minimal tap + assert pattern
+appId: com.acme.HabitForge
+---
+- launchApp
+- assertVisible: "Your Habits"
+- tapOn: "Add Habit"
+- assertVisible: "New Habit"
+- tapOn: "Cancel"
+- assertVisible: "Your Habits"

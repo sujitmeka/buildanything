@@ -1,0 +1,17 @@
+# Form fill + scroll + submit
+appId: com.acme.HabitForge
+---
+- launchApp
+- tapOn: "Add Habit"
+- assertVisible: "New Habit"
+- tapOn:
+    id: "habitNameField"
+- inputText: "Drink water"
+- hideKeyboard
+- tapOn:
+    id: "notesField"
+- inputText: "Eight glasses per day, spread across mornings and afternoons"
+- hideKeyboard
+- scroll
+- tapOn: "Save"
+- assertVisible: "Drink water"

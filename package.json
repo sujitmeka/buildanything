@@ -35,6 +35,9 @@
     "agents/",
     "commands/",
     "hooks/",
-    "README.md"
+    "protocols/",
+    "skills/",
+    "README.md",
+    "CHANGELOG.md"
   ]
 }

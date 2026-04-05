@@ -1,0 +1,14 @@
+# Open modal sheet, interact, dismiss
+appId: com.acme.HabitForge
+---
+- launchApp
+- tapOn: "Settings"
+- assertVisible: "Preferences"
+- tapOn: "Appearance"
+- assertVisible: "Theme"
+- tapOn: "Dark"
+- swipe:
+    direction: DOWN
+- assertVisible: "Preferences"
+- back
+- assertVisible: "Your Habits"

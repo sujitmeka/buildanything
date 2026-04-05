@@ -1,0 +1,13 @@
+# Tab bar navigation — verify each tab loads its root screen
+appId: com.acme.HabitForge
+---
+- launchApp
+- assertVisible: "Your Habits"
+- tapOn: "Stats"
+- assertVisible: "Weekly Progress"
+- tapOn: "Journal"
+- assertVisible: "Entries"
+- tapOn: "Settings"
+- assertVisible: "Preferences"
+- tapOn: "Habits"
+- assertVisible: "Your Habits"

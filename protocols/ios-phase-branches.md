@@ -1,0 +1,162 @@
+# iOS Phase Branches
+
+_Loaded into orchestrator session context when `project_type=ios`. Contains per-phase iOS-specific instructions. Mode-agnostic phase scaffolding lives in `commands/build.md`._
+
+## iOS Mode Tool Stack
+
+When `project_type=ios` is set in `docs/plans/.build-state.md`, use this stack in place of the web defaults:
+
+- Project creation: Xcode New Project dialog (user-guided — no Tuist, no XcodeGen)
+- Structure changes: XcodeBuildMCP primary / user-assisted Add Files fallback
+- Swift code edits: direct file writes (Claude via Edit/Write tools)
+- Build, diagnostics, SwiftUI Preview capture: XcodeBuildMCP
+- E2E tests: Maestro (`.yaml` flows — agent-friendly)
+- OAuth / web-views on simulator: agent-browser `-p ios` (Mobile Safari only, not native UI)
+- Design references: Apple HIG + SF Symbols + Liquid Glass (iOS 26+)
+- Code signing / TestFlight / App Store: fastlane (optional — Phase 7 only)
+
+**Architecture default for iOS:** vanilla SwiftUI + `@Observable`. TCA is opt-in only (user explicitly requests it, or existing TCA codebase detected). Do not propose TCA by default.
+
+All iOS implementation agents inherit the `protocols/ios-context.md` persona (Senior iOS Engineer) — pass it into every agent prompt in Phases 4, 5, 6, 7 when `project_type=ios`.
+
+## Phase 0 additions (iOS-specific)
+
+When Phase 0 classifier sets `project_type=ios`:
+- Load `protocols/ios-context.md` into orchestrator session context — it holds the Senior iOS Engineer persona inherited by every iOS implementation agent (injected into agent prompts).
+- Reference `protocols/ios-frameworks-map.md` by **path only** — do NOT load its 323 lines into session context or inject into agent prompts. It is a lookup reference: agents `Read` it on-demand when they hit a "user wants X → which Apple framework?" question, grep for their capability, extract the 1-2 relevant rows. The orchestrator cites it by path when dispatching the architect, entitlements-generator, and impl agents; those agents open it themselves.
+- Use the iOS Mode Tool Stack above — not the web defaults.
+- Phase 3 skips `/design-system` (no web style guide). Phase 6 dispatches to iOS twins of `/verify` + `/ux-review` + `/fix`.
+- If greenfield (no `.xcodeproj` exists), **Phase -1 Bootstrap** runs before Phase 1.
+
+## Phase -1 — iOS Bootstrap (iOS-only, greenfield only)
+
+**Runs ONLY if** `project_type=ios` AND no `.xcodeproj` exists in the project root. Skip entirely for `project_type=web` OR when an Xcode project already exists.
+
+**Goal:** verify the iOS toolchain, create the Xcode project, wire MCP servers, install test tooling — so Phase 1 planning starts against a real, buildable Xcode project.
+
+### Step -1.1 — Environment Check
+
+Verify (or guide the user to install):
+- **Xcode 26.3+** (hard requirement — no fallback). If missing or older, direct user to Mac App Store update. Requires macOS 26 Tahoe + Apple Silicon.
+- **XcodeBuildMCP** server configured in Claude settings.
+- **apple-docs-mcp** server configured (for iOS 26 API lookups during architecture).
+- **Maestro CLI** (`brew install maestro`) for E2E tests.
+- **fastlane** — defer to Phase 7, do NOT install now (optional, ship-only).
+
+### Step -1.2 — Xcode Project Creation (user-guided)
+
+Dispatch the `ios-bootstrap` skill (or inline the prompt if the skill isn't available):
+
+Call the Agent tool — description: "iOS bootstrap" — mode: "bypassPermissions" — prompt: "Guide the user through creating a new Xcode project via Xcode's New Project dialog (File > New > Project > iOS App). Target: iOS 26.0+, Swift 6.2+, SwiftUI interface, SwiftData storage (if data persistence is in the design). Do NOT use Tuist or XcodeGen. After the user confirms project creation, verify: `.xcodeproj` exists, the project builds clean via XcodeBuildMCP, and the app launches on a simulator. Also create the canonical `maestro/` directory at the project root (for Phase 4 flow stubs + Phase 5 smoke tests) — no leading dot, committed to git. Report the project path and bundle identifier."
+
+### Step -1.3 — Bootstrap Verification
+
+Confirm all of: Xcode version OK, `.xcodeproj` exists, XcodeBuildMCP responds, apple-docs-mcp responds, Maestro installed, first build+launch on simulator succeeded. Log status to `docs/plans/.build-state.md` under `## iOS Bootstrap`. If any check fails, STOP and surface the blocker — do NOT proceed to Phase 1.
+
+**Compaction checkpoint.** Update `docs/plans/.build-state.md` per the format in `commands/build.md`.
+
+## Phase 1 — Plan (iOS additions)
+
+Load phase-specific iOS skill bundle per `protocols/ios-context.md` §Phase 1. Planning agent = `ios-swift-architect` (not the generic web planner). Market/tech-feasibility research agents must check App Store category landscape, TestFlight constraints, and iOS 26 API availability (via apple-docs-mcp) in addition to standard research.
+
+## Phase 2 — Architecture (iOS additions)
+
+Load phase-specific iOS skill bundle per `protocols/ios-context.md` §Phase 2. Architecture agents must select iOS 26 APIs via apple-docs-mcp (verify availability, deprecations, minimum OS). Replace "Backend architecture" / "Frontend architecture" with: (1) SwiftUI view hierarchy + navigation model, (2) SwiftData schema + CloudKit strategy, (3) Swift Concurrency / actor isolation plan, (4) iOS-specific security (Keychain, entitlements, ATS). Implementation blueprint lists Swift files + Xcode targets, not web modules.
+
+### Feature Flag Resolution (end of Phase 2)
+
+Before leaving Phase 2, resolve the `ios_features` flag block (schema in `protocols/ios-context.md` §iOS Feature Flag Schema) and WRITE it to `docs/plans/.build-state.md` under the `ios_features:` key. Determine each flag from the brainstorm + architecture outputs:
+
+- `widgets` — true if Home/Lock Screen widgets mentioned.
+- `liveActivities` — true if Live Activities / Dynamic Island mentioned.
+- `appIntents` — true if Siri / Shortcuts / App Intents mentioned.
+- `foundationModels` — true if on-device LLM / Foundation Models mentioned.
+- `storekit` — true if IAP / subscriptions mentioned.
+- `healthkit` — true if health / fitness data mentioned.
+- `push` — true if remote/local push notifications mentioned.
+- `cloudkit` — true if cross-device sync mentioned.
+- `siri` — true if Siri voice integration mentioned.
+- `location` — true if Maps / geolocation / geofencing mentioned.
+- `background` — true if background fetch / processing / BGTaskScheduler mentioned.
+- `cameraPhoto` — true if camera or photo picker mentioned.
+- `microphone` — true if audio recording / Speech mentioned.
+- `contacts` — true if Contacts framework mentioned.
+- `calendar` — true if EventKit / calendar / reminders mentioned.
+- `appleWatch` — true if watchOS companion mentioned.
+
+Resolution rule: keyword-match the brainstorm transcript + architecture doc; in autonomous mode default to `false` on ambiguous flags and log the assumption to `build-log.md`; in interactive mode confirm ambiguous flags with the user. These flags gate Phase 5 skill loading and Phase 4 entitlement generation.
+
+## Phase 3 — Design (iOS branch)
+
+Load phase-specific iOS skill bundle per `protocols/ios-context.md` §Phase 3. Do **NOT** build `/design-system` (web-only). Instead:
+
+- **Step 3.1 iOS** — agent-browser (`-p desktop`) harvests iOS UI references from **free** sources: screenlane.com (iOS screenshots), App Store web listings for top apps in the product category, Apple HIG pages, SF Symbols browser. No Mobbin (paid). Fallback: vibe-only design board if scraping blocked.
+- **Step 3.2 iOS** — synthesize an **iOS Design Board** (`docs/plans/ios-design-board.md`) grounded in Apple HIG + Liquid Glass (iOS 26+) + SF Symbols + the harvested references + the user's stated app vibe. Cover: typography (Dynamic Type scale), color (semantic + dark mode), spacing (HIG-compliant), navigation pattern (TabView / NavigationStack / sheets), iconography (SF Symbols).
+- **Skip Step 3.3** (Living Style Guide) — no web route.
+- **Step 3.4 iOS** — visual QA loop uses XcodeBuildMCP SwiftUI Preview captures (not Playwright screenshots). Exit criterion = user-approved pass/fail (not a 0-100 rubric). **Max 3 iterations** (tighter than web's 5). On stall: present captures + remaining issues to user for accept/reject decision.
+- Save final artifact to `docs/plans/ios-design-board.md` (Phase 4 gate reads this file instead of `visual-design-spec.md`).
+
+Phase 4 HARD-GATE: iOS mode requires `docs/plans/ios-design-board.md` to exist before Phase 4 starts. If missing, return to Phase 3.
+
+## Phase 4 — Foundation (iOS branch)
+
+Load phase-specific iOS skill bundle per `protocols/ios-context.md` §Phase 4.
+
+Dispatch `ios-entitlements-generator` (Info.plist + entitlements based on features: push, background, HealthKit, etc.) and `ios-info-plist-hardening` (ATS config, privacy usage strings, URL schemes).
+
+- **Step 4.1 (iOS):** Scaffolding is already done by Phase -1 Bootstrap. Instead, create the app target's folder structure (`Views/`, `Models/`, `Services/`, `Resources/`) via XcodeBuildMCP.
+- **Step 4.2 (iOS):** Implement iOS-native design tokens from `docs/plans/ios-design-board.md` (SwiftUI `Color` extensions, `Font` extensions, `ShapeStyle` tokens, spacing constants) — NOT web CSS.
+- **Step 4.2b (iOS):** Replace Playwright acceptance scaffolds with Maestro YAML flow stubs in `maestro/` directory.
+- **Step 4.3 (iOS):** Metric Loop on scaffold health — builds clean via XcodeBuildMCP, Swift Testing `@Test`s pass, structure matches architecture. Max 3 iterations.
+- **Step 4.4 (iOS):** Verification Gate via XcodeBuildMCP build + test. Do not proceed to Phase 5 until it passes.
+
+## Phase 5 — Build (iOS branch)
+
+Load full iOS skill bundle per `protocols/ios-context.md` §Phase 5. Every implementation agent inherits the `ios-context.md` Senior iOS Engineer persona. Bundle includes: `swiftui-pro`, `swift-concurrency`, `swiftdata-pro`, `swift-security-expert`, `swift-accessibility`.
+
+**Feature-flag gated skill loading** — before dispatching any gated skill, the orchestrator MUST read `ios_features` from `docs/plans/.build-state.md`. Load a gated skill only when its flag is `true`:
+- `widgets: true` → load `skills/ios/widgetkit/`
+- `liveActivities: true` → `skills/ios/activitykit/`
+- `appIntents: true` → `skills/ios/app-intents/`
+- `foundationModels: true` → `agents/ios-foundation-models-specialist.md`
+- `storekit: true` → `agents/ios-storekit-specialist.md`
+
+**Other Apple frameworks** (HealthKit, GameKit, ARKit, RealityKit, Vision, CoreML, MapKit, PhotoKit, WeatherKit, MusicKit, Contacts, EventKit, CallKit) — **available via iOS 26 SDK `import`**; agent uses `apple-docs-mcp` lookups + `ios-context.md` persona + `ios-entitlements-generator` for capability wiring. No dedicated mentor-skill yet — add one only if a specific framework becomes friction during dogfooding.
+
+### Step 5.1 — Implement (iOS)
+
+Call the Agent tool — description: "[task name]" — mode: "bypassPermissions" — prompt: "TASK: [task description + acceptance criteria]. HANDOFF — Architecture section: [paste]. Design section: [paste relevant section from `docs/plans/ios-design-board.md`]. Previous task output: [if relevant]. For UI tasks: consult `docs/plans/ios-design-board.md` for visual tokens + HIG patterns, and `skills/ios/swiftui-design-principles/` for the 10-rule polish checklist. Match the design board's tokens exactly. Implement fully with real Swift code, Swift Testing `@Test`s, and XcodeBuildMCP validation. Commit: 'feat: [task]'. Report what you built, files changed, and test results."
+
+Implementation agents edit Swift files directly and build/diagnose via XcodeBuildMCP. Set `[COMPLEXITY: S/M/L]` based on the task's Size from sprint-tasks.md.
+
+### Step 5.2 — Metric Loop (iOS)
+
+Metric loop uses XcodeBuildMCP SwiftUI Preview captures for UI verification (not agent-browser). Max 5 iterations.
+
+### Step 5.3b — Behavioral Smoke Test (iOS)
+
+Executes the task's **Maestro** flow from `maestro/` against a booted simulator (via XcodeBuildMCP `BuildAndRun` → `maestro test maestro/<flow>.yaml`) — NOT agent-browser or localhost. Evidence = Maestro run log + Preview/simulator screenshots. For OAuth/web-view flows on the simulator only, use agent-browser `-p ios`.
+
+## Phase 6 — Harden (iOS branch)
+
+Phase 6 does NOT run the web audit bundle. Instead, **dispatch to the three iOS twin commands in sequence**:
+
+1. `/buildanything:verify` (iOS twin — functional correctness, XcodeBuildMCP diagnostics, Maestro E2E)
+2. `/buildanything:ux-review` (iOS twin — HIG audit via SwiftUI Preview captures + Apple HIG checklist)
+3. `/buildanything:fix` (iOS twin — dispatches specialist iOS agents for each finding)
+
+Each twin owns its own scope and reviewer — they are NOT merged into a single loop. After all three twins complete, run **Step 6.4 Reality Check** (in `commands/build.md`) with iOS evidence (Maestro run logs, Preview captures, HIG findings).
+
+Skip Steps 6.1, 6.1b, 6.2, 6.2b, 6.2c (Playwright E2E), 6.2d (agent-browser dogfood), 6.2e (web fake-data patterns).
+
+## Phase 7 — Ship (iOS branch, optional)
+
+Ship pipeline is **optional** (simulator-only is a valid end-state — no Apple Developer account required).
+
+If the user opts to ship: run the iOS `asc-*` pipeline:
+- `asc-metadata-generator` (App Store Connect listing + keywords + description)
+- `asc-screenshot-generator` (generate App Store screenshots via XcodeBuildMCP at all required device sizes)
+- `asc-privacy-manifest` (PrivacyInfo.xcprivacy)
+- Then `fastlane` for code signing + TestFlight upload.
+
+This is SEPARATE from the web ship pipeline — do NOT run web README/deployment steps. Documentation = README with simulator run instructions + TestFlight invite link (if shipped). Skip Step 7.1 web docs and web deployment notes.
