@@ -1,6 +1,6 @@
 {
   "name": "buildanything",
-  "version": "1.7.1",
+  "version": "1.8.0",
   "description": "One command to build an entire product. 73 specialist agents orchestrated into a full engineering pipeline for Claude Code.",
   "bin": {
     "buildanything": "./bin/setup.js"
