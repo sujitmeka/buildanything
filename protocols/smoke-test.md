@@ -19,7 +19,15 @@ Check that `agent-browser` is available:
 which agent-browser
 ```
 
-If not installed, log "SMOKE: SKIPPED -- agent-browser not available" to `docs/plans/.build-state.md` and return. Do not block the build.
+**If installed:** proceed to Step 1.
+
+**If not installed AND the task has a non-N/A Behavioral Test field in `docs/plans/sprint-tasks.md`:**
+1. Dispatch an installer agent: "Install agent-browser via `npm install -g agent-browser`. Verify `which agent-browser` returns a path. Report PASS/FAIL." MAX 2 attempts.
+2. If installation succeeds, proceed to Step 1.
+3. If installation fails after 2 attempts, hard-fail the smoke test with directive: "agent-browser installation failed. Either (a) install manually and re-run, or (b) explicitly downgrade this task's Behavioral Test field to N/A in `sprint-tasks.md` to acknowledge the gap. The orchestrator may NOT proceed silently."
+4. Log "SMOKE: BLOCKED -- agent-browser unavailable, task [task-name] has Behavioral Test [field text]" to `docs/plans/.build-state.md`. Do NOT log SKIPPED. Do NOT log PASS. Return BLOCKED.
+
+**If not installed AND the task has Behavioral Test field = N/A:** log "SMOKE: SKIPPED -- task acknowledged as no-behavioral-coverage" with the task name. Return SKIPPED. (This is the only legal silent skip path, and it requires the spec to have explicitly declared N/A.)
 
 ## Step 1: Start Dev Server
 

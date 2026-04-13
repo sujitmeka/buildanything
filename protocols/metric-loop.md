@@ -57,7 +57,10 @@ Stop the loop if ANY of these:
 
 On stall or max iterations:
 - **Interactive mode:** present score history + top remaining issue to user. Ask for direction.
-- **Autonomous mode:** if score >= 60% of target, accept with warning. Otherwise skip. Log to `docs/plans/build-log.md`.
+- **Autonomous mode:**
+  - If score >= target: done (this branch is already handled in Step 2's exit conditions; included here for completeness).
+  - If score >= 60% of target AND no CRITICAL issues remain in the measurement: accept with WARNING. Log to `docs/plans/build-log.md` with the warning text and the score history. The orchestrator may proceed to the next phase, but the warning MUST be surfaced in the Phase 7 Completion Report's "Verification Gap" section.
+  - If score < 60% of target OR any CRITICAL issue remains: HALT. Do NOT skip. Log "METRIC LOOP: BLOCKED" to `docs/plans/.build-state.md` with the score history and the unresolved issues. Either (a) re-dispatch the fix agent with the unresolved issues, OR (b) abort the build with a directive to the user. The orchestrator may NOT silently proceed past a metric loop that did not converge.
 
 If not exiting, continue to Step 3.
 
