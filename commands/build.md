@@ -46,12 +46,12 @@ Your context window is precious. Protect it.
 
 If you catch yourself typing code or reading source files: STOP. You are wasting context. Spawn an agent.
 
-**Dispatch Counter:** Track agent dispatches in `docs/plans/.build-state.md` under `## Dispatch Counter`:
-- `dispatches_since_save: [N]`
-- `last_save: [Phase.Step]`
-Increment after each agent returns (parallel dispatch of 4 agents = +4). Reset to 0 after each compaction save.
+**Dispatch Counter:** Track agent dispatches in `docs/plans/.build-state.json` (source of truth) under the `dispatch_count` and `last_save_phase` fields:
+- `dispatch_count: [N]`
+- `last_save_phase: [Phase.Step]`
+Increment after each agent returns (parallel dispatch of 4 agents = +4). Reset to 0 after each compaction save. The rendered markdown view (`.build-state.md`) is regenerated from the JSON on every update — never edit the markdown directly.
 
-**Compaction checkpoint format:** At every phase boundary, check `dispatches_since_save` in `docs/plans/.build-state.md`. If >= 8: save ALL state (current phase, task statuses, metric loop scores, decisions) to `docs/plans/.build-state.md`. Reset `dispatches_since_save` to 0. TodoWrite does NOT survive compaction — rebuild it from this state file on resume.
+**Compaction checkpoint format:** At every phase boundary, check `dispatch_count` in `docs/plans/.build-state.json`. If >= 8: save ALL state (current phase, task statuses, metric loop scores, decisions) to `docs/plans/.build-state.json` and regenerate `.build-state.md` as the rendered view. Reset `dispatch_count` to 0. TodoWrite does NOT survive compaction — rebuild it from the JSON state file on resume. See `protocols/state-schema.md` for the full schema and rendering contract.
 
 Input: $ARGUMENTS
 
@@ -61,11 +61,22 @@ If the input contains `--autonomous` or `--auto`, this build runs **unattended**
 - Quality gates auto-approve. Do NOT pause and wait for user input.
 - Brainstorming runs in autonomous mode (see protocol).
 - Metric loops that stall accept at >= 60% of target, skip below that.
-- Log every decision to `docs/plans/build-log.md` so the user can review later.
 
 If `--autonomous` is NOT present, all quality gates require user approval as described below.
 
 When combining `--resume` with `--autonomous`: the current invocation's flags take precedence over saved state. If you resume a previously interactive build with `--autonomous`, it continues in autonomous mode.
+
+### Always-On Build Log
+
+`docs/plans/build-log.md` is written in **BOTH interactive and autonomous mode**. Every phase transition writes a one-line entry with the shape: `{timestamp, phase, step, action, outcome}`. Examples:
+
+```
+2026-04-13T19:00:01Z | Phase 0 | Step 0.1b | classified project_type=ios | ok
+2026-04-13T19:02:14Z | Phase 1 | Step 1.2 | dispatched 5 research agents | 5/5 returned
+2026-04-13T19:17:33Z | Phase 6 | Step 6.4 | Reality Checker verdict | PRODUCTION READY
+```
+
+This produces a readable build history that survives compaction, supports `--resume`, enables debugging, and gives the user a narrative of what happened during the build. Append to this file at EVERY phase boundary, EVERY Reality Checker dispatch, EVERY metric-loop iteration, and EVERY quality gate decision. In autonomous mode, ALSO log every auto-approval decision here so the user can review later.
 
 ### Metric Loop
 
@@ -89,11 +100,13 @@ METRIC LOOP NON-NEGOTIABLES:
 
 When spawning agents in sequence (e.g., architect → implementer → reviewer), pass **scoped handoffs** — not the full architecture dump. Each agent receives only what it needs:
 
-1. **Relevant architecture section** — the specific part of architecture.md that applies to this agent's task
+1. **Relevant architecture refs** (Phase 5+) or relevant architecture section (Phase 1-2) — see rule below
 2. **Previous agent's output** — what the upstream agent produced (if any)
 3. **Acceptance criteria** — what "done" looks like for THIS agent
 
-For implementation agents (Phase 5+): Do NOT paste the entire Design Document or Architecture Document. Extract the relevant sections only. For research and architecture agents (Phases 1-2): pass the full document — these agents need complete context to do their analysis.
+**Phase 5+ rule (refs not pastes):** For implementation agents, pass REFS to `architecture.md` and `visual-design-spec.md` / `ios-design-board.md` — NOT pasted content. The orchestrator reads `docs/plans/.refs.json` (produced by the Phase 2.3 architecture synthesizer per `protocols/architecture-schema.md`), resolves the task topic against the anchor index, and passes a short ref list to the implementer (primary anchor + optional secondary anchors). The implementer uses the Read tool to pull refs it needs. This keeps orchestrator context lean and lets the implementer widen its view on demand instead of being locked into whatever slice the orchestrator chose.
+
+**Phase 1-2 rule (full document):** For research and architecture agents (brainstorm synthesis, market research, tech feasibility, architecture design), pass the FULL Design Document — these agents need complete context to do their analysis and the refs pattern is premature (the architecture anchors don't exist yet).
 
 ### Complexity Routing (Advisory)
 
@@ -110,8 +123,8 @@ Mode-specific tool stacks, per-phase branches, and persona rules are in separate
 ## Phase 0: Context & Pre-Flight
 
 **Resuming?** If the input contains `--resume` OR if context was just compacted (SessionStart hook fired with active state):
-1. Read `docs/plans/.build-state.md` — verify it exists and has a Resume Point section.
-   If `docs/plans/.build-state.md` does not exist or has no Resume Point, warn the user: 'No previous build state found. Starting fresh.' Then proceed to Step 0.1 as a new build.
+1. Read `docs/plans/.build-state.json` (source of truth) — verify it exists and has a `resume_point` field. Fall back to reading `docs/plans/.build-state.md` (rendered view) if the JSON file is missing but the markdown exists (graceful migration path from pre-W1-2 builds).
+   If neither `docs/plans/.build-state.json` nor `docs/plans/.build-state.md` exists, OR neither has a Resume Point, warn the user: 'No previous build state found. Starting fresh.' Then proceed to Step 0.1 as a new build.
 2. Re-read this file and all protocol files in `protocols/`.
 3. Re-read `docs/plans/sprint-tasks.md`, `docs/plans/architecture.md`, and `CLAUDE.md`.
 4. Rebuild TodoWrite from the state file (TodoWrite does NOT survive compaction or session breaks).
@@ -146,7 +159,7 @@ Scan the build request AND any context from Step 0.1 for iOS signals. Keywords: 
 | Signal | Action |
 |---|---|
 | iOS keywords present in prompt | Confirm with user: "This looks like an iOS app — confirm? [y/n]" |
-| User confirms OR says iOS during brainstorming | Set `project_type: ios` in `docs/plans/.build-state.md` |
+| User confirms OR says iOS during brainstorming | Set `project_type: ios` in `docs/plans/.build-state.json` (regenerate markdown view) |
 | `.xcodeproj` / `Package.swift` / `*.swift` files in existing codebase | Set `project_type: ios` automatically |
 | No iOS signals, no Swift files | Default `project_type: web` (existing behavior) |
 
@@ -157,9 +170,30 @@ Scan the build request AND any context from Step 0.1 for iOS signals. Keywords: 
 - If `project_type=web`: load `protocols/web-phase-branches.md` into session context.
 - Load only ONE branch file. The other mode's content is irrelevant to this build.
 
-Record the classification in `docs/plans/.build-state.md` as a top-level field: `project_type: ios` or `project_type: web`. This field survives compaction and gates every branching block below.
+Record the classification in `docs/plans/.build-state.json` as the top-level `project_type` field: `"ios"` or `"web"`. Regenerate `.build-state.md` after the write. This field survives compaction and gates every branching block below.
 
 **Mode-specific additions to Phase 0:** See `protocols/ios-phase-branches.md` §Phase 0 additions (iOS only). No web-specific Phase 0 additions.
+
+### Step 0.1c — Learnings Loader
+
+Read `docs/plans/learnings.jsonl` (the cross-run learnings store). If the project-local file does not exist, fall back to `~/.claude/buildanything/learnings.jsonl` (the plugin's persistent learnings directory). If neither exists, this is a first-time-ever build — proceed with an empty active-learnings file and skip the rest of this step.
+
+If a learnings file exists:
+1. Parse each line as a JSON row with the schema written at Step 6.4.1: `{run_id, timestamp, project_type, phase_where_learning_surfaced, metric, top_issue, fix_applied, score_delta, pattern_type}`.
+2. Filter entries where `project_type` matches the current build's classification (set at Step 0.1b).
+3. Rank the filtered entries by a composite score: prefer entries matching the current build's expected `pattern_type` (PITFALL > PATTERN > HEURISTIC for relevance), then by `phase_where_learning_surfaced` (earlier phases first — they apply to more of the build), then by `score_delta` magnitude (larger deltas indicate higher-impact learnings).
+4. Select the top 3 most relevant entries.
+5. Write them to `docs/plans/.active-learnings.md` as a short markdown section (one bullet per learning) that downstream agents can inject into their prompts. Format:
+
+```markdown
+## Prior Learnings (top 3 relevant)
+
+- **PITFALL (phase 4.2b, iOS):** [top_issue] — fix: [fix_applied]
+- **PATTERN (phase 5.1, web):** [top_issue] — fix: [fix_applied]
+- **HEURISTIC (phase 6.2, iOS):** [top_issue] — fix: [fix_applied]
+```
+
+The Phase 5.1 implementer prompt assembly step (below) reads `.active-learnings.md` and injects its contents into every implementer dispatch under a `## Prior Learnings` section. This is how learnings from build N flow into build N+1.
 
 ### Step 0.2 — Human Prerequisites Checklist
 
@@ -194,8 +228,10 @@ Autonomous mode: Log checklist to `docs/plans/build-log.md`. Create `.env.exampl
 
 0. Create `docs/plans/` directory if it doesn't exist (greenfield projects won't have it).
 1. Create a TodoWrite checklist with Phases 0-7.
-2. Create `docs/plans/.build-state.md` as a single write with ALL of the following: phase and step (`Phase: 0 — Starting`), input (`[build request]`), context level (`[classification]`), prerequisites (`[status]`), dispatch counter (`dispatches_since_save: 0, last_save: Phase 0`), and a `## Resume Point` section with: phase, step, autonomous mode flag, completed tasks (none), git branch name.
+2. Write `docs/plans/.build-state.json` as the **source of truth** per the schema in `protocols/state-schema.md`. Required top-level fields: `project_type`, `phase`, `step`, `input`, `context_level`, `prerequisites`, `dispatch_count`, `last_save_phase`, `autonomous`, `session_id`, `session_started`, `completed_tasks[]`, `metric_loop_scores[]`, `resume_point { phase, step, completed_tasks, git_branch }`. Then regenerate `docs/plans/.build-state.md` from the JSON as a **read-only rendered view** — this is what humans read on resume. The markdown is derived; the JSON is authoritative. See `protocols/state-schema.md` for the rendering contract (deterministic layout, one section per top-level JSON field, no free-form appends).
 3. Go to Phase 1 (or Phase 2 if context level is "Full design").
+
+**Orchestrator note:** Throughout this file, references to "update `docs/plans/.build-state.md`" mean: update `.build-state.json` as the source of truth, then regenerate `.build-state.md` as the rendered view. The `.build-state.md` path is preserved for backward compatibility with downstream readers (resume handlers, compaction hooks, user inspection) but it is no longer the authoritative file. See `protocols/state-schema.md`.
 
 ---
 
@@ -332,6 +368,8 @@ Call the Agent tool 4 times in a single message:
 
 After all 4 return, YOU synthesize into one Architecture Document. Save to `docs/plans/architecture.md`.
 
+**SYNTHESIS OUTPUT CONTRACT:** emit `architecture.md` with stable section anchors per `protocols/architecture-schema.md`. Required top-level sections: Overview, Frontend, Backend, Data Model, Security, Infrastructure, MVP Scope, Out of Scope. Required subsection anchors listed in `architecture-schema.md`. Also emit `docs/plans/.refs.json` as a flat JSON index of all anchors in the synthesized doc — shape: `[{ "anchor": "#frontend/checkout", "topic": "short topic string", "file_path": "docs/plans/architecture.md" }, ...]`. This refs index is consumed by Phase 5.1 implementer dispatches (refs not pastes — see Handoff Documents rule above and Step 5.1 prompt assembly below).
+
 ### Step 2.3 — Metric Loop: Architecture Quality
 
 Run the Metric Loop Protocol (`protocols/metric-loop.md`) on the Architecture Document. Define a metric based on: coverage of design doc requirements, specificity, consistency between agents, and **simplicity** — is this the simplest architecture that meets the requirements? Could any service, abstraction, or dependency be eliminated without losing functionality? Penalize over-engineering (microservices for a simple app, Kubernetes for a static site, complex state management for a 3-page app). Max 3 iterations.
@@ -434,6 +472,28 @@ Expand TodoWrite with each sprint task.
 
 Per the mode-specific branch file referenced above. Pick the right developer framing: frontend, backend, AI, etc. Set `[COMPLEXITY: S/M/L]` based on the task's Size from sprint-tasks.md.
 
+**Prompt assembly — pass refs, not pastes.** The orchestrator MUST NOT slice `architecture.md` or `visual-design-spec.md` sections and paste them into the implementer prompt. Instead:
+
+1. Read `docs/plans/.refs.json` (generated by the Phase 2.3 architecture synthesizer per `protocols/architecture-schema.md`).
+2. Resolve this task's topic against the anchor index — pick the primary anchor (section the task directly touches) and any secondary anchors (sections the task's dependencies reference).
+3. Pass the implementer ONLY a ref list in the prompt, shaped like this:
+
+```
+ARCHITECTURE REFS:
+  - architecture.md#<anchor1> (primary)
+  - architecture.md#<anchor2> (secondary — read if touching X)
+DESIGN REFS:
+  - visual-design-spec.md#<anchor> (web only)
+  - ios-design-board.md#<anchor> (iOS only)
+PREVIOUS TASK: task-N → see docs/plans/.task-outputs/task-N.json for files-changed
+```
+
+4. Instruct the implementer: "Read the refs listed above via the Read tool as needed. Widen your view by reading additional refs from `docs/plans/.refs.json` if you discover a dependency not captured in the primary/secondary list. Do NOT expect pasted architecture content in this prompt."
+
+5. **Inject prior learnings.** Read `docs/plans/.active-learnings.md` (written by the Phase 0 Learnings Loader at Step 0.1c) and paste its contents into the implementer prompt under a `## Prior Learnings` section. If the active-learnings file is empty or missing, skip this injection silently — first-time builds legitimately have no prior learnings.
+
+This pattern respects the "dispatcher not doer" HARD-GATE at the top of this file: the orchestrator never reads `architecture.md` into its own context just to slice it.
+
 ### Step 5.1b — Cleanup (De-Sloppify)
 
 Follow the Cleanup Protocol (`protocols/cleanup.md`). Critical rules (survive compaction):
@@ -490,11 +550,87 @@ Run the Verification Protocol (`protocols/verify.md`). All checks must pass befo
 
 ### Step 6.4 — Reality Check
 
-Call the Agent tool — description: "Final verdict" — prompt: "You are the Reality Checker. Default: NEEDS WORK. The hardening loop reached score [final_score] after [iterations] iterations. Score history: [paste table]. Review all evidence. Eval harness results: [baseline pass rate] → [final pass rate]. E2E test results: [paste E2E table — 3 iterations, final pass rate, quarantined count]. Dogfood results: [paste issue count and any CRITICAL/HIGH findings, or 'clean — no issues found']. Fake data audit results: [paste findings or 'clean — no fake data detected']. CRITICAL failures remaining: [list or none]. Verdict: PRODUCTION READY or NEEDS WORK with specifics."
+<HARD-GATE>
+PRECONDITION (orchestrator-side, BEFORE dispatching the Reality Checker):
 
-<HARD-GATE>Do NOT self-approve. Reality Checker must give the verdict.</HARD-GATE>
+The orchestrator MUST verify ALL of the following evidence files exist and are non-empty before dispatching. If ANY are missing or empty, log "REALITY CHECK BLOCKED" to `docs/plans/.build-state.json` (and regenerate `.build-state.md`) with the missing-file list, and either:
+  - Interactive mode: present the blocker to the user with the missing-file list. Ask: "Re-run the failing step, or abort?" Do NOT proceed to Phase 7 with BLOCKED.
+  - Autonomous mode: return to the failing step (the one that should have produced the missing file) and re-dispatch it once. If still missing after one retry, log FAILED and abort the build. Do NOT proceed to Phase 7 with BLOCKED.
 
-**On PRODUCTION READY:** Log verdict. Proceed to Phase 7.
+REQUIRED EVIDENCE FOR ALL PROJECTS:
+  - `docs/plans/.build-state.json` exists, contains the current build session id, and contains a recent `VERIFY: PASS` line from this session.
+
+REQUIRED EVIDENCE FOR `project_type=web`:
+  - `docs/plans/evidence/eval-harness/baseline.json` (non-empty)
+  - `docs/plans/evidence/eval-harness/final.json` (non-empty)
+  - `docs/plans/evidence/e2e/iter-3-results.json` (non-empty)
+  - `docs/plans/evidence/dogfood/findings.md` (non-empty)
+  - `docs/plans/evidence/fake-data-audit.md` (non-empty)
+  - `docs/plans/evidence/manifest.json` (the file manifest written by the smoke test protocol)
+
+REQUIRED EVIDENCE FOR `project_type=ios`:
+  - `docs/plans/ios-verify-report.md` (non-empty, from `/buildanything:verify` iOS twin)
+  - `docs/plans/ios-ux-review-report.md` (non-empty, from `/buildanything:ux-review` iOS twin)
+  - At least one `*.yaml` file in `maestro/` directory
+  - At least one `*.png` screenshot in `docs/plans/evidence/maestro-runs/` from this build session
+  - `docs/plans/evidence/manifest.json`
+
+If any required file does not exist or is empty, do NOT dispatch the Reality Checker. STOP HERE.
+</HARD-GATE>
+
+Call the Agent tool — description: "Final verdict" — prompt: "You are the Reality Checker. Default verdict: NEEDS WORK. You receive evidence by FILE PATH only — never by paste. You must use the Read and Glob tools to verify each file exists, is non-empty, was modified within this build session (after timestamp `[build_session_start]`), and contains no placeholder strings ('TODO', 'PLACEHOLDER', 'TBD', 'FIXME', 'XXX').
+
+Evidence paths to verify:
+  - `docs/plans/.build-state.json`
+  - `docs/plans/evidence/manifest.json` (READ this file; for every entry, verify the `file_path` exists and the `byte_count` matches the on-disk size)
+  - [project-type-specific paths from the precondition above — orchestrator pastes the relevant list]
+
+For every Behavioral Test field in `docs/plans/sprint-tasks.md`, verify a corresponding evidence file exists in `docs/plans/evidence/[task-slug]/` AND that the test-stub-detector (per `protocols/verify.md` Step 2) does not flag the corresponding test file as a stub. Use Grep and Glob to locate.
+
+For every architecture MUST in `docs/plans/architecture.md`, verify the corresponding implementation file exists via Glob, AND that the file contains the named symbol via Grep.
+
+After completing all reads, write an evidence manifest summarizing what you verified to `docs/plans/evidence/reality-check-manifest.json` with fields: `{ file_path, sha256, byte_count, modified_time, verdict_contribution }`.
+
+Issue ONE of three verdicts:
+  - **PRODUCTION READY**: every required evidence file exists, every Behavioral Test maps to a non-stub test file, every architecture MUST maps to an implementation, zero placeholders, zero CRITICAL findings.
+  - **NEEDS WORK**: at least one fixable issue (failing test, missing implementation file for a non-critical task, fake-data finding) but the build is structurally complete. Return the specific list.
+  - **BLOCKED**: at least one required evidence file is missing or empty despite the precondition check having passed. This indicates a bug in the precondition logic. Return the missing-file list and STOP — do not return PRODUCTION READY.
+
+You may NOT issue PRODUCTION READY without having invoked the Read or Glob tool at least once. If your verdict reasoning does not cite specific file paths and specific contents you read, your verdict is invalid."
+
+**Reality Checker output schema:** the Reality Checker MUST return a structured verdict with these fields:
+
+```json
+{
+  "code_review_verdict": "PASS | FAIL",
+  "behavioral_verdict": "PASS | FAIL | UNVERIFIED",
+  "combined_verdict": "PRODUCTION READY | NEEDS WORK | BLOCKED",
+  "evidence_manifest_path": "docs/plans/evidence/reality-check-manifest.json",
+  "behavioral_test_count_declared": "<integer from sprint-tasks.md grep>",
+  "behavioral_test_count_passing": "<integer from test runner output>",
+  "behavioral_test_count_stub_flagged": "<integer from verify.md Step 2 stub detector>",
+  "evidence_files_checked": ["<list of paths>"],
+  "missing_evidence_files": ["<list of paths or empty>"],
+  "specific_findings": ["<list of issues if NEEDS WORK>"]
+}
+```
+
+**Combined verdict rules:**
+
+- `combined_verdict = "PRODUCTION READY"` REQUIRES `code_review_verdict == "PASS"` AND `behavioral_verdict == "PASS"` AND `behavioral_test_count_stub_flagged == 0`.
+- `combined_verdict = "NEEDS WORK"` if `code_review_verdict == "FAIL"` OR `behavioral_verdict == "FAIL"` OR `behavioral_test_count_stub_flagged > 0`.
+- `combined_verdict = "BLOCKED"` if `len(missing_evidence_files) > 0`. NEVER PRODUCTION READY in this case.
+
+**`behavioral_verdict = "UNVERIFIED"`** is a legal state for projects that legitimately have no behavioral tests (CLI tools, pure libraries, no UI). It is NEVER a synonym for PASS. The combined verdict in that case is NEEDS WORK with the specific finding "behavioral verification was not run" — and the user is presented with the option to either explicitly accept UNVERIFIED (which gets logged as "shipped without behavioral verification, user accepted") or downgrade to NEEDS WORK and provide tests.
+
+<HARD-GATE>
+Do NOT self-approve. Reality Checker must give the verdict.
+
+Verdict resolution:
+  - PRODUCTION READY → log verdict + manifest path. Proceed to Step 6.4.1 (Record Learnings), then Phase 7.
+  - NEEDS WORK → existing fix-and-retest loop below (max 2 cycles).
+  - BLOCKED → return to the step that should have produced the missing evidence, re-dispatch, re-run from precondition. NEVER proceed to Phase 7 with BLOCKED.
+</HARD-GATE>
 
 **On NEEDS WORK:** The Reality Checker returns specific issues. These must be fixed — not logged and ignored.
 
@@ -511,6 +647,20 @@ Max 2 NEEDS WORK cycles. If the Reality Checker returns NEEDS WORK a third time:
 - **Autonomous:** Log remaining issues to `docs/plans/build-log.md`. Proceed to Phase 7 with a warning in the completion report.
 Do not loop forever.
 </HARD-GATE>
+
+### Step 6.4.1 — Record Learnings (primary write)
+
+Reached only after a successful Reality Check (combined_verdict == PRODUCTION READY, OR combined_verdict == NEEDS WORK with all issues resolved on retry). Append a JSON line to `docs/plans/learnings.jsonl` (create if it doesn't exist). This is the PRIMARY learnings write — Phase 7.3 is retained only for late learnings surfaced during Phase 7 itself.
+
+Row schema (one line per learning, 3-5 rows per build):
+
+```json
+{"run_id": "[session_id]", "timestamp": "[ISO8601]", "project_type": "ios|web", "phase_where_learning_surfaced": "[N.x]", "metric": "[metric name]", "top_issue": "[short description]", "fix_applied": "[what was done]", "score_delta": [integer], "pattern_type": "PATTERN|PITFALL|HEURISTIC"}
+```
+
+Base rows on: metric loop stall patterns, build-fix frequency, phases that exceeded expected iterations, agent prompts that needed rework, Reality Checker NEEDS WORK findings that were resolved.
+
+Use the same `learnings.jsonl` path referenced by the Phase 0 Learnings Loader (Step 0.1c). The store is append-only — never truncate or rewrite prior rows.
 
 **Compaction checkpoint.** Update `docs/plans/.build-state.md` per the format above.
 
@@ -545,26 +695,53 @@ Per the mode-specific branch file referenced at the top of Phase 7.
 
 Run the Metric Loop Protocol on documentation. Define a metric based on completeness and whether a new developer could follow the README. Max 3 iterations.
 
-### Step 7.3 — Record Learnings
+### Step 7.3 — Record Late Learnings (Phase 7 only)
 
-Append to `docs/plans/learnings.md` (create if it doesn't exist). Review the build and record 3-5 learnings:
+**Note:** The primary learnings write happens after Phase 6.4 Reality Check (see Step 6.4 "Record Learnings" below). Step 7.3 is retained for any LATE learnings surfaced during Phase 7 itself (documentation friction, deployment blockers, requirements-coverage gaps surfaced in Step 7.0b).
 
-- **PATTERN:** [what worked well and should be repeated in future builds]
-- **PITFALL:** [what failed, caused waste, or required excessive iterations]
-- **HEURISTIC:** [project-specific tuning discovered during this build]
+If any late learnings surfaced during Phase 7, append them to `docs/plans/learnings.jsonl` using the same row schema as the primary write:
 
-Base learnings on: metric loop stall patterns, build-fix frequency, phases that exceeded expected iterations, agent prompts that needed rework.
+```json
+{"run_id": "[session_id]", "timestamp": "[ISO8601]", "project_type": "ios|web", "phase_where_learning_surfaced": "7.x", "metric": "[metric name if applicable]", "top_issue": "[short description]", "fix_applied": "[what was done]", "score_delta": [integer or null], "pattern_type": "PATTERN|PITFALL|HEURISTIC"}
+```
+
+Base late learnings on: documentation friction, deployment blockers, requirements-coverage gaps, late-surfacing Verification Gap findings. If no late learnings surfaced, skip this step entirely — an empty Phase 7.3 is the expected state for a clean build.
 
 ### Completion Report
 
-Create final commit. Present:
+Create final commit. The Completion Report MUST draw its verification surface from the Reality Checker's structured output (`docs/plans/evidence/reality-check-manifest.json`) — NOT from orchestrator summary prose. Present:
 
 ```
 BUILD COMPLETE
 Project: [name] | Tasks: [done]/[total] | Tests: [count] passing
-Agents used: [list] | Verdict: [Reality Checker result]
+Agents used: [list] | Verdict: [combined_verdict from Reality Checker]
 Metric loops run: [count] | Avg iterations: [N]
 Remaining: [any NEEDS WORK items]
 ```
 
-Mark all TodoWrite items complete. Update `docs/plans/.build-state.md`: "Phase: 7 COMPLETE."
+**Verification table (MANDATORY — pulled from Reality Checker structured output):**
+
+| Metric | Count | Status |
+|--------|-------|--------|
+| Behavioral Tests declared in spec | `behavioral_test_count_declared` | — |
+| Behavioral Tests with non-stub bodies | `behavioral_test_count_passing` | PASS if `== declared`, FAIL otherwise |
+| Behavioral evidence files written | count from `evidence_files_checked[]` | — |
+| Maestro flows present (iOS) | count of `maestro/*.yaml` | — |
+| Test-stub detector flagged files | `behavioral_test_count_stub_flagged` | PASS if `== 0`, FAIL otherwise |
+| Code review verdict | `code_review_verdict` | — |
+| Behavioral verdict | `behavioral_verdict` | — |
+| Combined verdict | `combined_verdict` | — |
+
+**Verification Gap handling:** If `behavioral_test_count_passing < behavioral_test_count_declared` OR `behavioral_test_count_stub_flagged > 0`, the report MUST surface a top-level "Verification Gap" section BEFORE writing the report to disk:
+
+```
+## Verification Gap
+
+The build declared [declared] behavioral tests but only [passing] have non-stub bodies.
+Stub-flagged files: [list from reality-check-manifest.json]
+Missing test bodies for tasks: [list from sprint-tasks.md grep of non-N/A Behavioral Test fields without matching non-stub test files]
+```
+
+Then ask the user: "Write the Completion Report with this verification gap surfaced? [YES/NO]" <HARD-GATE>DO NOT write the report to disk without explicit YES confirmation. In autonomous mode: still write but flag the gap prominently as the first section and log to `docs/plans/build-log.md`.</HARD-GATE>
+
+Mark all TodoWrite items complete. Update `docs/plans/.build-state.json` (source of truth) and regenerate `docs/plans/.build-state.md` (rendered view): "Phase: 7 COMPLETE."
