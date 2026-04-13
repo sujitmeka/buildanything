@@ -4,14 +4,14 @@
     "name": "Sujit"
   },
   "metadata": {
-    "description": "buildanything — one command to build an entire product. 73 agents, 2 commands, zero overwhelm.",
+    "description": "buildanything — one command to build an entire product. 61 agents, 2 commands, zero overwhelm.",
     "version": "1.0.0"
   },
   "plugins": [
     {
       "name": "buildanything",
       "source": "./",
-      "description": "Full product build pipeline with 73 specialist agents orchestrated across architecture, implementation, testing, and hardening phases. Includes /build (full factory) and /idea-sweep (parallel research).",
+      "description": "Full product build pipeline with 61 specialist agents orchestrated across architecture, implementation, testing, and hardening phases. Includes /build (full factory) and /idea-sweep (parallel research).",
       "version": "1.8.0"
     }
   ]

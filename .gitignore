@@ -1,3 +1,8 @@
 node_modules/
 .DS_Store
 research/
+
+# Local-only plugin R&D (debate artifacts, internal design docs, session state)
+# These live on the maintainer's machine but don't ship to plugin users.
+docs/plans/
+.claude/
