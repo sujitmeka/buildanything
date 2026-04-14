@@ -127,9 +127,10 @@ Mode-specific tool stacks, per-phase branches, and persona rules are in separate
    If neither `docs/plans/.build-state.json` nor `docs/plans/.build-state.md` exists, OR neither has a Resume Point, warn the user: 'No previous build state found. Starting fresh.' Then proceed to Step 0.1 as a new build.
 2. Re-read this file and all protocol files in `protocols/`.
 3. Re-read `docs/plans/sprint-tasks.md`, `docs/plans/architecture.md`, and `CLAUDE.md`.
-4. Rebuild TodoWrite from the state file (TodoWrite does NOT survive compaction or session breaks).
-5. Reset `dispatches_since_save` to 0 (fresh context window).
-6. Resume from the saved phase and step. Skip Phase 0.
+4. Read `docs/plans/decisions.jsonl` if it exists (sorted by `decision_id` desc, top 5 most recent rows filtered to the current phase and all upstream phases). Pass the short row fields + `ref` anchors into Phase 0 rehydration context — not the full row prose. See `protocols/decision-log.md`.
+5. Rebuild TodoWrite from the state file (TodoWrite does NOT survive compaction or session breaks).
+6. Reset `dispatches_since_save` to 0 (fresh context window).
+7. Resume from the saved phase and step. Skip Phase 0.
 
 ### Step 0.1 — Read the Room
 
@@ -140,6 +141,7 @@ Before doing anything, scan for existing context:
 - Check if there's existing code in the project. If so, this is an enhancement, not greenfield.
 - Check the conversation history — has the user been discussing this idea already?
 - Check if `docs/plans/learnings.md` exists from a previous build. If so, read it. Apply relevant PATTERNS to agent prompt design, avoid listed PITFALLs, use HEURISTICS when applicable.
+- Check if `docs/plans/decisions.jsonl` exists from a previous build or partial run. If so, note its presence — it will be read by the resume handler and by Reality Checker Step 6.4.
 
 **Classify what you found:**
 
@@ -288,7 +290,7 @@ Read the Design Document and Research Brief together. Check for contradictions:
 - User-research says "no validated demand" → flag as pivot point
 - Business-model says "no moat" → note for speed-to-market priority
 
-Update the Design Document with corrections. Save final version.
+Update the Design Document with corrections. Save final version. Then append decision rows to `docs/plans/decisions.jsonl` for every major Phase 1 decision — tech stack choice, data model shape, scope boundary — per `protocols/decision-log.md`. Author = the Brainstorm synthesis agent. Bounded per protocols/decision-log.md limits.
 
 ### Step 1.4 — Write CLAUDE.md
 
@@ -369,6 +371,8 @@ Call the Agent tool 4 times in a single message:
 After all 4 return, YOU synthesize into one Architecture Document. Save to `docs/plans/architecture.md`.
 
 **SYNTHESIS OUTPUT CONTRACT:** emit `architecture.md` with stable section anchors per `protocols/architecture-schema.md`. Required top-level sections: Overview, Frontend, Backend, Data Model, Security, Infrastructure, MVP Scope, Out of Scope. Required subsection anchors listed in `architecture-schema.md`. Also emit `docs/plans/.refs.json` as a flat JSON index of all anchors in the synthesized doc — shape: `[{ "anchor": "#frontend/checkout", "topic": "short topic string", "file_path": "docs/plans/architecture.md" }, ...]`. This refs index is consumed by Phase 5.1 implementer dispatches (refs not pastes — see Handoff Documents rule above and Step 5.1 prompt assembly below).
+
+**DECISION LOG:** Also append decision rows to `docs/plans/decisions.jsonl` for every cross-cutting architecture decision — API contract, service boundary, persistence layer, auth model, framework choice. Author = the architecture synthesizer. Each row carries a `ref` anchor pointing into `architecture.md` per `protocols/decision-log.md`.
 
 ### Step 2.3 — Metric Loop: Architecture Quality
 
@@ -492,6 +496,8 @@ PREVIOUS TASK: task-N → see docs/plans/.task-outputs/task-N.json for files-cha
 
 5. **Inject prior learnings.** Read `docs/plans/.active-learnings.md` (written by the Phase 0 Learnings Loader at Step 0.1c) and paste its contents into the implementer prompt under a `## Prior Learnings` section. If the active-learnings file is empty or missing, skip this injection silently — first-time builds legitimately have no prior learnings.
 
+**Decision log (deviation only):** Implementers write decision rows to `docs/plans/decisions.jsonl` ONLY when deviating from the planned task — e.g., when the acceptance criteria force a different approach than the architecture document assumed. Normal on-plan implementation does not write decisions. See `protocols/decision-log.md`.
+
 This pattern respects the "dispatcher not doer" HARD-GATE at the top of this file: the orchestrator never reads `architecture.md` into its own context just to slice it.
 
 ### Step 5.1b — Cleanup (De-Sloppify)
@@ -589,45 +595,25 @@ For every Behavioral Test field in `docs/plans/sprint-tasks.md`, verify a corres
 
 For every architecture MUST in `docs/plans/architecture.md`, verify the corresponding implementation file exists via Glob, AND that the file contains the named symbol via Grep.
 
-After completing all reads, write an evidence manifest summarizing what you verified to `docs/plans/evidence/reality-check-manifest.json` with fields: `{ file_path, sha256, byte_count, modified_time, verdict_contribution }`.
+After completing all reads, write an evidence manifest summarizing what you verified to `docs/plans/evidence/reality-check-manifest.json` with fields: `{ file_path, sha256, byte_count, modified_time, verdict_contribution }`. Emit any structural findings you surface during the sweep. Do NOT issue a combined verdict — hand off to Step 6.5."
 
-Issue ONE of three verdicts:
-  - **PRODUCTION READY**: every required evidence file exists, every Behavioral Test maps to a non-stub test file, every architecture MUST maps to an implementation, zero placeholders, zero CRITICAL findings.
-  - **NEEDS WORK**: at least one fixable issue (failing test, missing implementation file for a non-critical task, fake-data finding) but the build is structurally complete. Return the specific list.
-  - **BLOCKED**: at least one required evidence file is missing or empty despite the precondition check having passed. This indicates a bug in the precondition logic. Return the missing-file list and STOP — do not return PRODUCTION READY.
+Reality Checker's output is the **evidence manifest JSON** (written to `docs/plans/evidence/reality-check-manifest.json`) plus any structural findings it surfaces during its sweep. Reality Checker does NOT issue a combined verdict — that authority moved to the Launch Readiness Review aggregator at Step 6.5 (see below, per `protocols/launch-readiness.md`). Reality Checker hands off to Step 6.5; LRR chapter agents read the evidence manifest, emit typed chapter verdicts, and the LRR aggregator emits the final combined_verdict.
 
-You may NOT issue PRODUCTION READY without having invoked the Read or Glob tool at least once. If your verdict reasoning does not cite specific file paths and specific contents you read, your verdict is invalid."
+**Step 6.4.Xb — Dissent Log Revisit Pass.**
 
-**Reality Checker output schema:** the Reality Checker MUST return a structured verdict with these fields:
+As part of its evidence sweep, Reality Checker MUST read `docs/plans/decisions.jsonl`. For every row where `status == "open"` and `revisit_criterion` is non-empty, Reality Checker semantically evaluates the criterion against current evidence (metric-loop findings, eval harness results, smoke test outcomes, Reality Check findings). If triggered:
 
-```json
-{
-  "code_review_verdict": "PASS | FAIL",
-  "behavioral_verdict": "PASS | FAIL | UNVERIFIED",
-  "combined_verdict": "PRODUCTION READY | NEEDS WORK | BLOCKED",
-  "evidence_manifest_path": "docs/plans/evidence/reality-check-manifest.json",
-  "behavioral_test_count_declared": "<integer from sprint-tasks.md grep>",
-  "behavioral_test_count_passing": "<integer from test runner output>",
-  "behavioral_test_count_stub_flagged": "<integer from verify.md Step 2 stub detector>",
-  "evidence_files_checked": ["<list of paths>"],
-  "missing_evidence_files": ["<list of paths or empty>"],
-  "specific_findings": ["<list of issues if NEEDS WORK>"]
-}
-```
+1. Emit a structural finding in the evidence manifest citing the `decision_id`, form: `"revisit-criterion-triggered: D-N-M — [criterion]"`.
+2. Signal Step 6.4.1 (Record Learnings) to append a PITFALL row to `learnings.jsonl` with `{pattern_type: "PITFALL", top_issue: "[decision] — revisit criterion triggered: [criterion]", fix_applied: "[what the build did instead]", provenance: {decision_id: "D-N-M"}}`.
+3. Flag the triggered decision in the manifest — this feeds LRR aggregation as a potential cross-chapter concern.
 
-**Combined verdict rules:**
-
-- `combined_verdict = "PRODUCTION READY"` REQUIRES `code_review_verdict == "PASS"` AND `behavioral_verdict == "PASS"` AND `behavioral_test_count_stub_flagged == 0`.
-- `combined_verdict = "NEEDS WORK"` if `code_review_verdict == "FAIL"` OR `behavioral_verdict == "FAIL"` OR `behavioral_test_count_stub_flagged > 0`.
-- `combined_verdict = "BLOCKED"` if `len(missing_evidence_files) > 0`. NEVER PRODUCTION READY in this case.
-
-**`behavioral_verdict = "UNVERIFIED"`** is a legal state for projects that legitimately have no behavioral tests (CLI tools, pure libraries, no UI). It is NEVER a synonym for PASS. The combined verdict in that case is NEEDS WORK with the specific finding "behavioral verification was not run" — and the user is presented with the option to either explicitly accept UNVERIFIED (which gets logged as "shipped without behavioral verification, user accepted") or downgrade to NEEDS WORK and provide tests.
+See `protocols/decision-log.md` for the decisions.jsonl schema and `protocols/launch-readiness.md` for how triggered criteria feed LRR.
 
 <HARD-GATE>
-Do NOT self-approve. Reality Checker must give the verdict.
+Do NOT self-approve. The combined verdict comes from the LRR Aggregator at Step 6.5 (per protocols/launch-readiness.md), not from Reality Checker.
 
-Verdict resolution:
-  - PRODUCTION READY → log verdict + manifest path. Proceed to Step 6.4.1 (Record Learnings), then Phase 7.
+Verdict resolution (same shape, new source):
+  - PRODUCTION READY → log verdict + manifest path. Proceed to Step 6.4.1 (Record Learnings), then Step 6.5 (if not already run), then Phase 7.
   - NEEDS WORK → existing fix-and-retest loop below (max 2 cycles).
   - BLOCKED → return to the step that should have produced the missing evidence, re-dispatch, re-run from precondition. NEVER proceed to Phase 7 with BLOCKED.
 </HARD-GATE>
@@ -652,6 +638,8 @@ Do not loop forever.
 
 Reached only after a successful Reality Check (combined_verdict == PRODUCTION READY, OR combined_verdict == NEEDS WORK with all issues resolved on retry). Append a JSON line to `docs/plans/learnings.jsonl` (create if it doesn't exist). This is the PRIMARY learnings write — Phase 7.3 is retained only for late learnings surfaced during Phase 7 itself.
 
+**Also harvest PITFALL rows from decisions.jsonl triggered-revisit events.** Reality Checker's Dissent Log Revisit Pass (Step 6.4.Xb above) flags decisions whose `revisit_criterion` was triggered by current-build evidence. Each triggered criterion becomes a learnings row with `pattern_type: PITFALL`, `top_issue: "[decision] — [criterion]"`, `provenance.decision_id` referencing the source row. This is the cross-run PITFALL capture path — distinct from the metric-loop post-hoc harvest. See `protocols/decision-log.md`.
+
 Row schema (one line per learning, 3-5 rows per build):
 
 ```json
@@ -661,6 +649,66 @@ Row schema (one line per learning, 3-5 rows per build):
 Base rows on: metric loop stall patterns, build-fix frequency, phases that exceeded expected iterations, agent prompts that needed rework, Reality Checker NEEDS WORK findings that were resolved.
 
 Use the same `learnings.jsonl` path referenced by the Phase 0 Learnings Loader (Step 0.1c). The store is append-only — never truncate or rewrite prior rows.
+
+### Step 6.5 — Launch Readiness Review
+
+Follow the Launch Readiness Review Protocol (`protocols/launch-readiness.md`). LRR replaces the monolithic Reality Checker verdict authority with 5 independent chapter verdicts + aggregator. Reality Checker (Step 6.4) keeps its evidence sweep role; LRR Aggregator issues the final `combined_verdict`.
+
+**Precondition:** Step 6.4 (Reality Check evidence sweep + Dissent Log Revisit Pass) must have completed with a non-empty `docs/plans/evidence/reality-check-manifest.json`.
+
+**Step 6.5a — Dispatch 5 chapter agents in parallel.**
+
+Call the Agent tool 5 times in a single message. Each chapter agent receives fresh context, its own evidence slice, and the chapter verdict schema from `protocols/launch-readiness.md`.
+
+1. Description: "LRR Eng chapter" — Prompt: "You are the Engineering chapter of the Launch Readiness Review. Read: docs/plans/architecture.md, docs/plans/.task-outputs/, `protocols/verify.md` check outputs from `.build-state.json`, test results from Phase 5 and 6. Also read docs/plans/decisions.jsonl for context. Evaluate code quality, test coverage adequacy, and architecture conformance. Write a typed verdict to `docs/plans/evidence/lrr/eng.json` per protocols/launch-readiness.md schema. Fields: chapter=eng, verdict, override_blocks_launch, evidence_files_read (non-empty), findings[], follow_up_spawned=false, follow_up_findings=null. Eng chapters CANNOT spawn follow-ups."
+
+2. Description: "LRR QA chapter" — Prompt: "You are the QA chapter of the Launch Readiness Review. Read: docs/plans/evidence/e2e/iter-3-results.json, docs/plans/evidence/ for smoke tests and dogfood findings, behavioral-test stub detector output (per protocols/verify.md Step 2). Also read docs/plans/decisions.jsonl for context. Evaluate test adequacy — do declared behavioral tests actually exercise the features? Are there stub-flagged tests? Write a typed verdict to `docs/plans/evidence/lrr/qa.json` per protocols/launch-readiness.md schema. Fields: chapter=qa, verdict, override_blocks_launch, evidence_files_read (non-empty), findings[], follow_up_spawned=false, follow_up_findings=null. QA chapters CANNOT spawn follow-ups."
+
+3. Description: "LRR Sec chapter" — Prompt: "You are the Security chapter of the Launch Readiness Review. Read: docs/plans/evidence/fake-data-audit.md, the security section of Step 6.1's 5-agent audit output, eval-harness security cases, and docs/plans/decisions.jsonl for context. Evaluate auth model, input validation, secrets management, dependency vulnerabilities. Write a typed verdict to `docs/plans/evidence/lrr/sec.json` per protocols/launch-readiness.md schema. Fields: chapter=sec, verdict, override_blocks_launch, evidence_files_read (non-empty), findings[], follow_up_spawned (boolean), follow_up_findings (null or typed object). Sec chapters MAY spawn ONE follow-up investigation if verdict would be BLOCK or if a finding needs verification — follow-up is read-only, max 15 tool calls, self-report tool_calls_used. See protocols/launch-readiness.md for follow-up flow and hard caps."
+
+4. Description: "LRR SRE chapter" — Prompt: "You are the SRE/Reliability chapter of the Launch Readiness Review. Read: docs/plans/evidence/ for performance-audit outputs, NFRs from docs/plans/sprint-tasks.md, reliability checks from Phase 6 audits. Also read docs/plans/decisions.jsonl for context. Evaluate whether the build meets its NFR targets (response time, load handling, error rates) and is production-ready under load. Write a typed verdict to `docs/plans/evidence/lrr/sre.json` per protocols/launch-readiness.md schema. Fields: chapter=sre, verdict, override_blocks_launch, evidence_files_read (non-empty), findings[], follow_up_spawned (boolean), follow_up_findings (null or typed object). SRE chapters MAY spawn ONE follow-up investigation if verdict would be BLOCK or if a finding needs verification — same caps as Sec per protocols/launch-readiness.md."
+
+5. Description: "LRR Design chapter" — Prompt: "You are the Design chapter of the Launch Readiness Review. First verify via Glob that docs/plans/visual-design-spec.md exists. Read: visual-design-spec.md (if exists), Phase 3 metric loop final score from docs/plans/.build-state.json, and any Playwright screenshots under docs/plans/evidence/ that match Phase 3 visual QA (file patterns like evidence/design/ or screenshot paths). Write a typed verdict to `docs/plans/evidence/lrr/design.json` per protocols/launch-readiness.md schema. Design chapter rules: PASS if visual-design-spec.md exists AND Phase 3 metric score >= 80 AND at least one screenshot exists. CONCERNS if spec exists but score 65-79 or screenshots missing. BLOCK if spec missing or score < 65. Fields: chapter=design, verdict, override_blocks_launch, evidence_files_read (non-empty), findings[], follow_up_spawned=false, follow_up_findings=null. Design chapters CANNOT spawn follow-ups."
+
+**Step 6.5b — PM verdict (from existing Step 7.0b).**
+
+PM is not a separate chapter dispatch. The existing Step 7.0b Requirements Coverage Report (later in Phase 7) produces a PM verdict. Its output is written to `docs/plans/evidence/lrr/pm.json` per Edit 9 below. If Step 7.0b has not yet run, the LRR Aggregator proceeds with 5 chapter files and re-runs after Step 7.0b completes in Phase 7.
+
+**Step 6.5c — Dispatch the LRR Aggregator.**
+
+After all 5 chapter verdict files exist at `docs/plans/evidence/lrr/*.json`, call the Agent tool once more:
+
+Description: "LRR Aggregator" — Prompt: "You are the LRR Aggregator. Read every file matching `docs/plans/evidence/lrr/*.json` via Glob + Read. For each file, verify the schema matches protocols/launch-readiness.md (verdict is enum, evidence_files_read non-empty, override_blocks_launch only legal on BLOCK, follow_up_spawned only legal for sec/sre). Then apply the 6 aggregation rules from protocols/launch-readiness.md exactly:
+
+1. ANY `override_blocks_launch: true` → combined_verdict = BLOCKED
+2. ALL verdicts PASS AND zero follow-ups spawned → combined_verdict = PRODUCTION READY
+3. ANY verdict BLOCK (with override_blocks_launch: false) → combined_verdict = NEEDS WORK + findings routed to fix loop
+4. ANY verdict CONCERNS → combined_verdict = NEEDS WORK, concerns logged
+5. Follow-up spawned AND follow_up.confirmed: true → treat parent chapter verdict as if BLOCK
+6. Contradictions between chapters on typed fields → combined_verdict = BLOCKED with cross-chapter contradiction finding
+
+Write the final aggregate to `docs/plans/evidence/lrr-aggregate.json` with shape:
+{
+  \"combined_verdict\": \"PRODUCTION READY | NEEDS WORK | BLOCKED\",
+  \"chapter_verdicts\": { \"eng\": \"PASS|CONCERNS|BLOCK\", ... },
+  \"triggered_rule\": 1-6,
+  \"findings\": [ ... aggregated from all chapters ... ],
+  \"follow_ups_spawned\": [ list of chapters that spawned follow-ups ],
+  \"timestamp\": \"ISO-8601\"
+}
+
+You may NOT self-approve — you are mechanically applying the 6 rules. No verdict is valid without citing the triggering rule number."
+
+**Step 6.5d — Verdict resolution.**
+
+The LRR Aggregator's `combined_verdict` is the authoritative verdict. Resolution rules (same as prior Reality Checker semantics, new source):
+  - **PRODUCTION READY** → log aggregate path to `.build-state.json` and `build-log.md`. Proceed to Phase 7.
+  - **NEEDS WORK** → existing fix-and-retest loop from Step 6.4. Max 2 NEEDS WORK cycles (unchanged from prior policy).
+  - **BLOCKED** → return to the failing step. NEVER proceed to Phase 7 with BLOCKED.
+
+<HARD-GATE>
+The LRR Aggregator is the ONLY agent that may emit `combined_verdict`. No other agent — not the orchestrator, not Reality Checker, not individual chapters — may self-issue a combined verdict. This is the non-negotiable independence guarantee.
+</HARD-GATE>
 
 **Compaction checkpoint.** Update `docs/plans/.build-state.md` per the format above.
 
@@ -684,6 +732,8 @@ Call the Agent tool — description: "Requirements coverage check" — prompt: "
 |-------------|------|------|----------|--------|
 
 Mark each as COVERED, PARTIAL (implemented but untested), or MISSING. Any MISSING feature is a blocker — report it immediately."
+
+**LRR hook:** Also write a typed verdict file at `docs/plans/evidence/lrr/pm.json` per `protocols/launch-readiness.md` — `verdict=PASS` if all features COVERED, `CONCERNS` if any PARTIAL, `BLOCK` if any MISSING. Fields: `chapter=pm`, `verdict`, `override_blocks_launch=false`, `evidence_files_read` (the sprint-tasks / Design Doc paths read), `findings[]` (one per PARTIAL or MISSING feature), `follow_up_spawned=false`, `follow_up_findings=null`. After writing `lrr/pm.json`, if Step 6.5c LRR Aggregator has not yet run with this file, re-dispatch the aggregator so pm.json is included in the final combined verdict.
 
 If any features are MISSING: spawn implementation agents to build them, then re-run verification. This is the final safety net before shipping — it catches requirements that were planned but somehow never built.
 
@@ -709,17 +759,17 @@ Base late learnings on: documentation friction, deployment blockers, requirement
 
 ### Completion Report
 
-Create final commit. The Completion Report MUST draw its verification surface from the Reality Checker's structured output (`docs/plans/evidence/reality-check-manifest.json`) — NOT from orchestrator summary prose. Present:
+Create final commit. The Completion Report MUST draw its verification surface from the LRR Aggregator's structured output (`docs/plans/evidence/lrr-aggregate.json`) and the Reality Checker's evidence manifest (`docs/plans/evidence/reality-check-manifest.json`) — NOT from orchestrator summary prose. Present:
 
 ```
 BUILD COMPLETE
 Project: [name] | Tasks: [done]/[total] | Tests: [count] passing
-Agents used: [list] | Verdict: [combined_verdict from Reality Checker]
+Agents used: [list] | Verdict: [combined_verdict from lrr-aggregate.json]
 Metric loops run: [count] | Avg iterations: [N]
 Remaining: [any NEEDS WORK items]
 ```
 
-**Verification table (MANDATORY — pulled from Reality Checker structured output):**
+**Verification table (MANDATORY — pulled from LRR aggregator output):**
 
 | Metric | Count | Status |
 |--------|-------|--------|
@@ -728,17 +778,18 @@ Remaining: [any NEEDS WORK items]
 | Behavioral evidence files written | count from `evidence_files_checked[]` | — |
 | Maestro flows present (iOS) | count of `maestro/*.yaml` | — |
 | Test-stub detector flagged files | `behavioral_test_count_stub_flagged` | PASS if `== 0`, FAIL otherwise |
-| Code review verdict | `code_review_verdict` | — |
-| Behavioral verdict | `behavioral_verdict` | — |
-| Combined verdict | `combined_verdict` | — |
+| Combined verdict | `combined_verdict` from `lrr-aggregate.json` | — |
+| LRR chapter verdicts | list of chapter:verdict pairs | — |
+| LRR follow-ups spawned | count of chapters with `follow_up_spawned: true` | — |
+| LRR triggered rule | rule number 1-6 | — |
 
-**Verification Gap handling:** If `behavioral_test_count_passing < behavioral_test_count_declared` OR `behavioral_test_count_stub_flagged > 0`, the report MUST surface a top-level "Verification Gap" section BEFORE writing the report to disk:
+**Verification Gap handling:** If `behavioral_test_count_passing < behavioral_test_count_declared` OR `behavioral_test_count_stub_flagged > 0` (pulled from the LRR QA chapter findings in `lrr-aggregate.json`), the report MUST surface a top-level "Verification Gap" section BEFORE writing the report to disk:
 
 ```
 ## Verification Gap
 
 The build declared [declared] behavioral tests but only [passing] have non-stub bodies.
-Stub-flagged files: [list from reality-check-manifest.json]
+Stub-flagged files: [list from lrr-aggregate.json QA chapter findings]
 Missing test bodies for tasks: [list from sprint-tasks.md grep of non-N/A Behavioral Test fields without matching non-stub test files]
 ```
 
