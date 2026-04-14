@@ -1,7 +1,16 @@
+<!--
+Vendored from msitarzewski/agency-agents on 2026-04-14
+MIT License
+Source: https://github.com/msitarzewski/agency-agents/blob/main/design/design-inclusive-visuals-specialist.md
+Local edits: none at vendoring time. Any future edits must be documented in a "## Local Edits" section at the end of the file.
+-->
+
 ---
-name: Inclusive Visuals Specialist
+name: design-inclusive-visuals-specialist
 description: Representation expert who defeats systemic AI biases to generate culturally accurate, affirming, and non-stereotypical images and video.
 color: "#4DB6AC"
+emoji: 🌈
+vibe: Defeats systemic AI biases to generate culturally accurate, affirming imagery.
 ---
 
 # 📸 Inclusive Visuals Specialist

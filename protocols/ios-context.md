@@ -129,7 +129,7 @@ Permission requests must be contextual with purpose strings; haptics rare and me
 - Documentation comments on public API.
 - **Never commit secrets.** API keys go in `.xcconfig` (gitignored) or the keychain.
 - **Localization:** if the project uses `Localizable.xcstrings`, add user-facing strings as **symbol keys** (e.g. `helloWorld`) with `extractionState: "manual"`, accessed via generated symbols: `Text(.helloWorld)`. Offer to translate new keys into all supported languages.
-- **PrivacyInfo.xcprivacy ownership:** the `ios-info-plist-hardening` skill (Phase 4 Foundation) owns creating `PrivacyInfo.xcprivacy` — NOT Phase 7 Ship. Any required-reason API declarations, tracking domains, and collected-data-type entries must land in Phase 4 alongside Info.plist hardening.
+- **PrivacyInfo.xcprivacy ownership:** the `ios-info-plist-hardening` skill (Phase 4 Step 4.0 Scaffold) owns creating `PrivacyInfo.xcprivacy` — NOT Phase 7 Ship. Any required-reason API declarations, tracking domains, and collected-data-type entries must land in Phase 4 alongside Info.plist hardening.
 
 ---
 
@@ -164,7 +164,7 @@ When MCP servers are available, **always prefer them** over generic file or shel
 
 ## iOS Feature Flag Schema
 
-These flags gate Phase 5 skill loading and Phase 4 entitlement generation. Orchestrator resolves them at the end of Phase 2 (see `commands/build.md` → Phase 2 "Feature Flag Resolution") and persists them to `docs/plans/.build-state.md` under an `ios_features:` key.
+These flags gate Phase 4 per-task skill loading and Phase 4 Step 4.0 entitlement generation. Orchestrator resolves them at the end of Phase 2 (see `commands/build.md` → Phase 2 "Feature Flag Resolution") and persists them to `docs/plans/.build-state.md` under an `ios_features:` key.
 
 ```yaml
 ios_features:
@@ -186,7 +186,7 @@ ios_features:
   appleWatch: bool
 ```
 
-**Read contract:** Phase 4 (`ios-entitlements-generator`) and Phase 5 (skill loader) MUST read this block from `.build-state.md` before acting. A skill gated by flag `X` is loaded only when `ios_features.X == true`. Unset flags default to `false`.
+**Read contract:** Phase 4 Step 4.0 (`ios-entitlements-generator`) and Phase 4 per-task flow (skill loader) MUST read this block from `.build-state.md` before acting. A skill gated by flag `X` is loaded only when `ios_features.X == true`. Unset flags default to `false`.
 
 ---
 
@@ -211,11 +211,11 @@ _Per-phase skill bundle — orchestrator loads the relevant subset based on curr
 - `skills/ios/swiftui-liquid-glass/` — iOS 26 glass decision tree
 - `skills/ios/writing-for-interfaces/` — microcopy (if not yet ported, TBD)
 
-### Phase 4 — Foundation
+### Phase 4 — Build (Step 4.0 Scaffold)
 - `skills/ios/ios-entitlements-generator/` (stub)
 - `skills/ios/ios-info-plist-hardening/` (stub)
 
-### Phase 5 — Build
+### Phase 4 — Build (Step 4.1+ per-task flow)
 - `skills/ios/swiftui-pro/` (every UI write)
 - `skills/ios/swift-concurrency/` (async/actor/Sendable)
 - `skills/ios/swiftdata-pro/` (@Model/@Query usage)
@@ -225,7 +225,7 @@ _Per-phase skill bundle — orchestrator loads the relevant subset based on curr
 - AI feature: `agents/ios-foundation-models-specialist.md`
 - IAP feature: `agents/ios-storekit-specialist.md`
 
-### Phase 6 — Harden
+### Phase 5 — Audit
 _Dispatches to `/verify` + `/ux-review` + `/fix` iOS twins in sequence. Each twin has its own skill bundle inline in its command file._
 
 ### Phase 7 — Ship (optional)

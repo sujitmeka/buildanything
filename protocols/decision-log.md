@@ -1,6 +1,6 @@
 # Decision Log Protocol
 
-This is the append-only decision log that captures rejected alternatives alongside the chosen approach, with a natural-language revisit criterion for each rejection. It feeds two loops: the learnings pipeline at Step 6.4.1 (cross-run PITFALL capture) and the Phase 0 resume handler (preserving the *why* across build sessions). Without this log the build remembers *what* it chose but forgets *what it rejected and under what conditions to reconsider*.
+This is the append-only decision log that captures rejected alternatives alongside the chosen approach, with a natural-language revisit criterion for each rejection. It feeds two loops: the learnings pipeline at Step 6.0.1 (cross-run PITFALL capture) and the Phase 0 resume handler (preserving the *why* across build sessions). Without this log the build remembers *what* it chose but forgets *what it rejected and under what conditions to reconsider*.
 
 ## Schema
 
@@ -20,11 +20,15 @@ Rows live in `docs/plans/decisions.jsonl`, one JSON object per line, append-only
       "revisit_criterion": "multi-user access OR >10k rows OR concurrent writes"
     }
   ],
-  "decided_by": "architect | orchestrator | human",
+  "decided_by": "<agent-role-string>",
   "ref": "architecture.md#backend/persistence",
   "status": "open"
 }
 ```
+
+`decided_by` is a free-form string naming the agent role that authored the decision (e.g., `architect`, `implementer`, `design-brand-guardian`, `ux-architect`, `human`, `design-critic`). The orchestrator does not validate against a fixed enum — the set of writing agents changes as new phases ship, and a brittle whitelist would force a schema migration every time. The LRR Aggregator matches on the string value directly against its known-agent registry; unknown values fall through to the legacy classification path in Step 4.
+
+Findings in LRR chapter verdicts may reference a decision row via the `related_decision_id` field, which the LRR Aggregator uses for backward routing (see `protocols/launch-readiness.md` Aggregator Step 3). The `related_decision_id` lives on the **finding** object inside a chapter verdict, not on the decision row itself — it is the pointer from a finding back to the decision that authored the choice being violated.
 
 The `status` field takes one of three values:
 
@@ -65,9 +69,9 @@ Author = the agent that made the call. The orchestrator NEVER writes decision ro
 | 1 (Brainstorm) | Brainstorm synthesis agent | Tech stack, data model, scope boundary |
 | 2.2 (Architecture) | Architecture synthesizer | API contract, service boundary, persistence, auth model |
 | 3 (Design) | [DEFERRED — currently no author until Phase 3 changes ship] | Visual direction kill rationales |
-| 5 (Build) | Implementer — ONLY if deviating from planned task | Deviation rationale |
+| 4 (Build) | Implementer — ONLY if deviating from planned task | Deviation rationale |
 
-Phases 0, 4, 6, 7 do not write decisions.
+Phases 0, 6, 7 do not write decisions.
 
 ## Readers
 
@@ -75,9 +79,9 @@ Three consumers, each reads a bounded slice:
 
 1. **Phase 0 Resume Handler (on `--resume`)** — reads the top 5 most recent rows sorted by `decision_id` desc, filtered to the current phase and upstream phases. Injects short fields + `ref` anchor into rehydration context alongside `architecture.md`. Never reads all rows.
 
-2. **Step 6.4 Reality Checker (Dissent Log Revisit Pass)** — reads all rows where `status == "open"` and `revisit_criterion` is non-empty. Semantically evaluates each criterion against the current build's evidence manifest. For any triggered row, emits a structural finding of the form `"revisit-criterion-triggered: D-N-M — [criterion]"` in `specific_findings[]` and contributes to `combined_verdict` (triggered → at minimum NEEDS WORK).
+2. **Step 6.0 Reality Checker (Dissent Log Revisit Pass)** — reads all rows where `status == "open"` and `revisit_criterion` is non-empty. Semantically evaluates each criterion against the current build's evidence manifest. For any triggered row, emits a structural finding of the form `"revisit-criterion-triggered: D-N-M — [criterion]"` in `specific_findings[]` and contributes to `combined_verdict` (triggered → at minimum NEEDS WORK).
 
-3. **Step 6.4.1 Learnings Harvester** — reads the Reality Checker's triggered findings and appends one PITFALL row per trigger to `learnings.jsonl` with `provenance.decision_id` back-referencing the source row. This is the cross-run PITFALL capture path, distinct from the in-run metric-loop post-hoc harvest.
+3. **Step 6.0.1 Learnings Harvester** — reads the Reality Checker's triggered findings and appends one PITFALL row per trigger to `learnings.jsonl` with `provenance.decision_id` back-referencing the source row. This is the cross-run PITFALL capture path, distinct from the in-run metric-loop post-hoc harvest.
 
 ## Orchestrator Never Writes
 
@@ -141,12 +145,12 @@ If the orchestrator ever appears to need to write a decision row, the correct mo
 }
 ```
 
-**Phase 5 build — implementer deviation:**
+**Phase 4 build — implementer deviation:**
 
 ```json
 {
-  "decision_id": "D-5-02",
-  "phase": "5",
+  "decision_id": "D-4-02",
+  "phase": "4",
   "timestamp": "2026-04-13T19:48:03Z",
   "decision": "deviated from planned Task 14 approach — used React Query instead of raw fetch in loader",
   "chosen_approach": "TanStack Query with 30s stale time on the /api/items loader",
@@ -157,7 +161,7 @@ If the orchestrator ever appears to need to write a decision row, the correct mo
       "revisit_criterion": "React Query footprint exceeds justification on bundle-size audit"
     }
   ],
-  "decided_by": "architect",
+  "decided_by": "implementer",
   "ref": "sprint-tasks.md#task-14",
   "status": "open"
 }
@@ -168,11 +172,11 @@ If the orchestrator ever appears to need to write a decision row, the correct mo
 | Item | Budget |
 |------|--------|
 | decisions.jsonl on disk per build | 500-1000 tokens worst case |
-| Reality Checker read (Step 6.4) | ~200 tokens |
+| Reality Checker read (Step 6.0) | ~200 tokens |
 | Resume handler read (Phase 0) | ~300 tokens |
-| Learnings harvester read (Step 6.4.1) | ~200 tokens |
+| Learnings harvester read (Step 6.0.1) | ~200 tokens |
 | **Total per build** | **~1.2-1.7K tokens** |
 
 ## Ref Field Convention
 
-Every row carries a `ref` anchor (e.g., `architecture.md#backend/persistence` or `visual-design-spec.md#<anchor>`) that downstream readers use to widen context without pasting prose. The resume handler passes the row's short fields *plus* the ref — the resumed agent reads the anchor via its own Read tool if it needs the full context. This matches the existing `.refs.json` pattern in `commands/build.md` (primary/secondary anchors handed to implementers instead of pasted content), and keeps rehydration token cost bounded to ~300 tokens for the top 5 rows regardless of how much architectural prose sits behind each anchor.
+Every row carries a `ref` anchor (e.g., `architecture.md#backend/persistence` or `visual-design-spec.md#<anchor>`) that downstream readers use to widen context without pasting prose. The resume handler passes the row's short fields *plus* the ref — the resumed agent reads the anchor via its own Read tool if it needs the full context. This matches the existing `refs.json` pattern in `commands/build.md` (primary/secondary anchors handed to implementers instead of pasted content), and keeps rehydration token cost bounded to ~300 tokens for the top 5 rows regardless of how much architectural prose sits behind each anchor.

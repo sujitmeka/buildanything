@@ -17,14 +17,14 @@ The synthesized `architecture.md` MUST contain these top-level headings, in this
 - `# MVP Scope`
 - `# Out of Scope`
 
-For iOS builds, `# Frontend` MAY be titled `# App` and `# Backend` MAY be omitted if the app is fully on-device (the `.refs.json` index reflects whatever headings exist). For web builds, all eight headings are required.
+For iOS builds, `# Frontend` MAY be titled `# App` and `# Backend` MAY be omitted if the app is fully on-device (the `refs.json` index reflects whatever headings exist). For web builds, all eight headings are required.
 
 ## Anchor naming rules
 
 - Anchors are **kebab-case** within a section — lowercase, hyphen-separated, no spaces.
 - Subsections use a **nested anchor** of the form `parent/child`. For example, `frontend/checkout` refers to a `## Checkout` subsection under `# Frontend`.
-- Anchors must be **stable across synthesizer reruns**. A rerun of the synthesizer on the same inputs must produce the same anchors, so that refs cached in `.refs.json` or in implementer prompts do not break.
-- Anchors are **referenced via `architecture.md#parent/child`** in prompt bodies and in `.refs.json`. The `#` separator is a plain markdown fragment — no special escaping.
+- Anchors must be **stable across synthesizer reruns**. A rerun of the synthesizer on the same inputs must produce the same anchors, so that refs cached in `refs.json` or in implementer prompts do not break.
+- Anchors are **referenced via `architecture.md#parent/child`** in prompt bodies and in `refs.json`. The `#` separator is a plain markdown fragment — no special escaping.
 - Deeper nesting (`parent/child/grandchild`) is allowed but discouraged. Prefer two levels.
 - Anchor names MUST NOT include spaces, uppercase letters, punctuation other than `-` and `/`, or numeric prefixes like `1-frontend`.
 
@@ -78,48 +78,68 @@ The orchestrator NEVER pastes section content into the implementer prompt. It em
 
 ## Phase 2.3 synthesizer output contract
 
-The Phase 2.3 architecture synthesizer MUST produce two artifacts:
+The Phase 2.3 architecture synthesizer MUST produce one artifact:
 
 1. `docs/plans/architecture.md` — the human-readable architecture doc, containing:
    - All eight required top-level headings (or the iOS-adjusted set).
    - All required subsection anchors for each top-level section present.
    - Prose content under each subsection sufficient for an implementer to ground their work.
 
-2. `docs/plans/.refs.json` — a flat JSON index of every anchor in `architecture.md`, used by the orchestrator for quick lookup when constructing implementer prompts. The synthesizer writes this file; no other agent edits it.
+The synthesizer does NOT write `refs.json`. The Phase 2.2 Refs Indexer owns that file (see below).
 
 The synthesizer MUST fail loudly (emit a BLOCKED verdict) if it cannot produce all required subsection anchors — e.g., if the architecture is too thin to have a meaningful `security/auth` section, the synthesizer stubs the anchor with a one-line "N/A — {reason}" rather than omitting it.
 
-## .refs.json example
+## refs.json — the live downstream docs index
+
+`refs.json` is the live downstream docs index. It covers every anchor in:
+
+- `design-doc.md` (THE PRD)
+- `architecture.md`
+- `sprint-tasks.md`
+- `visual-design-spec.md` (if exists)
+- `quality-targets.json` (via flat key anchors)
+
+Writer: Phase 2.2 Refs Indexer step (dispatched as INTERNAL inline role-string). Consumers: Phase 3+ agents via the Briefing Officer per-task context map (no full pastes). Phase 1 raw research files are NOT in `refs.json` — they are spent after Phase 2 hybrid routing distributes them to architects.
+
+The Phase 2.2 Refs Indexer (INTERNAL inline role-string dispatched by the orchestrator) is the sole writer of `refs.json`. It runs after the architecture synthesizer and Sprint Breakdown steps, reads the live docs (`design-doc.md`, `architecture.md`, `sprint-tasks.md`, `visual-design-spec.md` if exists, `quality-targets.json`), and emits the multi-doc anchor index.
+
+See `commands/build.md` Phase 2.2 Step 2.3 Refs Indexer dispatch for the exact generation prompt.
+
+## refs.json example
 
 ```json
 {
-  "schema_version": 1,
+  "schema_version": "2.0",
   "generated_at": "2026-04-13T10:00:00Z",
-  "generated_from": "docs/plans/architecture.md",
+  "generated_by": "Phase 2.2 Refs Indexer",
   "anchors": [
     {
-      "anchor": "frontend/layout",
-      "topic": "Page hierarchy and Next.js App Router routing",
-      "line_start": 42,
-      "line_end": 91
+      "file_path": "docs/plans/design-doc.md",
+      "anchor": "#persona",
+      "topic": "primary user persona + JTBD",
+      "line_start": 12,
+      "line_end": 38
     },
     {
-      "anchor": "frontend/checkout",
-      "topic": "Checkout page layout and flow",
-      "line_start": 120,
-      "line_end": 180
+      "file_path": "docs/plans/architecture.md",
+      "anchor": "#frontend/checkout",
+      "topic": "checkout flow component tree",
+      "line_start": 102,
+      "line_end": 145
     },
     {
-      "anchor": "data-model/orders",
+      "file_path": "docs/plans/architecture.md",
+      "anchor": "#data-model/orders",
       "topic": "Orders entity, status enum, relations to users and items",
       "line_start": 302,
       "line_end": 358
     },
     {
-      "anchor": "security/auth",
-      "topic": "Supabase Auth with JWT; server-side route guards",
-      "line_start": 410,
-      "line_end": 455
+      "file_path": "docs/plans/sprint-tasks.md",
+      "anchor": "#sprint-1-task-3",
+      "topic": "wire checkout form to /api/checkout",
+      "line_start": 88,
+      "line_end": 104
     }
   ]
 }
@@ -127,21 +147,25 @@ The synthesizer MUST fail loudly (emit a BLOCKED verdict) if it cannot produce a
 
 Fields:
 
-- `schema_version` (integer) — currently `1`.
-- `generated_at` (ISO 8601) — synthesizer run timestamp.
-- `generated_from` (string) — source markdown path.
-- `anchors` (array) — one entry per anchor. Each: `{anchor, topic, line_start, line_end}`. `topic` is a one-sentence summary used by the orchestrator to pick refs without reading the file.
+- `schema_version` (string) — currently `"2.0"`. Bumped from `1` when the index was extended from architecture-only to the multi-doc scope above.
+- `generated_at` (ISO 8601) — Refs Indexer run timestamp.
+- `generated_by` (string) — `"Phase 2.2 Refs Indexer"`.
+- `anchors` (array) — one entry per anchor across all indexed files. Each: `{file_path, anchor, topic, line_start, line_end}`.
+  - `file_path` — repo-relative path of the file the anchor lives in. Required. Tells consumers which document to `Read`.
+  - `anchor` — the markdown fragment, including the leading `#` (e.g. `#frontend/checkout`, `#persona`). For `quality-targets.json` entries, the anchor is the flat key name.
+  - `topic` — one-sentence summary used by the Briefing Officer to pick refs without reading the file.
+  - `line_start`, `line_end` — optional but recommended. Allow consumers to `Read` just the section instead of the whole file.
 
 ## Validation
 
-A synthesized `architecture.md` plus `.refs.json` pair is well-formed iff:
+A synthesized `architecture.md` plus `refs.json` pair is well-formed iff:
 
 1. All required top-level headings exist in `architecture.md` (grep `^# {Heading}$` for each).
 2. All required subsection anchors resolve to real `## Heading` lines under the correct parent. (A heading `## Checkout` under `# Frontend` resolves the anchor `frontend/checkout`.)
-3. `.refs.json` parses as valid JSON against the shape above.
-4. Every anchor in `.refs.json.anchors[].anchor` resolves to a real heading in `architecture.md` at the claimed `line_start`.
-5. Every required anchor from this document appears in `.refs.json.anchors`.
-6. No anchor appears twice in `.refs.json.anchors`.
-7. `generated_from` matches the actual path written by the synthesizer.
+3. `refs.json` parses as valid JSON against the shape above.
+4. Every architecture-scoped entry in `refs.json.anchors[]` (those with `file_path` ending in `architecture.md`) resolves to a real heading in `architecture.md` at the claimed `line_start`.
+5. Every required anchor from this document appears in `refs.json.anchors` with the correct `file_path`.
+6. No `(file_path, anchor)` pair appears twice in `refs.json.anchors`.
+7. `schema_version` is `"2.0"` and `generated_by` is `"Phase 2.2 Refs Indexer"`.
 
-The Wave 1 `buildanything:verify` protocol runs these checks after Phase 2.3 completes. A failure flips the Phase 2 verdict to `NEEDS_WORK` and re-dispatches the synthesizer with a directive listing the missing anchors.
+The Wave 1 `buildanything:verify` protocol runs these checks after Phase 2.3 completes. A failure flips the Phase 2 verdict to `NEEDS_WORK` and re-dispatches the Refs Indexer (or the synthesizer, if the missing anchors indicate `architecture.md` itself is incomplete) with a directive listing the missing anchors.
