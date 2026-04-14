@@ -16,13 +16,13 @@ Three structural shifts from the prior 5-chapter panel:
 
 LRR runs **five chapters**: Eng-Quality, Security, SRE, A11y, and Brand Guardian.
 
-PM is **not** a separate LRR dispatch. The existing Step 7.0 Requirements Coverage Report already reads Design Doc + sprint-tasks MVP scope and produces COVERED/PARTIAL/MISSING — it is a PM verdict in everything but name. Its output is written to `docs/plans/evidence/lrr/pm.json` and is read by the **Eng-Quality chapter as a sub-input**, not by the Aggregator directly. PM is no longer a separate 6th chapter; it is folded into Eng-Quality evidence.
+Requirements coverage is evaluated as a sub-input of the Eng-Quality chapter. There is no separate PM chapter, no `pm.json` file, and the LRR Aggregator runs exactly once. The Eng-Quality chapter agent reads the Design Doc + `sprint-tasks.md` MVP scope directly alongside its other evidence and emits COVERED/PARTIAL/MISSING per feature inline on its own verdict (see the `requirements_coverage` field in the schema below). There is no separate Step 7.0 dispatch and no Aggregator re-run.
 
 ### Primary evidence inputs
 
 | Chapter | Primary evidence inputs |
 |---|---|
-| Eng-Quality | `architecture.md`, `task-outputs/`, `verify.md` check outputs, test results, eval results, `docs/plans/evidence/lrr/pm.json` (Requirements Coverage fold-in) |
+| Eng-Quality | `architecture.md`, `task-outputs/`, `verify.md` check outputs, test results, eval results, Design Doc + `sprint-tasks.md` MVP scope (read directly for the Requirements Coverage sub-input) |
 | Security | `evidence/fake-data-audit.md`, Phase 5 security audit output, eval-harness security cases |
 | SRE | Phase 5 performance-audit outputs, Performance Benchmarker evidence, NFRs from `sprint-tasks.md`, reliability checks |
 | A11y | Phase 5 a11y audit output, Phase 3.7 `a11y-design-review.md`, WCAG 2.2 AA runtime findings, per-page accessibility findings |
@@ -42,7 +42,7 @@ Each chapter agent runs fresh-context, reads its own slice of the evidence manif
 
 ```json
 {
-  "chapter": "eng-quality | security | sre | a11y | brand-guardian | pm",
+  "chapter": "eng-quality | security | sre | a11y | brand-guardian",
   "verdict": "PASS | CONCERNS | BLOCK",
   "override_blocks_launch": false,
   "evidence_files_read": ["docs/plans/evidence/..."],
@@ -54,7 +54,17 @@ Each chapter agent runs fresh-context, reads its own slice of the evidence manif
 }
 ```
 
-The `pm` value in the `chapter` enum is retained because `pm.json` still exists as a sub-input file for Eng-Quality (Requirements Coverage fold-in). It is **not** a dispatched LRR chapter — the Aggregator does not read `pm.json` directly.
+The **Eng-Quality** chapter additionally carries the Requirements Coverage sub-input inline on its verdict:
+
+```json
+{
+  "requirements_coverage": [
+    {"feature": "string", "status": "COVERED | PARTIAL | MISSING", "note": "optional string"}
+  ]
+}
+```
+
+This field carries the PM coverage signal directly on the Eng-Quality verdict — there is no separate `pm.json` file and no separate PM dispatch. The Eng-Quality chapter agent reads the Design Doc + `sprint-tasks.md` MVP scope as part of its own evidence sweep and emits the coverage list alongside its code-quality judgment.
 
 <HARD-GATE>
 SCHEMA CONTRACT:
@@ -175,7 +185,7 @@ Before applying any aggregation rule, the Aggregator MUST Glob `docs/plans/evide
 - `a11y.json`
 - `brand-guardian.json`
 
-Optionally also read `pm.json` if it exists (the Requirements Coverage fold-in for Eng-Quality). `pm.json` is a sub-input file — the Aggregator does **not** aggregate it as a 6th chapter.
+The Aggregator does **not** expect or read any `pm.json` file. Requirements coverage lives inline on the Eng-Quality verdict (`requirements_coverage` field) and is not a separate artifact.
 
 If any of the 5 required files are missing, OR any file fails to parse as valid JSON, OR any file is missing required schema fields (`chapter`, `verdict`, non-empty `evidence_files_read`), the Aggregator:
 
@@ -230,14 +240,13 @@ If Step 2 resolves to `combined_verdict = PRODUCTION READY`, the Aggregator writ
 ## File paths
 
 - Chapter verdicts: `docs/plans/evidence/lrr/{eng-quality,security,sre,a11y,brand-guardian}.json`
-- Also: `docs/plans/evidence/lrr/pm.json` (Requirements Coverage fold-in — read as **Eng-Quality sub-input**, not a separate chapter; the Aggregator does not read `pm.json` directly)
 - Aggregator output: `docs/plans/evidence/lrr-aggregate.json`
 
 Why under `evidence/`: the existing evidence manifest sweep picks up anything under `docs/plans/evidence/` for free, and these files ARE evidence — typed attestations from independent chapters. Putting them elsewhere would create a second manifest path the aggregator has to know about separately.
 
 ## Token budget
 
-~10-14K tokens per LRR cycle: five chapter dispatches at 2-3K each (Brand Guardian is slightly higher due to the DNA axis scoring rubric), plus one aggregator at 1-2K. Roughly flat with the prior cost envelope despite the richer Brand Guardian evaluation — the savings from merging Eng+QA into Eng-Quality offset most of the added Brand Guardian cost, and the removed Design mechanical-check chapter frees the rest.
+~12-17K tokens per LRR cycle, net of PM fold-in (no separate Step 7.0 dispatch, no Aggregator re-run): five chapter dispatches at 2-3K each (Brand Guardian is slightly higher due to the DNA axis scoring rubric, Eng-Quality is slightly higher because it now carries the Requirements Coverage sub-input inline), plus the nested `pr-test-analyzer` sub-dispatch inside Eng-Quality at ~1.5-2K, plus one aggregator at 1-2K. The Aggregator runs exactly once per cycle; there is no PM re-aggregation pass.
 
 ## Contingency clause
 

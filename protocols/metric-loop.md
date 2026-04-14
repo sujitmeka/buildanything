@@ -52,8 +52,12 @@ Read the agent's response. You need: the SCORE, the TOP ISSUE, and the file path
 Stop the loop if ANY of these:
 
 - **Score >= target** → done. Log "Target met at iteration [N]."
+- **Iter-1 short-circuit: score >= target + 10 on the first measurement** → done. Log "Short-circuit at iteration 1. Score: [N]." and record `exit_reason: "short_circuit_iter1"` in the loop state.
 - **Iteration >= max** → done. Log "Max iterations reached. Final score: [N]."
 - **Stall: last 2 scores show no improvement** (delta <= 0 twice in a row) → done. Log "Stalled at score [N]."
+
+### Early exit — iter-1 short-circuit
+If the first measurement (iter-1) scores >= `target + 10`, exit the loop immediately and commit the iter-1 output. Log `exit_reason: "short_circuit_iter1"` in the loop state. The 10-point margin guards against measurement noise at the boundary; a genuinely excellent first pass does not need rework.
 
 On stall or max iterations:
 - **Interactive mode:** present score history + top remaining issue to user. Ask for direction.
