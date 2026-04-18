@@ -4,6 +4,21 @@
 
 `docs/plans/.build-state.json` is the **typed source of truth** for build state. The human-readable `docs/plans/.build-state.md` file is an **auto-rendered view** regenerated on every state change — it is never edited directly. This document defines the required fields, their types, the rendering contract that produces the markdown view, and the validation rules a well-formed state file must satisfy. Introduced in Wave 1 (W1-2) to eliminate the drift observed in freeform markdown state (duplicate `Autonomous:` fields, Phase Progress append-instead-of-replace, mode branch collisions) and to give the Wave 2 `PreToolUse` schema lint hook something concrete to validate against.
 
+**Machine-authoritative source:** `protocols/state-schema.json` is the SSOT (Stage 1 A8). If this prose doc and the JSON Schema diverge, the JSON Schema wins. Update both together; changes here that are not reflected there will be caught by the W2-2 lint hook.
+
+## Schema versions
+
+`schema_version` is a monotonically increasing integer bumped on each Shape-B migration stage. The runtime reads the incoming `.build-state.json` and compares `schema_version` against its compiled-in `MAX_SUPPORTED_SCHEMA_VERSION` constant.
+
+| Version | Stage | Fields added | Rollback semantics |
+|---|---|---|---|
+| 1 | Stages 1-3 | initial schema (all pre-Stage-4 fields) | n/a |
+| 2 | Stage 4 | `backward_routing_count` (newly typed), `backward_routing_count_by_target_phase`, `in_flight_backward_edge`, `mode_transitions[]` | A7 forward-reject on `schema_version > MAX_SUPPORTED_SCHEMA_VERSION`; A3 stale-edge decrement on `--resume` |
+| 3 | Stage 5 | `lrr_cycle_state` | Stage 5 rollback flag (TBD) |
+| 4 | Stage 6 | `current_sprint_context_hash` | Stage 6 rollback flag (TBD) |
+
+**A7 forward-reject rule.** When `bin/buildanything-runtime.ts` reads `.build-state.json` at session start, if `schema_version > MAX_SUPPORTED_SCHEMA_VERSION`, the runtime refuses to proceed and emits a clear error pointing to the compat matrix (`docs/migration/sdk-host-compat.md`). This is the A7 defense against silent schema drift — an old runtime must never silently ignore fields a newer runtime persisted. See **Task 4.5.2** for the runtime implementation (out of scope for this prose-only update).
+
 ## Required fields
 
 ```jsonc
@@ -38,7 +53,7 @@
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
-| `schema_version` | integer | yes | Currently `1`. Bump on breaking changes. |
+| `schema_version` | integer | yes | Currently `2` (Stage 4); see version table above. Bumped on each Shape-B migration stage. |
 | `project_type` | enum | yes | `"ios"` or `"web"`. Drives mode-branch routing. |
 | `phase` | integer | yes | Current phase, one of `-1, 0, 1, 2, 3, 4, 5, 6, 7`. |
 | `step` | string | yes | Dotted step identifier within the phase (e.g., `"5.3b"`, `"6.4"`). |
@@ -65,6 +80,17 @@
 | `resume_point` | object | yes | `{phase, step, autonomous, completed_summary, git_branch}`. Snapshot used by Phase-0 resume logic. |
 | `verification` | object | yes | `{last_verify_result, last_verify_timestamp}`. `last_verify_result` is one of `"PRODUCTION_READY"`, `"NEEDS_WORK"`, `"BLOCKED"`, or `null`. |
 | `blockers` | array | no | Open blockers. Each: `{id, description, surfaced_at, type}`. Type is `"build"`, `"design"`, `"dep"`, or `"external"`. |
+
+### Fields added at v2 (Stage 4)
+
+These fields are present only when `schema_version >= 2`. They support the Shape-B SDK migration's backward-routing bookkeeping (A3, A6) and SDK/markdown mode-flip audit trail.
+
+| Field | Type | Required | Added in | Notes |
+|---|---|---|---|---|
+| `backward_routing_count` | object (string → integer ≥ 0) | no | v2 | Per-decision backward-routing counter keyed by `decision_id`. Existed informally pre-v2; formally typed at v2 and paired with the by-phase counter below. Incremented atomically with `in_flight_backward_edge` on dispatch. |
+| `backward_routing_count_by_target_phase` | object (string → integer ≥ 0) | no | v2 | **A6 off-by-one fix.** Per-target-phase backward-routing counter keyed by target phase number (e.g., `"4"`, `"5"`). Lets the max-backward-routes guard count by destination phase rather than by decision, which previously miscounted when a single decision routed back to multiple phases. |
+| `in_flight_backward_edge` | object | no | v2 | **A3 crash-seam defense.** Present only while a backward-route dispatch is mid-flight. Written atomically with the counter increment; cleared by the target phase on re-entry. Fields: `decision_id` (string), `target_phase` (string), `counter_value` (integer ≥ 0), `started_at` (ISO 8601). On `--resume`, stale edges (>60s old) trigger a counter decrement so a crashed dispatch does not permanently inflate the guard. |
+| `mode_transitions` | array of objects | no | v2 | SDK/markdown flag-flip audit trail (Task 4.7.1). Each entry: `{from, to, timestamp}` where `from`/`to` are mode labels (e.g., `"markdown"`, `"sdk"`) and `timestamp` is ISO 8601. Append-only within a session. |
 
 ## Rendering contract
 
