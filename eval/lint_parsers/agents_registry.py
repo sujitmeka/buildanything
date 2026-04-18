@@ -6,8 +6,10 @@ Two entry points:
   shape used by the other source parsers in this package.
 * ``validate_agents_registry(repo)`` — validator conforming to the Parser
   protocol in ``base.py``. Returns ``list[ParseIssue]`` the aggregator
-  consumes (drift rules: prompt_path exists on disk, phase_usage ∈
-  {-1, 1..6}, tool names non-empty, no duplicate agent names).
+  consumes. Drift rules: prompt_path exists on disk, phase_usage ∈ the
+  top-level phase ids declared in ``docs/migration/phase-graph.yaml``
+  (SSOT — derived, not hard-coded), tool names non-empty, no duplicate
+  agent names.
 """
 
 from __future__ import annotations
@@ -22,7 +24,41 @@ from .base import ParseIssue
 
 PARSER_NAME = "agents_registry"
 REGISTRY_REL_PATH = "docs/migration/agents.yaml"
-VALID_PHASES: frozenset[str] = frozenset({"-1", "1", "2", "3", "4", "5", "6"})
+PHASE_GRAPH_REL_PATH = "docs/migration/phase-graph.yaml"
+
+# Used only when phase-graph.yaml is absent or unreadable (SSOT itself is
+# broken). Kept aligned with the known top-level phases as of the A8 migration.
+_FALLBACK_VALID_PHASES: frozenset[str] = frozenset(
+    {"-1", "0", "1", "2", "3", "4", "5", "6", "7"}
+)
+
+
+def _load_valid_phases(repo: Path) -> frozenset[str]:
+    """Return the set of top-level phase ids declared in phase-graph.yaml."""
+    graph_path = repo / PHASE_GRAPH_REL_PATH
+    if not graph_path.exists():
+        return _FALLBACK_VALID_PHASES
+    try:
+        data = yaml.safe_load(graph_path.read_text())
+    except yaml.YAMLError:
+        return _FALLBACK_VALID_PHASES
+    if not isinstance(data, dict):
+        return _FALLBACK_VALID_PHASES
+    phases = data.get("phases")
+    if not isinstance(phases, list):
+        return _FALLBACK_VALID_PHASES
+    ids: set[str] = set()
+    for phase in phases:
+        if not isinstance(phase, dict):
+            continue
+        pid = phase.get("id")
+        if pid is None:
+            continue
+        pid_str = str(pid)
+        if "." in pid_str:
+            continue
+        ids.add(pid_str)
+    return frozenset(ids) if ids else _FALLBACK_VALID_PHASES
 
 
 @dataclass(frozen=True)
@@ -126,6 +162,7 @@ def validate_agents_registry(repo: Path) -> list[ParseIssue]:
             )
         ]
 
+    valid_phases = _load_valid_phases(repo)
     issues: list[ParseIssue] = []
     seen_names: set[str] = set()
 
@@ -203,14 +240,14 @@ def validate_agents_registry(repo: Path) -> list[ParseIssue]:
 
         for phase in entry.get("phase_usage") or []:
             phase_str = str(phase)
-            if phase_str not in VALID_PHASES:
+            if phase_str not in valid_phases:
                 issues.append(
                     ParseIssue(
                         parser=PARSER_NAME,
                         kind="invalid_phase",
                         message=(
                             f"agent {name!r} has invalid phase {phase_str!r}; "
-                            f"valid: {sorted(VALID_PHASES)}"
+                            f"valid: {sorted(valid_phases)}"
                         ),
                         source=entry_src,
                         details={"agent": name, "phase": phase_str},
