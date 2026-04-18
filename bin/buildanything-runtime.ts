@@ -84,9 +84,10 @@ async function main(): Promise<void> {
   console.log(`[buildanything-runtime] sdkActive=${sdkActive} (stateFile=${stateFileActive}, hostCompat=${hostCompat})`);
 
   // [Task 1.2.4] scribe MCP registration
+  // [Task 2.3.4] write-lease MCP registration
   const mcpServers: Record<string, unknown> = {};
   if (!sdkActive) {
-    console.log("[buildanything-runtime] sdk inactive — scribe MCP registration skipped (markdown mode)");
+    console.log("[buildanything-runtime] sdk inactive — scribe + write-lease MCP registration skipped (markdown mode)");
   } else {
     try {
       const sdk = await import("@anthropic-ai/claude-agent-sdk");
@@ -100,6 +101,29 @@ async function main(): Promise<void> {
     } catch (err) {
       console.warn(
         `[buildanything-runtime] warning: scribe MCP registration failed (${(err as Error).message}); continuing in markdown mode`,
+      );
+    }
+
+    try {
+      const sdk = await import("@anthropic-ai/claude-agent-sdk");
+      const {
+        buildAcquireWriteLeaseTool,
+        buildReleaseWriteLeaseTool,
+        buildListWriteLeasesTool,
+      } = await import("./adapters/write-lease-tool.js");
+      const acquireTool = buildAcquireWriteLeaseTool(sdk.tool);
+      const releaseTool = buildReleaseWriteLeaseTool(sdk.tool);
+      const listTool = buildListWriteLeasesTool(sdk.tool);
+      mcpServers.write_lease = sdk.createSdkMcpServer({
+        name: "write_lease",
+        tools: [acquireTool, releaseTool, listTool],
+      });
+      console.log(
+        "[buildanything-runtime] write-lease MCP server registered (tools: acquire_write_lease, release_write_lease, list_write_leases)",
+      );
+    } catch (err) {
+      console.warn(
+        `[buildanything-runtime] warning: write-lease MCP registration failed (${(err as Error).message}); continuing without lease enforcement`,
       );
     }
   }
