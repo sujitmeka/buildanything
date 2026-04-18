@@ -30,6 +30,9 @@ MISSING=()
 command -v agent-browser >/dev/null 2>&1 || MISSING+=("agent-browser CLI")
 { [ -e "$HOME/.claude/skills/agent-browser" ] || [ -e "$HOME/.claude/skills/agent-browser.md" ]; } || MISSING+=("agent-browser skill")
 { [ -e "$HOME/.claude/skills/dogfood" ] || [ -e "$HOME/.claude/skills/dogfood.md" ]; } || MISSING+=("dogfood skill")
+if [ "${BUILDANYTHING_PROJECT_TYPE:-}" = "ios" ]; then
+  claude mcp list 2>/dev/null | grep -q "apple-docs" || MISSING+=("apple-docs-mcp (iOS docs probe)")
+fi
 if [ ${#MISSING[@]} -gt 0 ]; then
   JOINED=$(IFS=,; echo "${MISSING[*]}"); JOINED=${JOINED//,/, }
   DEPS_WARNING="buildanything: missing deps (${JOINED}). Run /buildanything:setup to complete install."
