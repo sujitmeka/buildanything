@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+# buildanything: SubagentStart staging hook (task 3.1.1)
+# Reads docs/plans/.build-state.json and stages the CONTEXT-header inputs
+# under .buildanything/subagent-start-cache/<id>.json for the 3.1.2 renderer
+# and 3.1.3 injector to consume. Purely observational — always exit 0.
+
+set -u
+
+HANDLER="${CLAUDE_PLUGIN_ROOT:-$(cd "$(dirname "$0")/.." && pwd)}/hooks/subagent-start.ts"
+
+if [ ! -f "$HANDLER" ]; then
+  # Handler missing — fail open so the hook never bricks the session.
+  echo "buildanything: subagent-start handler missing at $HANDLER — skipping" >&2
+  exit 0
+fi
+
+exec npx --no-install tsx "$HANDLER"
