@@ -6,3 +6,4 @@ research/
 # These live on the maintainer's machine but don't ship to plugin users.
 docs/plans/
 .claude/
+.buildanything/

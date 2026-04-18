@@ -14,13 +14,16 @@
  * Rollback: BUILDANYTHING_ENFORCE_WRITER_OWNER=false downgrades denies to
  * stdout warnings and exits 0.
  *
- * This is the v1 skeleton. Deliberately does NOT:
+ * Task 2.1.2: boot-compiled cache at .buildanything/writer-owner.json is the
+ * fast path. Cache misses (missing / corrupt / stale-mtime) fall back to live
+ * YAML parse with a single stderr warning.
+ *
+ * Still deliberately does NOT:
  *   - Default-deny unknown paths (that is task 2.1.3).
- *   - Cache the parsed table across invocations (task 2.1.2).
  *   - Consult active_write_leases (task 2.4.1).
  */
 
-import { readFileSync, realpathSync } from "node:fs";
+import { readFileSync, realpathSync, statSync } from "node:fs";
 import { isAbsolute, relative, resolve } from "node:path";
 import process from "node:process";
 import { parse as parseYaml } from "yaml";
@@ -41,11 +44,32 @@ interface ArtifactEntry {
   path: string;
   writer?: string;
   writers?: string[];
+  // Populated when the entry comes from the boot-compiled cache.
+  regex?: string;
+  is_glob?: boolean;
 }
 
 interface PhaseGraph {
   artifacts?: ArtifactEntry[];
 }
+
+interface CachedArtifact {
+  path: string;
+  writers: string[];
+  is_glob: boolean;
+  regex?: string;
+}
+
+interface WriterOwnerCache {
+  version: number;
+  source_sha: string;
+  source_mtime: number;
+  compiled_at: string;
+  artifacts: CachedArtifact[];
+}
+
+const CACHE_VERSION = 1;
+const CACHE_REL_PATH = ".buildanything/writer-owner.json";
 
 interface BuildState {
   current_phase?: string | number;
@@ -100,10 +124,17 @@ function findArtifact(filePath: string, artifacts: ArtifactEntry[]): ArtifactEnt
   const exact = artifacts.find((a) => a.path === filePath);
   if (exact) return exact;
   for (const a of artifacts) {
-    if (!a.path.includes("*") && !a.path.includes("[")) continue;
-    // Treat `[task-id]` placeholder in path-with-id entries as `*` for matching.
-    const normalized = a.path.replace(/\[[^\]]+\]/g, "*");
-    if (globToRegex(normalized).test(filePath)) return a;
+    const isGlob = a.is_glob ?? (a.path.includes("*") || a.path.includes("["));
+    if (!isGlob) continue;
+    let re: RegExp;
+    if (a.regex) {
+      re = new RegExp(a.regex);
+    } else {
+      // Treat `[task-id]` placeholder in path-with-id entries as `*` for matching.
+      const normalized = a.path.replace(/\[[^\]]+\]/g, "*");
+      re = globToRegex(normalized);
+    }
+    if (re.test(filePath)) return a;
   }
   return null;
 }
@@ -141,11 +172,70 @@ function loadBuildStatePhase(projectDir: string): string | null {
   }
 }
 
-function loadArtifacts(pluginDir: string): ArtifactEntry[] {
-  const path = resolve(pluginDir, "docs/migration/phase-graph.yaml");
-  const text = readFileSync(path, "utf8");
+function phaseGraphPath(pluginDir: string): string {
+  return resolve(pluginDir, "docs/migration/phase-graph.yaml");
+}
+
+function cachePath(projectDir: string): string {
+  return resolve(projectDir, CACHE_REL_PATH);
+}
+
+function cachedToEntry(c: CachedArtifact): ArtifactEntry {
+  return { path: c.path, writers: c.writers, is_glob: c.is_glob, regex: c.regex };
+}
+
+function loadFromCache(pluginDir: string, projectDir: string): ArtifactEntry[] | null {
+  // Cache hit requires: file exists, parses, version matches, and the source
+  // YAML's current mtime matches cache.source_mtime. Any mismatch is a miss.
+  const cPath = cachePath(projectDir);
+  let text: string;
+  try {
+    text = readFileSync(cPath, "utf8");
+  } catch {
+    return null;
+  }
+  let cache: WriterOwnerCache;
+  try {
+    cache = JSON.parse(text) as WriterOwnerCache;
+  } catch {
+    process.stderr.write(
+      "buildanything: writer-owner cache malformed; parsing YAML live\n",
+    );
+    return null;
+  }
+  if (cache.version !== CACHE_VERSION || !Array.isArray(cache.artifacts)) {
+    process.stderr.write(
+      "buildanything: writer-owner cache schema mismatch; parsing YAML live\n",
+    );
+    return null;
+  }
+  try {
+    const srcMtime = Math.floor(statSync(phaseGraphPath(pluginDir)).mtimeMs);
+    if (srcMtime !== cache.source_mtime) {
+      process.stderr.write(
+        "buildanything: writer-owner cache stale; parsing YAML live\n",
+      );
+      return null;
+    }
+  } catch {
+    // Source YAML missing — fall through to live parse (which will also fail
+    // gracefully and treat the table as empty).
+    return null;
+  }
+  return cache.artifacts.map(cachedToEntry);
+}
+
+function loadFromYaml(pluginDir: string): ArtifactEntry[] {
+  const text = readFileSync(phaseGraphPath(pluginDir), "utf8");
   const doc = parseYaml(text) as PhaseGraph;
   return Array.isArray(doc?.artifacts) ? doc.artifacts : [];
+}
+
+function loadArtifacts(pluginDir: string, projectDir: string): ArtifactEntry[] {
+  const cached = loadFromCache(pluginDir, projectDir);
+  if (cached) return cached;
+  // Live parse fallback. Do NOT rewrite the cache — that is session-start's job.
+  return loadFromYaml(pluginDir);
 }
 
 function enforceMode(): "deny" | "warn" {
@@ -175,9 +265,10 @@ function main(): number {
 
   let artifacts: ArtifactEntry[];
   try {
-    artifacts = loadArtifacts(plugin);
+    artifacts = loadArtifacts(plugin, project);
   } catch {
-    // phase-graph.yaml unreadable — fail open. Task 2.1.2 will add caching.
+    // Cache missing AND phase-graph.yaml unreadable — fail open, treat table
+    // as empty. Default-deny lands in task 2.1.3.
     return 0;
   }
 

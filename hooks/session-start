@@ -136,6 +136,22 @@ if [ -n "$DEPS_WARNING" ]; then
 ${CONTEXT}"
 fi
 
+# Compile writer-owner cache (task 2.1.2). Best-effort: if it fails for any
+# reason, log a warning and continue — the PreToolUse handler falls back to
+# a live YAML parse.
+PLUGIN_ROOT="${CLAUDE_PLUGIN_ROOT:-$(cd "$(dirname "$0")/.." && pwd)}"
+PHASE_GRAPH="$PLUGIN_ROOT/docs/migration/phase-graph.yaml"
+CACHE_DIR=".buildanything"
+CACHE_FILE="$CACHE_DIR/writer-owner.json"
+if [ -f "$PHASE_GRAPH" ]; then
+  mkdir -p "$CACHE_DIR" 2>/dev/null
+  if ! npx --no-install tsx "$PLUGIN_ROOT/hooks/compile-writer-owner-cache.ts" "$PHASE_GRAPH" "$CACHE_FILE" 2>/dev/null; then
+    echo "buildanything: writer-owner cache compile failed; handler will fall back to live YAML parse" >&2
+  fi
+else
+  echo "buildanything: phase-graph.yaml not found at $PHASE_GRAPH; writer-owner cache skipped" >&2
+fi
+
 # Output as additional_context for Claude Code
 # JSON-escape the context
 ESCAPED=$(printf '%s' "$CONTEXT" | python3 -c 'import sys,json; print(json.dumps(sys.stdin.read()))')
