@@ -22,8 +22,15 @@
  * CJS-compatible (no import.meta). Invoked via `npx --no-install tsx`.
  */
 
-import { existsSync, readFileSync, renameSync, writeFileSync } from "node:fs";
-import { resolve } from "node:path";
+import {
+  appendFileSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  renameSync,
+  writeFileSync,
+} from "node:fs";
+import { dirname, resolve } from "node:path";
 import process from "node:process";
 
 const TRACKED_FLAGS = [
@@ -94,6 +101,21 @@ function atomicWriteJson(path: string, value: unknown): void {
   renameSync(tmp, path);
 }
 
+function formatTransitionLogLine(row: ModeTransitionRow): string {
+  const sessionId = row.session_id ?? "null";
+  return `[${row.timestamp}] mode_transition flag=${row.flag} old_value=${row.old_value} new_value=${row.new_value} session_id=${sessionId}`;
+}
+
+function appendTransitionsToBuildLog(rows: ModeTransitionRow[]): void {
+  const logPath = resolve(
+    process.env.BUILDANYTHING_BUILD_LOG_PATH ?? "docs/plans/build-log.md",
+  );
+  const dir = dirname(logPath);
+  if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+  const payload = `${rows.map(formatTransitionLogLine).join("\n")}\n`;
+  appendFileSync(logPath, payload, "utf8");
+}
+
 function main(): number {
   const statePath = resolve(
     process.env.BUILDANYTHING_STATE_PATH ?? "docs/plans/.build-state.json",
@@ -141,6 +163,15 @@ function main(): number {
     process.stderr.write(`record-mode-transitions: write failed: ${msg}\n`);
     return 1;
   }
+
+  // Best-effort: build-log is additive; state row is already persisted.
+  try {
+    appendTransitionsToBuildLog(rows);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    process.stderr.write(`record-mode-transitions: build-log append failed: ${msg}\n`);
+  }
+
   return 0;
 }
 
