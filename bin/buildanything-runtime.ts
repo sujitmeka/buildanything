@@ -7,6 +7,7 @@
 import process from "node:process";
 import { readFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
+import semver from "semver";
 
 interface PluginConfig {
   config?: {
@@ -32,10 +33,12 @@ async function main(): Promise<void> {
 
   let pinned = "unknown";
   let hostRange = "unknown";
+  let sdkStateFile = ".buildanything/sdk-state";
   try {
     const plugin = await loadPluginConfig();
     if (plugin.config?.sdkVersion) pinned = plugin.config.sdkVersion;
     if (plugin.config?.claudeCodeHostRange) hostRange = plugin.config.claudeCodeHostRange;
+    if (plugin.config?.sdkStateFile) sdkStateFile = plugin.config.sdkStateFile;
     if (!plugin.config) {
       console.warn("[buildanything-runtime] warning: plugin.json has no 'config' block; using unknown defaults");
     }
@@ -50,9 +53,36 @@ async function main(): Promise<void> {
     // [Task 4.3.4] --resume staleness decrement
   }
 
-  // [Task 1.1.4] $SDK_STATE_FILE read
-  // [Task 1.4.1] semver.satisfies host check
-  // [Task 1.4.2] fallback-to-markdown warning
+  const hostVersion = process.env.CLAUDE_CODE_VERSION;
+  let hostCompat = true;
+  if (!hostVersion) {
+    console.log("[buildanything-runtime] host version unavailable (CLAUDE_CODE_VERSION not set); skipping compat check");
+  } else if (semver.satisfies(hostVersion, hostRange)) {
+    console.log(`[buildanything-runtime] host version ${hostVersion} satisfies compat range ${hostRange}`);
+  } else {
+    hostCompat = false;
+  }
+
+  if (!hostCompat) {
+    console.warn(`[buildanything-runtime] host version ${hostVersion} outside compat range ${hostRange} — falling back to markdown mode.`);
+  }
+
+  const stateFilePath = resolve(process.cwd(), sdkStateFile);
+  let stateFileActive = false;
+  try {
+    const contents = (await readFile(stateFilePath, "utf8")).trim();
+    stateFileActive = contents === "on";
+  } catch (err) {
+    const code = (err as NodeJS.ErrnoException).code;
+    if (code === "ENOENT") {
+      console.log(`[buildanything-runtime] debug: sdk state file missing at ${stateFilePath}; treating as off`);
+    } else {
+      console.warn(`[buildanything-runtime] warning: could not read sdk state file (${(err as Error).message}); treating as off`);
+    }
+  }
+  const sdkActive = stateFileActive && hostCompat;
+  console.log(`[buildanything-runtime] sdkActive=${sdkActive} (stateFile=${stateFileActive}, hostCompat=${hostCompat})`);
+
   // [Task 1.2.4] scribe MCP registration
   // [Task 4.5.2] schema_version forward-reject
 }
