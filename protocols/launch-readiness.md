@@ -4,13 +4,7 @@ You are the orchestrator. You are about to run a Launch Readiness Review (LRR) �
 
 ## Purpose
 
-LRR replaces the monolithic Reality Checker verdict authority with five independent chapter verdicts plus a mechanical aggregator. The current Reality Checker collapses code quality, security, reliability, accessibility, and product completeness into a single verdict from a single agent — the exact failure mode matrix organizations exist to prevent. LRR splits that authority into Eng-Quality, Security, SRE, A11y, and Brand Guardian chapters, each running fresh-context with its own evidence slice. Independence matters most for Security and SRE: production incidents from those chapters are asymmetric in consequence — a security finding that goes unchallenged is a breach; a reliability finding is an outage. That asymmetry justifies the extra dispatch power and the pessimistic-block fallback, neither of which apply to the other chapters.
-
-Three structural shifts from the prior 5-chapter panel:
-
-- **Eng and QA merged into Eng-Quality.** More than half of their evidence overlapped (tests, verify outputs, task-level quality signals), and two nearly-identical verdicts produced two-thirds the signal of one coherent view. The merged chapter now renders a single judgment on code quality, test coverage, eval results, and requirements coverage together.
-- **A11y is a new seat.** The WCAG gap was the biggest coverage hole in the prior panel — a mechanical contrast field on the old Design chapter is not a runtime accessibility check. A11y now gates on Phase 5 runtime findings (axe-core sweep or equivalent) and on the Phase 3.7 design review.
-- **Brand Guardian replaces the Design mechanical check.** The prior Design chapter was a 15-line threshold on a Phase 3 metric score — theater, not judgment. Brand Guardian runs a real taste evaluation on DNA drift: did the built product stay true to the 6-axis Visual DNA locked at Phase 3.0? Harder to score, more valuable to read.
+LRR replaces the monolithic Reality Checker verdict with five independent chapter verdicts plus a mechanical aggregator.
 
 ## Chapters
 
@@ -27,14 +21,6 @@ Requirements coverage is evaluated as a sub-input of the Eng-Quality chapter. Th
 | SRE | Phase 5 performance-audit outputs, Performance Benchmarker evidence, NFRs from `sprint-tasks.md`, reliability checks |
 | A11y | Phase 5 a11y audit output, Phase 3.7 `a11y-design-review.md`, WCAG 2.2 AA runtime findings, per-page accessibility findings |
 | Brand Guardian | `docs/plans/visual-design-spec.md`, `docs/plans/visual-dna.md`, `docs/plans/design-references.md`, Playwright screenshots under `docs/plans/evidence/` matching product pages |
-
-### Why each chapter cannot be folded
-
-- **Eng-Quality:** code quality, test coverage adequacy, eval results, and requirements coverage together — a single coherent view of engineering quality. Merged from the previous Eng+QA chapters because >50% of their evidence overlapped, which produced two near-identical verdicts instead of one stronger one.
-- **Security:** independent Security veto on auth/validation/secrets/deps — production breach risk is asymmetric, so an independent chapter runs fresh-context against security evidence with the power to veto launch outright.
-- **SRE:** independent "production-ready under load" judgment. Now explicitly reads Performance Benchmarker evidence (previously unclear which chapter owned perf NFRs), plus reliability checks and NFR thresholds from `sprint-tasks.md`.
-- **A11y:** NEW SEAT closing the WCAG gap. The prior Design chapter had a mechanical contrast check and nothing runtime. A11y reads the Phase 5 runtime accessibility sweep and the Phase 3.7 design review, and gates on Critical/Serious finding counts — spec-only compliance does not pass.
-- **Brand Guardian:** REPLACES the mechanical Design check. Reads the locked DNA card + rendered screenshots + visual design spec + design references, and judges **drift from the DNA** — did the built product stay true to the direction locked at Phase 3.0? Taste judgment, not checklist theater.
 
 ## Chapter verdict schema
 
@@ -193,7 +179,7 @@ If any of the 5 required files are missing, OR any file fails to parse as valid 
 2. Writes `docs/plans/evidence/lrr-aggregate.json` with `combined_verdict = INCOMPLETE` and the list of missing/malformed files.
 3. STOPS — does **NOT** proceed to the 6 aggregation rules.
 
-This is the partial-glob race fix. The prior aggregator would happily emit a verdict even when a chapter file had not been written yet, because it iterated whatever the glob happened to return. The explicit roster check makes the race impossible: the Aggregator fails loudly instead of silently under-counting.
+This is the partial-glob race fix — the explicit roster check makes the race impossible: the Aggregator fails loudly instead of silently under-counting.
 
 ### Step 2: Apply the 6 aggregation rules
 
@@ -206,13 +192,9 @@ Once all 5 chapter files are present and parseable, the Aggregator applies these
 5. **Follow-up spawned AND `follow_up.confirmed: true`** → treat the parent chapter's verdict as if it were `BLOCK` (since the follow-up confirmed the concern).
 6. **Contradictions between chapters on typed fields** → `combined_verdict = BLOCKED` with the specific finding `cross-chapter contradiction: {field} differs between {chapter_a} and {chapter_b}`.
 
-#### Rule 6 — cross-chapter detection without anchoring cost
+Rule 6 detects cross-chapter conflicts mechanically on typed fields only — no chapter reads another's draft, preserving fresh-context independence.
 
-Rule 6 is the load-bearing mechanism that gives us cross-chapter conflict detection **without the anchoring cost of cross-chapter review**. A naive matrix-org design would have Security read Eng-Quality's draft to catch disagreements — that reintroduces the exact anchoring bias that fresh-context-per-chapter is designed to prevent (Madaan et al. Self-Refine; Gou et al. CRITIC). Instead, the aggregator does the cross-chapter check mechanically on typed fields only. If Eng-Quality's verdict says `tests_passing: true` and A11y's verdict says `runtime_sweep_ran: false`, that is a structured contradiction the aggregator can detect without either chapter reading the other's draft. Typed fields are mechanically diffable; free-form findings prose is not — and the prose is where the anchoring bias would come from. This gives us independent fresh-context judgment plus cross-chapter conflict detection.
-
-### Step 3: BLOCK routing via `decisions.jsonl` `decided_by` lookup (the star rule)
-
-This is the single highest-leverage edit in the LRR design. The decision log infrastructure (decision IDs, `related_decision_id` references, phase-scoped authoring) is already built — Step 3 is the wiring that finally turns it into a feedback loop.
+### Step 3: BLOCK routing via `decisions.jsonl` `decided_by` lookup
 
 When the Aggregator determines `combined_verdict = BLOCKED` or `NEEDS WORK` via a BLOCK finding, it MUST NOT stop and wait. Instead:
 
@@ -223,7 +205,7 @@ When the Aggregator determines `combined_verdict = BLOCKED` or `NEEDS WORK` via 
 
 If no `related_decision_id` is present on the finding (legacy finding, or a non-decision-backed issue such as a runtime crash or a fresh test failure), fall back to the legacy routing: classify by severity and route to Phase 4 (code-level) or Phase 2 (structural) per Step 4 below.
 
-This replaces the current "BLOCKED → return to failing step and re-dispatch" behavior with **author-aware re-entry**. A BLOCK on an authentication model flaw no longer routes to the Phase 4 implementer who wrote the route file; it routes to the Phase 2 architecture synthesizer who authored the auth-model decision in the first place. The finding lands where the root cause lives.
+This replaces "BLOCKED → return to failing step" with author-aware re-entry — a BLOCK on an auth model flaw routes to the Phase 2 architecture synthesizer who authored the decision, not the Phase 4 implementer.
 
 ### Step 4: Classification for NEEDS WORK findings
 
@@ -242,12 +224,35 @@ If Step 2 resolves to `combined_verdict = PRODUCTION READY`, the Aggregator writ
 - Chapter verdicts: `docs/plans/evidence/lrr/{eng-quality,security,sre,a11y,brand-guardian}.json`
 - Aggregator output: `docs/plans/evidence/lrr-aggregate.json`
 
-Why under `evidence/`: the existing evidence manifest sweep picks up anything under `docs/plans/evidence/` for free, and these files ARE evidence — typed attestations from independent chapters. Putting them elsewhere would create a second manifest path the aggregator has to know about separately.
-
 ## Token budget
 
-~12-17K tokens per LRR cycle, net of PM fold-in (no separate Step 7.0 dispatch, no Aggregator re-run): five chapter dispatches at 2-3K each (Brand Guardian is slightly higher due to the DNA axis scoring rubric, Eng-Quality is slightly higher because it now carries the Requirements Coverage sub-input inline), plus the nested `pr-test-analyzer` sub-dispatch inside Eng-Quality at ~1.5-2K, plus one aggregator at 1-2K. The Aggregator runs exactly once per cycle; there is no PM re-aggregation pass.
+~12-17K tokens per LRR cycle, net of PM fold-in: five chapter dispatches at 2-3K each, plus the nested `pr-test-analyzer` sub-dispatch inside Eng-Quality at ~1.5-2K, plus one aggregator at 1-2K. The Aggregator runs exactly once per cycle.
 
-## Contingency clause
 
-If a future iteration replaces the Brand Guardian chapter with a different taste-judgment implementation (for example, a `design-critic` wrapped around a different metric loop), the Aggregator is unchanged — it reads whichever `brand-guardian.json` file exists under `docs/plans/evidence/lrr/`. The schema stays identical, the aggregation rules stay identical, and the chapter count stays identical. The design is robust to either implementation, and the same robustness applies if the A11y chapter's runtime sweep is later replaced by a different WCAG tool chain.
+## Design Notes (non-operational)
+
+### Rationale: single-verdict failure mode
+
+The current Reality Checker collapses code quality, security, reliability, accessibility, and product completeness into a single verdict from a single agent — the exact failure mode matrix organizations exist to prevent. Independence matters most for Security and SRE: production incidents from those chapters are asymmetric in consequence — a security finding that goes unchallenged is a breach; a reliability finding is an outage. That asymmetry justifies the extra dispatch power and the pessimistic-block fallback.
+
+### Structural shifts from the prior 5-chapter panel
+
+- **Eng and QA merged into Eng-Quality.** More than half of their evidence overlapped (tests, verify outputs, task-level quality signals), and two nearly-identical verdicts produced two-thirds the signal of one coherent view.
+- **A11y is a new seat.** The WCAG gap was the biggest coverage hole in the prior panel — a mechanical contrast field on the old Design chapter is not a runtime accessibility check.
+- **Brand Guardian replaces the Design mechanical check.** The prior Design chapter was a 15-line threshold on a Phase 3 metric score — theater, not judgment.
+
+### Why each chapter cannot be folded
+
+- **Eng-Quality:** Merged from the previous Eng+QA chapters because >50% of their evidence overlapped, which produced two near-identical verdicts instead of one stronger one.
+- **Security:** Production breach risk is asymmetric, so an independent chapter runs fresh-context against security evidence with the power to veto launch outright.
+- **SRE:** Now explicitly reads Performance Benchmarker evidence (previously unclear which chapter owned perf NFRs), plus reliability checks and NFR thresholds from `sprint-tasks.md`.
+- **A11y:** The prior Design chapter had a mechanical contrast check and nothing runtime. A11y reads the Phase 5 runtime accessibility sweep and the Phase 3.7 design review, and gates on Critical/Serious finding counts.
+- **Brand Guardian:** Reads the locked DNA card + rendered screenshots + visual design spec + design references, and judges drift from the DNA. Taste judgment, not checklist theater.
+
+### Rule 6 — anchoring cost rationale
+
+A naive matrix-org design would have Security read Eng-Quality's draft to catch disagreements — that reintroduces the exact anchoring bias that fresh-context-per-chapter is designed to prevent (Madaan et al. Self-Refine; Gou et al. CRITIC). Instead, the aggregator does the cross-chapter check mechanically on typed fields only. Typed fields are mechanically diffable; free-form findings prose is not — and the prose is where the anchoring bias would come from.
+
+### Why under `evidence/`
+
+The existing evidence manifest sweep picks up anything under `docs/plans/evidence/` for free, and these files ARE evidence — typed attestations from independent chapters. Putting them elsewhere would create a second manifest path the aggregator has to know about separately.

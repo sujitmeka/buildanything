@@ -4,7 +4,7 @@ _Loaded by every iOS implementation agent when `project_type=ios`. Not loaded in
 
 ## Credits
 - Core rules derived from **twostraws/SwiftAgents** (Paul Hudson) — MIT-style open guide.
-- HIG baseline + iOS 26 platform awareness adapted from **johnrogers/claude-swift-engineering** skills (`ios-hig`, `ios-26-platform`).
+- HIG baseline + iOS 26 platform awareness adapted from **johnrogers/claude-swift-engineering** skills (granular `hig-foundations` + `hig-components-*` family, `ios-26-platform`).
 - Tool-preference hierarchy and post-training-cutoff watch-terms **paraphrased** from Apple's Xcode 26 `AgentSystemPromptAddition` template (Apple copyright — paraphrased, never quoted).
 
 ---
@@ -114,7 +114,7 @@ Glass applies to navigation chrome only, never content; gate iOS 26 APIs behind 
 
 ## 8. HIG Compliance Baseline
 
-HIG compliance — see `skills/ios/ios-hig/` for full reference.
+HIG compliance — start with `skills/ios/hig-foundations/`; granular `skills/ios/hig-components-*` skills (content, controls, dialogs, layout, menus, search, status, system) cover specific component categories, and `hig-inputs`, `hig-patterns`, `hig-platforms`, `hig-project-context`, `hig-technologies` cover the remaining HIG surface area.
 Non-negotiables: 44pt touch targets, Dynamic Type support, dark mode parity, VoiceOver labels, Reduce Motion respect.
 Permission requests must be contextual with purpose strings; haptics rare and meaningful only.
 
@@ -206,10 +206,9 @@ _Per-phase skill bundle — orchestrator loads the relevant subset based on curr
 
 ### Phase 3 — Design
 - `agents/ios-swift-ui-design.md` — visual intake (mockups → SwiftUI plan)
-- `skills/ios/ios-hig/` — HIG compliance reference
+- `skills/ios/hig-foundations/` + granular `hig-*` skills — HIG compliance (see agent shortlists for per-agent selection)
 - `skills/ios/swiftui-design-principles/` — 10-rule visual polish
 - `skills/ios/swiftui-liquid-glass/` — iOS 26 glass decision tree
-- `skills/ios/writing-for-interfaces/` — microcopy (if not yet ported, TBD)
 
 ### Phase 4 — Build (Step 4.0 Scaffold)
 - `skills/ios/ios-entitlements-generator/` (stub)
@@ -217,7 +216,7 @@ _Per-phase skill bundle — orchestrator loads the relevant subset based on curr
 
 ### Phase 4 — Build (Step 4.1+ per-task flow)
 - `skills/ios/swiftui-pro/` (every UI write)
-- `skills/ios/swift-concurrency/` (async/actor/Sendable)
+- `skills/ios/swift-concurrency-6-2/` (async/actor/Sendable — Swift 6.2 single-threaded default)
 - `skills/ios/swiftdata-pro/` (@Model/@Query usage)
 - `skills/ios/swift-accessibility/` (every UI write — a11y first-draft)
 - `skills/ios/swift-security-expert/` (Keychain/Crypto/auth)

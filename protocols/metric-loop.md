@@ -19,6 +19,8 @@ Metric: [what you're measuring, in one sentence]
 How to measure: [what the measurement agent should do — run tests, audit code, check criteria, etc.]
 Target: [score 0-100 at which you stop]
 Max iterations: [hard cap, default 5]
+Scoring Criteria Checklist: [extracted in Step 0.5 — see .build-state.json]
+Extraction method: [mechanical | one-shot-dispatch | mixed]
 ```
 
 Then create a score log table:
@@ -36,11 +38,53 @@ Sub-step: [5.1 Implement | 5.1b Cleanup | 5.2 Metric Loop | 5.3 Loop Exit | 5.4 
 ```
 This tells the orchestrator exactly where to resume after context compaction.
 
+## Step 0.5: Extract Scoring Criteria
+
+Before the first measurement, extract a **Scoring Criteria Checklist** from the stable reference docs. This checklist is the critic's scoring input for every iteration — it replaces raw doc injection.
+
+### Why
+
+Reference docs (DNA cards, design specs, architecture docs, acceptance criteria) do not change during the loop. Pre-injecting them into every critic prompt wastes ~20-30K tokens per iteration. The checklist extracts the exact scoring values once and passes ~1-2K tokens instead.
+
+### Extraction mechanism (per doc type)
+
+Use the cheapest mechanism that preserves fidelity:
+
+| Source doc type | Structure | Extraction mechanism | Cost |
+|-----------------|-----------|---------------------|------|
+| Structured (named fields with explicit values) — e.g., `visual-dna.md` DNA card, `sprint-tasks.md` Behavioral Test field, `ios-design-board.md` named sections | YAML/markdown with named axes, fields, or sections | **Mechanical** — orchestrator parses and copies the values directly. No LLM reasoning. | ~0 tokens |
+| Semi-structured (values spread across prose sections) — e.g., `visual-design-spec.md`, Phase 5 audit findings | Long-form with explicit values in multiple sections | **One-shot extractor dispatch** — single agent call reads the full doc once and outputs the structured checklist. | ~20-25K one-time |
+| Unstructured (visual references, screenshots, mood boards) — e.g., `design-references.md` | Screenshot URLs, visual comps | **Not extracted.** Referenced by path in the checklist. Iteration 1 MAY read on-demand; iteration 2+ MUST NOT unless diagnosis explicitly flags a visual-reference gap. | 0 tokens |
+
+**Rule: if the source doc has named fields with explicit values, extraction is mechanical (no dispatch). If values are spread across prose sections, use a one-shot extractor dispatch. Never use orchestrator LLM reasoning for extraction — it burns the tokens you're trying to save.**
+
+### Persist the checklist
+
+Write the checklist to `.build-state.json` under `active_metric_loop.scoring_criteria_checklist`. Record the extraction method in `active_metric_loop.extraction_method` (one of: `mechanical`, `one-shot-dispatch`, `mixed`). The rendered `.build-state.md` view reflects it automatically.
+
+### Checklist format
+
+```
+Scoring Criteria Checklist
+Source docs: [list of source doc paths]
+Extracted at: [timestamp]
+Extraction method: [mechanical | one-shot-dispatch | mixed]
+
+[Structured criteria with exact values, organized by scoring dimension]
+
+Reference Anchors:
+- [path] (iteration 1 MAY read; iteration 2+ MUST NOT unless diagnosis flags gap)
+```
+
+The format is flexible — adapt it to the phase and artifact. The protocol gives a template, not a rigid schema. What matters: exact values, not summaries; organized by scoring dimension; reference anchors for unstructured docs.
+
 ## Step 1: MEASURE
 
 Call the Agent tool — description: "Measure [metric]" — prompt:
 
-"[How to measure, from your metric definition]. Score the current state 0-100. Return your response with a clear SCORE: [number] line, a list of FINDINGS, and the single TOP ISSUE most likely to improve the score if fixed."
+"SCORING CRITERIA CHECKLIST: [paste the checklist from Step 0.5 — NOT the raw reference docs]. [How to measure, from your metric definition]. Score the current state 0-100 against the checklist criteria. Return your response with a clear SCORE: [number] line, a list of FINDINGS, and the single TOP ISSUE most likely to improve the score if fixed."
+
+> **Pass the Scoring Criteria Checklist (from Step 0.5) to the measurement agent. Do NOT paste full reference docs into the prompt. The agent retains Read access for on-demand lookups if the checklist doesn't cover a specific detail, but the prompt must not pre-inject stable docs.**
 
 Read the agent's response. You need: the SCORE, the TOP ISSUE, and the file paths for diagnosis in Step 3. Record the score to `docs/plans/.build-state.md`. The full findings list is useful for diagnosis but does NOT need to persist in your context across iterations — once you've picked the top issue, the details of lower-priority findings can go. Append a row to the score log in `docs/plans/.build-state.md`:
 
@@ -80,6 +124,11 @@ Call the Agent tool — description: "Fix [top issue]" — mode: "bypassPermissi
 
 > **Do NOT pass the measurement agent's full findings to this agent. Only pass the single diagnosed issue and relevant file paths.**
 
+### Iteration-aware context rule
+
+- **Iteration 1 generator** receives the full phase context header + task description (the generator needs full context for its first pass).
+- **Iteration 2+ generator** receives ONLY: (a) the single top issue from diagnosis, (b) the relevant file paths, (c) the specific criteria values from the Scoring Criteria Checklist that relate to the top issue. The full `[CONTEXT header above]` preamble is NOT re-injected. The generator already has the codebase from iteration 1 — it only needs the delta.
+
 ## Step 5: LOOP
 
 Return to Step 1. Re-measure the artifact after the fix.
@@ -98,3 +147,7 @@ AUTHOR-BIAS ELIMINATION: The measurement agent and the fix agent must NEVER shar
 - Track ALL scores in `docs/plans/.build-state.md` so the history survives context compaction.
 - If context was compacted mid-loop: read `docs/plans/.build-state.md`, find the Active Metric Loop section, resume from the last recorded iteration.
 - CONTEXT HYGIENE: Measurement agents are analysis agents — read their full output for diagnosis. But once you've picked the top issue (Step 3) and dispatched the fix (Step 4), the detailed findings from THAT iteration are spent. Don't accumulate findings across iterations — each measurement is fresh.
+<STABLE-CONTEXT-RULE>
+STABLE CONTEXT RULE: Reference docs that do not change during the loop (design specs, DNA cards, architecture docs, acceptance criteria) MUST be extracted into the Scoring Criteria Checklist at Step 0.5 and passed as the checklist — never re-injected as raw content into iteration 2+ prompts. Fresh artifacts (screenshots, test results, rendered output) are fetched each iteration. This is the primary token-saving mechanism: ~1-2K checklist vs ~20-30K raw docs per iteration.
+</STABLE-CONTEXT-RULE>
+- CHECKLIST FALLBACK: If no Scoring Criteria Checklist is provided (Step 0.5 was skipped or caller did not pass one), the critic falls back to raw doc reads. The orchestrator MUST log a WARN to `docs/plans/build-log.md`: "Metric loop iteration [N]: no scoring criteria checklist provided, falling back to raw doc reads." Callers SHOULD always provide a checklist. New callers that omit it will trigger the WARN, making silent regressions visible.

@@ -2,6 +2,40 @@
 
 _Loaded into orchestrator session context when `project_type=web` (the default). Contains per-phase web-specific instructions. Mode-agnostic phase scaffolding lives in `commands/build.md`._
 
+## CONTEXT header injection (web branch — project_type hardcoded)
+
+Every `subagent_type:` dispatch in this file prepends a CONTEXT header to its prompt. Per `commands/build.md` CONTEXT HEADER HARD-GATE: the orchestrator MUST render this header ONCE at the start of each phase by resolving all values into concrete strings, then reuse the rendered header verbatim for every dispatch in that phase. DO NOT leave `{read from ...}` placeholders — resolve them before the first dispatch.
+
+```
+CONTEXT:
+  project_type: web
+  phase: <resolved: current phase number>
+  dna: <resolved: 6-axis DNA values extracted from docs/plans/visual-dna.md — NOT the full file content, just the axis values. Include only if phase >= 3 AND visual-dna.md exists>
+  archetype: <resolved: H1|H2|H3|H4 from .build-state.json>
+
+TASK:
+```
+
+**Resolution rules:**
+- `dna` = the 6 axis values only (Scope, Density, Character, Material, Motion, Type) — NOT the full `visual-dna.md` content. ~100 tokens, not ~5K.
+- `archetype` = single enum value from `.build-state.json`.
+- Phase 3 Step 3.0 (Visual DNA Selection) is the ONE exception — it runs BEFORE `visual-dna.md` exists, so its CONTEXT omits `dna`.
+- The rendered header is a stable prefix — it does not change between dispatches within a phase.
+
+Individual dispatches below reference `[CONTEXT header above]` and rely on this rendered template.
+
+## Phase 2 — Architecture (web branch additions)
+
+### Step 2.9 — Visual DNA Directional Preview (pre-Gate-2)
+
+Before the Quality Gate 2 approval prompt in `commands/build.md` is rendered, dispatch a lightweight directional DNA preview. This is NOT the full 6-axis lock (that remains Phase 3.0's job) — it is a 3-5 bullet sanity-check surfaced at Gate 2 so the user catches wrong visual direction before Phase 3+ burns tokens against it.
+
+Call the Agent tool once:
+
+1. Description: "Visual DNA directional preview" — subagent_type: `design-brand-guardian` — prompt: "[CONTEXT header above — phase: 2. NOTE: `dna` is omitted — this step produces the preview, not the lock.] Read `docs/plans/design-doc.md` (#persona, #scope, #voice), `docs/plans/findings-digest.md` (reference signals), and `docs/plans/architecture.md` (stack constraints). Emit a 3-5 bullet DIRECTIONAL preview of the intended Visual DNA — brand read in one line, then proposed leanings on Scope, Character, Material/Motion, and Type. NO rationale paragraphs, NO reference citations, NO incompatibility-matrix work. This is a sanity-check for the user at Gate 2, not the locked card. Save to `docs/plans/visual-dna-preview.md` as a flat bullet list. Target 150 tokens of output, max 250."
+
+Output: `docs/plans/visual-dna-preview.md` — surfaced by the orchestrator in the Gate 2 prompt alongside Architecture + Sprint Task List. Phase 3.0 Brand Guardian re-invokes to produce the full locked 6-axis card; the preview is discarded after Gate 2 approval.
+
 ## Phase 3 — Design (web branch)
 
 **Goal:** Lock a 6-axis Visual DNA card, then compose — not reconstruct — the product's visual system from a vendored component library. Every downstream step reads the DNA. Compositional beats reconstructive for visual quality. Fully autonomous.
@@ -18,7 +52,7 @@ Dispatch a single agent to lock the 6-axis Visual DNA card that governs every do
 
 Call the Agent tool once:
 
-1. Description: "Visual DNA selection" — subagent_type: `design-brand-guardian` — prompt: "You are the DNA Owner for this build. Read these inputs: `docs/plans/design-doc.md` (product concept, user, voice), `docs/plans/findings-digest.md` (reference sites the user mentioned, competitor aesthetic landscape), `docs/plans/architecture.md` (stack constraints — e.g. server-rendered Rails can't ship Three.js), `docs/plans/quality-targets.json` (perf budget constrains motion and material choices), `docs/plans/user-decisions.md` (if the user said 'like Linear' or 'make it playful' during brainstorm). Lock a 6-axis Visual DNA card per the schema in `protocols/visual-dna.md`. The 6 axes: **Scope** (Marketing / Product / Dashboard / Internal Tool — gates library install), **Density** (Airy / Balanced / Dense), **Character** (Minimal / Editorial / Maximalist / Brutalist / Playful), **Material** (Flat / Glassy / Physical / Neumorphic), **Motion** (Still / Subtle / Expressive / Cinematic), **Type** (Neutral Sans / Humanist Sans / Serif-forward / Display-forward / Mono-accented). Consult the incompatibility matrix in `protocols/visual-dna.md` — you are FORBIDDEN from picking illegal combinations (e.g. Dashboard + Cinematic is contradictory). Write the locked DNA card to `docs/plans/visual-dna.md`."
+1. Description: "Visual DNA selection" — subagent_type: `design-brand-guardian` — prompt: "[CONTEXT header above — phase: 3. NOTE: Step 3.0 omits `dna` because this step PRODUCES it.] You are the DNA Owner for this build. Read these inputs: `docs/plans/design-doc.md` (product concept, user, voice), `docs/plans/findings-digest.md` (reference sites the user mentioned, competitor aesthetic landscape), `docs/plans/architecture.md` (stack constraints — e.g. server-rendered Rails can't ship Three.js), `docs/plans/quality-targets.json` (perf budget constrains motion and material choices), `docs/plans/user-decisions.md` (if the user said 'like Linear' or 'make it playful' during brainstorm). Lock a 6-axis Visual DNA card per the schema in `protocols/visual-dna.md`. The 6 axes: **Scope** (Marketing / Product / Dashboard / Internal Tool — gates library install), **Density** (Airy / Balanced / Dense), **Character** (Minimal / Editorial / Maximalist / Brutalist / Playful), **Material** (Flat / Glassy / Physical / Neumorphic), **Motion** (Still / Subtle / Expressive / Cinematic), **Type** (Neutral Sans / Humanist Sans / Serif-forward / Display-forward / Mono-accented). Consult the incompatibility matrix in `protocols/visual-dna.md` — you are FORBIDDEN from picking illegal combinations (e.g. Dashboard + Cinematic is contradictory). Write the locked DNA card to `docs/plans/visual-dna.md`."
 
 Output: `docs/plans/visual-dna.md` — the locked DNA card. Every downstream Phase 3 step reads this file, and Phase 4 implementers read it via `refs.json`.
 
@@ -28,9 +62,9 @@ Research is now goal-directed — validate and enrich the locked DNA, not catalo
 
 Call the Agent tool 2 times in one message:
 
-1. Description: "Competitive visual audit" — subagent_type: `visual-research` — prompt: "Mode: `competitive-audit`. Read `docs/plans/visual-dna.md` to understand the locked DNA. Find 5-8 rival UIs that exemplify the chosen DNA axes (NOT all competitors — only ones that nail the axes we chose). Use Playwright to screenshot each at desktop 1920x1080 and mobile 375x812. For each site, analyze which DNA axes it nails and which it doesn't. Save screenshots to `docs/plans/design-references/competitors/`. Append findings to `docs/plans/design-references.md` grouped by DNA axis (motion refs, material refs, typography refs, character refs, density refs). Optional caller-supplied competitor URLs: [list or 'none']."
+1. Description: "Competitive visual audit" — subagent_type: `visual-research` — prompt: "[CONTEXT header above — phase: 3] Mode: `competitive-audit`. Read `docs/plans/visual-dna.md` to understand the locked DNA. Find 5-8 rival UIs that exemplify the chosen DNA axes (NOT all competitors — only ones that nail the axes we chose). Use Playwright to screenshot each at desktop 1920x1080 and mobile 375x812. For each site, analyze which DNA axes it nails and which it doesn't. Save screenshots to `docs/plans/design-references/competitors/`. Append findings to `docs/plans/design-references.md` grouped by DNA axis (motion refs, material refs, typography refs, character refs, density refs). Optional caller-supplied competitor URLs: [list or 'none']."
 
-2. Description: "Design inspiration mining" — subagent_type: `visual-research` — prompt: "Mode: `inspiration-mining`. Read `docs/plans/visual-dna.md`. Search Awwwards.com, Godly.website, and SiteInspire for award-winning sites that match the DNA axes. Use Playwright to screenshot the top 5-8 results at desktop 1920x1080 and mobile 375x812. Save to `docs/plans/design-references/inspiration/`. Append findings to `docs/plans/design-references.md` grouped by DNA axis. Tag every reference with the specific axis (or axes) it validates."
+2. Description: "Design inspiration mining" — subagent_type: `visual-research` — prompt: "[CONTEXT header above — phase: 3] Mode: `inspiration-mining`. Read `docs/plans/visual-dna.md`. Search Awwwards.com, Godly.website, and SiteInspire for award-winning sites that match the DNA axes. Use Playwright to screenshot the top 5-8 results at desktop 1920x1080 and mobile 375x812. Save to `docs/plans/design-references/inspiration/`. Append findings to `docs/plans/design-references.md` grouped by DNA axis. Tag every reference with the specific axis (or axes) it validates."
 
 Output: `docs/plans/design-references.md` — reference paths grouped by DNA axis, ready to feed Step 3.2 component mapping and Step 3.6 critic scoring.
 
@@ -40,7 +74,7 @@ This is the compositional step. The Visual Designer picks specific library compo
 
 Call the Agent tool once:
 
-1. Description: "Component library mapping" — subagent_type: `design-ui-designer` — prompt: "Read `docs/plans/visual-dna.md`, `docs/plans/design-references.md`, and `docs/library-refs/component-library-catalog.md` (the static reference mapping DNA-axis combinations to library component variants). Pick specific component variants for each slot the product needs: hero, cards, cta, nav, marquee, chart, 3D, form elements, modals. The catalog is authoritative — when the DNA matches a row, use the variants that row specifies; do not reinvent. Write `docs/plans/component-manifest.md` with the locked component picks, one row per slot, naming the library and the variant. For any slot the catalog doesn't cover, emit a row tagged 'manifest gap' with a short fallback plan (stock shadcn primitive plus notes)."
+1. Description: "Component library mapping" — subagent_type: `design-ui-designer` — prompt: "[CONTEXT header above — phase: 3] Read `docs/plans/visual-dna.md`, `docs/plans/design-references.md`, and `docs/library-refs/component-library-catalog.md` (the static reference mapping DNA-axis combinations to library component variants). Pick specific component variants for each slot the product needs: hero, cards, cta, nav, marquee, chart, 3D, form elements, modals. The catalog is authoritative — when the DNA matches a row, use the variants that row specifies; do not reinvent. Write `docs/plans/component-manifest.md` with the locked component picks, one row per slot, naming the library and the variant. For any slot the catalog doesn't cover, emit a row tagged 'manifest gap' with a short fallback plan (stock shadcn primitive plus notes)."
 
 Output: `docs/plans/component-manifest.md` — locked component manifest.
 
@@ -48,7 +82,7 @@ Output: `docs/plans/component-manifest.md` — locked component manifest.
 
 ### Step 3.2b — DNA Persona Check
 
-Call the Agent tool — description: "DNA persona check" — subagent_type: design-ux-researcher — prompt: "Read docs/plans/visual-dna.md (the locked 6-axis DNA card) + docs/plans/design-doc.md (#persona and #jobs-to-be-done sections) + docs/plans/findings-digest.md. Validate: does the chosen Visual DNA actually serve this persona and these jobs-to-be-done? Cross-check each DNA axis against the persona's context (e.g., if persona is 'senior enterprise buyer on a tight schedule' but DNA chose Maximalist + Cinematic, that's wrong — Enterprise/Minimal/Subtle fits better). Report any DNA-persona mismatches. If mismatches found, the Brand Guardian may need to re-lock the DNA (backward edge to Step 3.0). Save findings to docs/plans/dna-persona-check.md."
+Call the Agent tool — description: "DNA persona check" — subagent_type: design-ux-researcher — prompt: "[CONTEXT header above — phase: 3] Read docs/plans/visual-dna.md (the locked 6-axis DNA card) + docs/plans/design-doc.md (#persona and #jobs-to-be-done sections) + docs/plans/findings-digest.md. Validate: does the chosen Visual DNA actually serve this persona and these jobs-to-be-done? Cross-check each DNA axis against the persona's context (e.g., if persona is 'senior enterprise buyer on a tight schedule' but DNA chose Maximalist + Cinematic, that's wrong — Enterprise/Minimal/Subtle fits better). Report any DNA-persona mismatches. If mismatches found, the Brand Guardian may need to re-lock the DNA (backward edge to Step 3.0). Save findings to docs/plans/dna-persona-check.md."
 
 ### Step 3.3 — UX Architecture (single agent)
 
@@ -56,7 +90,7 @@ Structural design must align to the locked DNA — a Dense layout behaves differ
 
 Call the Agent tool once:
 
-1. Description: "UX architecture" — subagent_type: `design-ux-architect` — prompt: "Read `docs/plans/visual-dna.md`, `docs/plans/component-manifest.md`, and the #frontend anchor in `docs/plans/architecture.md`. Design information architecture, user flows, interaction patterns, and responsive strategy — all aligned to the locked DNA. Dense layout behaves differently than Airy layout even for the same flow; Cinematic motion reshapes page transitions versus Subtle motion. Map each user flow to the component-manifest slots it needs. Save to `docs/plans/ux-architecture.md`."
+1. Description: "UX architecture" — subagent_type: `design-ux-architect` — prompt: "[CONTEXT header above — phase: 3] Read `docs/plans/visual-dna.md`, `docs/plans/component-manifest.md`, and the #frontend anchor in `docs/plans/architecture.md`. Design information architecture, user flows, interaction patterns, and responsive strategy — all aligned to the locked DNA. Dense layout behaves differently than Airy layout even for the same flow; Cinematic motion reshapes page transitions versus Subtle motion. Map each user flow to the component-manifest slots it needs. Save to `docs/plans/ux-architecture.md`."
 
 Output: `docs/plans/ux-architecture.md`.
 
@@ -66,7 +100,7 @@ The Visual Designer re-invokes as writer this time, producing the much richer Vi
 
 Call the Agent tool once:
 
-1. Description: "Visual design spec" — subagent_type: `design-ui-designer` — prompt: "Second invocation as writer. Read `docs/plans/visual-dna.md`, `docs/plans/component-manifest.md`, `docs/plans/ux-architecture.md`, and `docs/plans/design-references.md`. Write `docs/plans/visual-design-spec.md` with ALL the following layers:
+1. Description: "Visual design spec" — subagent_type: `design-ui-designer` — prompt: "[CONTEXT header above — phase: 3] Second invocation as writer. Read `docs/plans/visual-dna.md`, `docs/plans/component-manifest.md`, `docs/plans/ux-architecture.md`, and `docs/plans/design-references.md`. Write `docs/plans/visual-design-spec.md` with ALL the following layers:
 
 **TOKENS** (existing): color system (hex, light + dark), typography scale, spacing (8px base), shadows, radius.
 
@@ -86,7 +120,7 @@ Output: `docs/plans/visual-design-spec.md` — substantially richer than the pri
 
 Call the Agent tool once:
 
-1. Description: "Inclusive visuals check" — subagent_type: `design-inclusive-visuals-specialist` — prompt: "Read `docs/plans/visual-dna.md`, `docs/plans/component-manifest.md`, and `docs/plans/visual-design-spec.md`. Audit for representation gaps, imagery bias, color choices that exclude colorblind users, contrast failures, and culturally-specific iconography that doesn't translate. Write findings to `docs/plans/inclusive-visuals-audit.md`."
+1. Description: "Inclusive visuals check" — subagent_type: `design-inclusive-visuals-specialist` — prompt: "[CONTEXT header above — phase: 3] Read `docs/plans/visual-dna.md`, `docs/plans/component-manifest.md`, and `docs/plans/visual-design-spec.md`. Audit for representation gaps, imagery bias, color choices that exclude colorblind users, contrast failures, and culturally-specific iconography that doesn't translate. Write findings to `docs/plans/inclusive-visuals-audit.md`."
 
 Output: `docs/plans/inclusive-visuals-audit.md`.
 
@@ -98,13 +132,13 @@ This is the only Phase 3 step that writes code. Wrapped in a generator/critic me
 
 Call the Agent tool once:
 
-1. Description: "Build living style guide" — subagent_type: `engineering-frontend-developer` — mode: "bypassPermissions" — prompt: "[COMPLEXITY: L] Read `docs/plans/component-manifest.md` and `docs/plans/visual-design-spec.md`. Build a `/design-system` route with rendered, interactive examples of every chosen variant from the manifest. **HARD-GATE: Import from the installed libraries. Do NOT write components from scratch when the manifest names one.** Every component must be interactive (hover, focus, transitions all work). Mobile-responsive. This ships with the product. Commit: 'feat: living style guide'."
+1. Description: "Build living style guide" — subagent_type: `engineering-frontend-developer` — mode: "bypassPermissions" — prompt: "[CONTEXT header above — phase: 3] [COMPLEXITY: L] Read `docs/plans/component-manifest.md` and `docs/plans/visual-design-spec.md`. Build a `/design-system` route with rendered, interactive examples of every chosen variant from the manifest. **HARD-GATE: Import from the installed libraries. Do NOT write components from scratch when the manifest names one.** Every component must be interactive (hover, focus, transitions all work). Mobile-responsive. This ships with the product. Commit: 'feat: living style guide'."
 
 **Metric loop wrapper** (per `protocols/metric-loop.md`):
 
-- **Critic** — Call the Agent tool — description: "Design critic scoring pass" — subagent_type: `design-critic` — prompt: "Read the rendered `/design-system` route via Playwright screenshot (desktop 1920x1080 + mobile 375x812), plus `docs/plans/visual-dna.md`, `docs/plans/design-references.md`, and `docs/plans/visual-design-spec.md`. Score the gap on **6 DNA axes** (Scope fit, Density, Character, Material, Motion, Type — 20 points each) plus **5 craft dimensions** (whitespace rhythm, visual hierarchy, motion coherence, color harmony, typographic refinement — 20 points each). Total 220. Target 180. Every finding must cite a specific element with file:line reference AND reference the DNA card or design-references path — score a gap, not an opinion. Suggest concrete improvements ('the card padding is 16px but the DNA calls for Airy density — bump to 32px'). Default verdict: NEEDS WORK. Never edit code. Max 5 iterations before exit."
+- **Critic** — Call the Agent tool — description: "Design critic scoring pass" — subagent_type: `design-critic` — prompt: "[CONTEXT header above — phase: 3] SCORING CRITERIA CHECKLIST: [paste the checklist from `active_metric_loop.scoring_criteria_checklist` in `.build-state.json` — NOT the raw reference docs]. Capture the rendered `/design-system` route via Playwright screenshot (desktop 1920x1080 + mobile 375x812). Score the gap on **6 DNA axes** (Scope fit, Density, Character, Material, Motion, Type — 20 points each) plus **5 craft dimensions** (whitespace rhythm, visual hierarchy, motion coherence, color harmony, typographic refinement — 20 points each). Total 220. Target 180. Every finding must cite a specific element with file:line reference AND reference the checklist criteria — score a gap, not an opinion. Suggest concrete improvements ('the card padding is 16px but the checklist says Density: Airy — 32px — bump to 32px'). Iteration 1 MAY Read `docs/plans/design-references.md` for visual comparison; iteration 2+ MUST NOT unless diagnosis explicitly flags a visual-reference gap. Default verdict: NEEDS WORK. Never edit code. Max 5 iterations before exit."
 
-- **Generator (re-invocation)** — Call the Agent tool — description: "Apply critic's top issue" — subagent_type: `engineering-frontend-developer` — mode: "bypassPermissions" — prompt: "Design Critic returned these top issues: [paste top issue]. Apply ONLY the top issue. Do not re-critique. Do not refactor other parts. Re-render the `/design-system` route. Return the commit SHA."
+- **Generator (re-invocation, iteration 2+)** — Call the Agent tool — description: "Apply critic's top issue" — subagent_type: `engineering-frontend-developer` — mode: "bypassPermissions" — prompt: "TARGETED FIX from metric loop diagnosis: [paste top issue from Step 3 diagnosis]. Files: [paste file paths]. Relevant criteria from checklist: [paste the specific checklist values that relate to the top issue — e.g., 'Density: Airy — 32px card padding']. Apply ONLY the top issue. Do not re-critique. Do not refactor other parts. Re-render the `/design-system` route. Return the commit SHA." NOTE: Do NOT include `[CONTEXT header above]` on iteration 2+ — the generator already has the codebase context from iteration 1. Per `protocols/metric-loop.md` Step 4 iteration-aware context rule.
 
 - **Exit conditions:** quality target hit (score ≥ 180), stall (no score improvement for 2 consecutive rounds), or max iterations (5 total).
 
@@ -116,7 +150,7 @@ WCAG 2.2 AA runtime check on the rendered style guide plus any key product pages
 
 Call the Agent tool once:
 
-1. Description: "A11y design review" — subagent_type: `a11y-architect` — prompt: "WCAG 2.2 AA runtime check on the rendered `/design-system` route and any key product pages. Check contrast, focus order, keyboard navigation, screen reader labels, reduced-motion variants, and touch targets (>= 44px). Use Playwright and axe-core. Save findings to `docs/plans/a11y-design-review.md` with severity tags (Critical / Serious / Moderate / Minor)."
+1. Description: "A11y design review" — subagent_type: `a11y-architect` — prompt: "[CONTEXT header above — phase: 3] WCAG 2.2 AA runtime check on the rendered `/design-system` route and any key product pages. Check contrast, focus order, keyboard navigation, screen reader labels, reduced-motion variants, and touch targets (>= 44px). Use Playwright and axe-core. Save findings to `docs/plans/a11y-design-review.md` with severity tags (Critical / Serious / Moderate / Minor)."
 
 Output: `docs/plans/a11y-design-review.md`.
 
@@ -144,25 +178,31 @@ Step 4.0 is three sequential dispatches: project scaffolding, design system setu
 
 #### 4.0.a — Project scaffolding
 
-Call the Agent tool — description: "Project scaffolding" — subagent_type: `engineering-rapid-prototyper` — mode: "bypassPermissions" — prompt: "[COMPLEXITY: M] Set up the project from this architecture: [paste]. Create directory structure, dependencies, build tooling, linting config, test framework with one passing test, .gitignore, .env.example. Read `docs/plans/visual-dna.md` Scope axis and only install the component libraries the DNA needs — never ship Three.js for an internal admin panel. Commit: 'feat: initial scaffolding'."
+Call the Agent tool — description: "Project scaffolding" — subagent_type: `engineering-rapid-prototyper` — mode: "bypassPermissions" — prompt: "[CONTEXT header above — phase: 4] [COMPLEXITY: M] Set up the project from the architecture. Read `docs/plans/architecture.md` via your Read tool before starting. Create directory structure, dependencies, build tooling, linting config, test framework with one passing test, .gitignore, .env.example. Read `docs/plans/visual-dna.md` Scope axis and only install the component libraries the DNA needs — never ship Three.js for an internal admin panel. Commit: 'feat: initial scaffolding'."
 
 #### 4.0.b — Design system setup
 
-Call the Agent tool — description: "Design system setup" — subagent_type: `engineering-frontend-developer` — mode: "bypassPermissions" — prompt: "Implement the design system from the Visual Design Spec: [paste from docs/plans/visual-design-spec.md]. Create CSS tokens matching the spec's color system, typography scale, spacing system, shadow/elevation tokens, and base layout components. The living style guide from Phase 3 is the reference implementation — components must match. Commit: 'feat: design system'."
+Call the Agent tool — description: "Design system setup" — subagent_type: `engineering-frontend-developer` — mode: "bypassPermissions" — prompt: "[CONTEXT header above — phase: 4] Implement the design system from the Visual Design Spec. Read `docs/plans/visual-design-spec.md` via your Read tool before starting. Create CSS tokens matching the spec's color system, typography scale, spacing system, shadow/elevation tokens, and base layout components. The living style guide from Phase 3 is the reference implementation — components must match. Commit: 'feat: design system'."
 
 #### 4.0.c — Acceptance test scaffolding
 
-Call the Agent tool — description: "Scaffold acceptance tests" — INTERNAL inline role-string: "Scaffold acceptance tests from sprint-tasks.md. Use Playwright Page Object Model. Each test should FAIL right now (features aren't built yet) — that's correct." — mode: "bypassPermissions" — prompt: "Read docs/plans/sprint-tasks.md. For every task with a Behavioral Test field, create a Playwright test stub in tests/e2e/acceptance/. Use Page Object Model. Each test should: navigate to the page, perform the interaction, assert the expected outcome. Tests should FAIL right now (features aren't built yet) — that's correct. Also ensure agent-browser is available (run `which agent-browser`). Commit: 'test: scaffold acceptance tests from sprint tasks'."
+Call the Agent tool — description: "Scaffold acceptance tests" — subagent_type: `engineering-frontend-developer` — mode: "bypassPermissions" — prompt: "[CONTEXT header above — phase: 4] Read docs/plans/sprint-tasks.md. For every task with a Behavioral Test field, create a Playwright test stub in tests/e2e/acceptance/. Use Page Object Model. Each test should: navigate to the page, perform the interaction, assert the expected outcome. Tests should FAIL right now (features aren't built yet) — that's correct. Also ensure agent-browser is available (run `which agent-browser`). Commit: 'test: scaffold acceptance tests from sprint tasks'."
 
 ## Phase 4 — Build per-task flow (web branch)
 
-These are the web-specific prompt templates for the per-task flow inside Phase 4 Step 4.1+. The orchestrator-side machinery (parallel batching by DAG, Briefing Officer dispatch, Senior Dev cleanup, code review pair, Metric Loop, Verify Service) lives in `commands/build.md` Phase 4. This section only overrides the implementer dispatch and UI-specific verification prompts.
+These are the web-specific prompt templates for the per-task flow inside Phase 4 Step 4.1+. The orchestrator-side machinery (wave-based parallel dispatch by DAG, Briefing Officer, Senior Dev cleanup, code review pair, Metric Loop, Verify Service) lives in `commands/build.md` Phase 4. This section only overrides the implementer dispatch and UI-specific verification prompts.
+
+### Wave dispatch (topological, dependency-bounded)
+
+Build the DAG from the `Dependencies:` field on each row in `docs/plans/sprint-tasks.md`. A wave is the set of all not-yet-dispatched tasks whose declared dependencies are ALL complete. Dispatch every task in a wave as parallel Agent tool calls in ONE message, wait for the full wave to return, write back any `deviation_row` payloads via the orchestrator-scribe (single-writer pattern per `commands/build.md` §Decision log scribe), then compute the next wave. Repeat until the graph is drained.
+
+No magic parallelism cap — the dependency graph is the limit. A task that declares no dependencies runs in wave 1 alongside every other root. A task that declares `Dependencies: T1, T2` runs in whichever wave first satisfies both.
 
 ### Step 4.1+ — Task execution overrides (web)
 
 #### Implementer dispatch (web)
 
-Call the Agent tool — description: "[task name]" — subagent_type: `[pick per task type]` — mode: "bypassPermissions" — prompt: "TASK: [task description + acceptance criteria]. CONTEXT MAP from Briefing Officer: [paste Briefing Officer output]. Use the Read tool to pull refs on demand — design-doc.md, architecture.md, visual-design-spec.md, component-manifest.md — do NOT expect full pasted content. For UI tasks: the living style guide at /design-system shows every component's exact styling and states — match it, and import from the manifest-named library variants (Phase 4 HARD-GATE — do not write components from scratch when the manifest names one). Implement fully with real code and tests. Commit: 'feat: [task]'. Report what you built, files changed, and test results."
+Call the Agent tool — description: "[task name]" — subagent_type: `[pick per task type]` — mode: "bypassPermissions" — prompt: "[CONTEXT header above — phase: 4] TASK: [task description + acceptance criteria]. CONTEXT MAP from Briefing Officer: [paste Briefing Officer output]. Use the Read tool to pull refs on demand — design-doc.md, architecture.md, visual-design-spec.md, component-manifest.md — do NOT expect full pasted content. For UI tasks: the living style guide at /design-system shows every component's exact styling and states — match it, and import from the manifest-named library variants (Phase 4 HARD-GATE — do not write components from scratch when the manifest names one). Implement fully with real code and tests. Commit: 'feat: [task]'. Report what you built, files changed, and test results."
 
 Pick the right developer framing AND the matching `subagent_type`:
 - Frontend / UI tasks → `engineering-frontend-developer`
@@ -174,7 +214,9 @@ Set `[COMPLEXITY: S/M/L]` based on the task's Size from sprint-tasks.md.
 
 #### Metric Loop (web behavioral verification)
 
-For UI-facing tasks, include behavioral verification: the measurement agent should use agent-browser to verify the feature renders and responds to interaction, not just read the code. Max 5 iterations. Other Metric Loop mechanics (generator re-invocation, critic dispatch, exit conditions) follow `commands/build.md` Phase 4.
+Per `protocols/metric-loop.md` Step 0.5, extract acceptance criteria from `sprint-tasks.md` Behavioral Test field into the Scoring Criteria Checklist before the loop starts. **Phase 4 per-task extraction is mechanical — no dispatch.** The Behavioral Test field is a single structured value per task; the orchestrator copies it directly into `active_metric_loop.scoring_criteria_checklist` in `.build-state.json`.
+
+For UI-facing tasks, include behavioral verification: the measurement agent receives the checklist + uses agent-browser to verify the feature renders and responds to interaction, not just read the code. Max 5 iterations. Generator re-invocation on iteration 2+ follows the lean context rule (top issue + file paths + relevant checklist values only — no full `[CONTEXT header above]`). Other Metric Loop mechanics (critic dispatch, exit conditions) follow `protocols/metric-loop.md`.
 
 #### Behavioral Smoke Test (web)
 
@@ -190,9 +232,9 @@ Read the NFRs from `docs/plans/quality-targets.json` (and `docs/plans/sprint-tas
 
 Call the Agent tool 6 times in one message:
 
-1. Description: "API testing" — subagent_type: `testing-api-tester` — Prompt: "Comprehensive API validation: all endpoints, edge cases, error responses, auth flows. NFR targets: [paste performance and reliability NFRs]. Report findings with counts."
+1. Description: "API testing" — subagent_type: `testing-api-tester` — Prompt: "[CONTEXT header above — phase: 5] Comprehensive API validation: all endpoints, edge cases, error responses, auth flows. NFR targets: Read `docs/plans/quality-targets.json` via your Read tool for performance and reliability thresholds. Report findings with counts."
 
-2. Description: "Performance audit" — subagent_type: `testing-performance-benchmarker` — Prompt: "Measure response times, identify bottlenecks, flag performance issues. NFR targets: [paste performance NFRs — e.g., API < 200ms, page load < 3s]. Report benchmarks AGAINST these targets.
+2. Description: "Performance audit" — subagent_type: `testing-performance-benchmarker` — Prompt: "[CONTEXT header above — phase: 5] Measure response times, identify bottlenecks, flag performance issues. NFR targets: Read `docs/plans/quality-targets.json` via your Read tool for performance thresholds. Report benchmarks AGAINST these targets.
 
 **Bundle budget per Scope axis** (read `docs/plans/visual-dna.md` Scope field):
 - Marketing:     500KB gzipped (excluding images), LCP <= 2.5s
@@ -202,13 +244,13 @@ Call the Agent tool 6 times in one message:
 
 Exceeding the budget by >25% auto-blocks the Phase 6 LRR SRE chapter. Budget violations route back to Phase 3.2 (component mapping — swap a heavy variant for a lighter one) OR Phase 4 (code-splitting, lazy-loading, dynamic imports). Report budget-compliance per Scope axis, with the exact gzipped bundle size and LCP measurement."
 
-3. Description: "Accessibility audit" — subagent_type: `a11y-architect` — Prompt: "WCAG 2.2 AA runtime compliance audit on all interfaces. NFR target: [paste accessibility NFR from quality-targets.json]. Check screen reader, keyboard nav, contrast, focus order, reduced-motion variants, touch targets >= 44px. Report issues with severity tags (Critical/Serious/Moderate/Minor). This is the same agent that sets constraints at Phase 2 and judges at Phase 6 LRR — keep the standards consistent across all three invocations."
+3. Description: "Accessibility audit" — subagent_type: `a11y-architect` — Prompt: "[CONTEXT header above — phase: 5] WCAG 2.2 AA runtime compliance audit on all interfaces. NFR target: Read `docs/plans/quality-targets.json` via your Read tool for accessibility thresholds. Check screen reader, keyboard nav, contrast, focus order, reduced-motion variants, touch targets >= 44px. Report issues with severity tags (Critical/Serious/Moderate/Minor). This is the same agent that sets constraints at Phase 2 and judges at Phase 6 LRR — keep the standards consistent across all three invocations."
 
-4. Description: "Security audit" — subagent_type: `engineering-security-engineer` — Prompt: "Security review: auth, input validation, data exposure, dependency vulnerabilities. NFR targets: [paste security NFRs]. Report findings with severity."
+4. Description: "Security audit" — subagent_type: `engineering-security-engineer` — Prompt: "[CONTEXT header above — phase: 5] Security review: auth, input validation, data exposure, dependency vulnerabilities. NFR targets: Read `docs/plans/quality-targets.json` via your Read tool for security thresholds. Report findings with severity."
 
-5. Description: "UX quality audit" — subagent_type: `design-ux-researcher` — Prompt: "UX quality review of every user-facing page. NFR targets: [paste accessibility NFRs]. First, screenshot the living style guide at /design-system as your reference for how components should look. Then review every product page and check: loading states (every async action must show a loading indicator), error states (every form and API call must show user-friendly error feedback), empty states (every list/table must handle zero items gracefully), mobile responsiveness (test at 375px viewport — touch targets >= 44px, no horizontal scroll, readable text), form validation (inline feedback, not just alert()), transition smoothness (no layout shifts, no janky animations), visual consistency (compare each page's components against the style guide — buttons, inputs, cards, colors, spacing should match). Report issues with page, severity, and screenshot."
+5. Description: "UX quality audit" — subagent_type: `design-ux-researcher` — Prompt: "[CONTEXT header above — phase: 5] UX quality review of every user-facing page. NFR targets: Read `docs/plans/quality-targets.json` via your Read tool for accessibility and UX thresholds. First, screenshot the living style guide at /design-system as your reference for how components should look. Then review every product page and check: loading states (every async action must show a loading indicator), error states (every form and API call must show user-friendly error feedback), empty states (every list/table must handle zero items gracefully), mobile responsiveness (test at 375px viewport — touch targets >= 44px, no horizontal scroll, readable text), form validation (inline feedback, not just alert()), transition smoothness (no layout shifts, no janky animations), visual consistency (compare each page's components against the style guide — buttons, inputs, cards, colors, spacing should match). Report issues with page, severity, and screenshot."
 
-6. Description: "Brand Guardian drift check" — subagent_type: `design-brand-guardian` — Prompt: "You are the Phase 5 drift check (proposed state §5 re-invite). Read `docs/plans/visual-dna.md` (the DNA card locked at Phase 3.0) + the actually-built pages via Playwright screenshots under `docs/plans/evidence/`. Score whether Phase 4 implementers stayed true to the DNA or drifted away from it. Specifically check each of the 6 DNA axes (Scope / Density / Character / Material / Motion / Type) against what the built product actually renders. Report drift count and specific elements (file:line references). Save findings to `docs/plans/evidence/brand-drift.md`. This is a drift check only — the Phase 6 LRR Brand Guardian chapter does the verdict. You do NOT issue a pass/fail here, only surface findings for the LRR chapter to read."
+6. Description: "Brand Guardian drift check" — subagent_type: `design-brand-guardian` — Prompt: "[CONTEXT header above — phase: 5] You are the Phase 5 drift check (proposed state §5 re-invite). Read `docs/plans/visual-dna.md` (the DNA card locked at Phase 3.0) + the actually-built pages via Playwright screenshots under `docs/plans/evidence/`. Score whether Phase 4 implementers stayed true to the DNA or drifted away from it. Specifically check each of the 6 DNA axes (Scope / Density / Character / Material / Motion / Type) against what the built product actually renders. Report drift count and specific elements (file:line references). Save findings to `docs/plans/evidence/brand-drift.md`. This is a drift check only — the Phase 6 LRR Brand Guardian chapter does the verdict. You do NOT issue a pass/fail here, only surface findings for the LRR chapter to read."
 
 ### Step 5.2 — Eval Harness
 
@@ -216,7 +258,9 @@ Run the Eval Harness Protocol (`protocols/eval-harness.md`). Define 8-15 concret
 
 ### Step 5.3 — Metric Loop: Hardening Quality
 
-Run the Metric Loop Protocol on the full codebase using audit findings as initial input. Define a composite metric based on what this project needs. Max 4 iterations.
+Per `protocols/metric-loop.md` Step 0.5, extract audit findings (from Step 5.1 and Step 5.2 eval harness) into the Scoring Criteria Checklist via a **one-shot extractor dispatch** — single agent call reads the audit reports and outputs a prioritized findings checklist with severity, description, and file refs. Persist to `active_metric_loop.scoring_criteria_checklist` in `.build-state.json`. Critic receives the checklist + fresh measurement results each iteration. Do NOT re-inject full audit reports per iteration.
+
+Run the Metric Loop Protocol on the full codebase using the checklist as scoring input. Define a composite metric based on what this project needs. Max 4 iterations.
 
 When fixing, dispatch to the RIGHT specialist. Security → security agent. Accessibility → frontend agent. Don't send everything to one agent.
 
@@ -234,13 +278,14 @@ Generate and execute end-to-end tests using Playwright against the running appli
 
 Call the Agent tool — description: "E2E test generation" — subagent_type: `engineering-frontend-developer` — mode: "bypassPermissions" — prompt:
 
-"[COMPLEXITY: L] Generate and run end-to-end Playwright tests for this application.
+"[CONTEXT header above — phase: 5] [COMPLEXITY: L] Generate and run end-to-end Playwright tests for this application.
 
 INPUTS:
-- User Journeys from docs/plans/sprint-tasks.md: [paste the User Journeys section — each journey becomes one E2E test]
-- Architecture doc (API contracts): [paste relevant sections from docs/plans/architecture.md]
-- NFRs from docs/plans/sprint-tasks.md: [paste — use performance thresholds as test assertions]
-- Visual Design Spec (component selectors): [paste relevant sections from docs/plans/visual-design-spec.md]
+Read these files via your Read tool before starting — do NOT expect pasted content:
+- User Journeys: `docs/plans/sprint-tasks.md` (User Journeys section — each journey becomes one E2E test)
+- Architecture (API contracts): `docs/plans/architecture.md`
+- NFRs: `docs/plans/sprint-tasks.md` (NFR section — use performance thresholds as test assertions)
+- Visual Design Spec (component selectors): `docs/plans/visual-design-spec.md`
 
 REQUIREMENTS:
 1. One E2E test per User Journey from sprint-tasks.md (each journey = one test file covering the full flow)
@@ -268,13 +313,13 @@ Record results: total tests, pass count, fail count, failure details. Log to `do
 
 **Iteration 2 — Fix & Re-run:**
 
-Call the Agent tool — description: "E2E fix iteration 2" — subagent_type: `engineering-frontend-developer` — mode: "bypassPermissions" — prompt: "[COMPLEXITY: M] Fix E2E test failures from iteration 1: [paste failure details — test names, error messages, screenshot paths]. Diagnose each as real bug, flaky test, or missing selector. Fix accordingly — do NOT delete or skip tests. Re-run ALL tests. Commit: 'fix: e2e test failures iteration 2'."
+Call the Agent tool — description: "E2E fix iteration 2" — subagent_type: `engineering-frontend-developer` — mode: "bypassPermissions" — prompt: "[CONTEXT header above — phase: 5] [COMPLEXITY: M] Fix E2E test failures from iteration 1: [paste failure details — test names, error messages, screenshot paths]. Diagnose each as real bug, flaky test, or missing selector. Fix accordingly — do NOT delete or skip tests. Re-run ALL tests. Commit: 'fix: e2e test failures iteration 2'."
 
 Record results in the E2E table. Identify flaky candidates (passed iter 1, failed iter 2 or vice versa).
 
 **Iteration 3 — Final Stability Run:**
 
-Call the Agent tool — description: "E2E stability run" — subagent_type: `engineering-frontend-developer` — mode: "bypassPermissions" — prompt: "[COMPLEXITY: M] Final E2E stability run (3 of 3). Previous results — Iter 1: [pass/fail counts], Iter 2: [pass/fail counts], Flaky candidates: [list]. Run ALL tests with --repeat-each=3. Quarantine inconsistent tests with test.fixme(). Fix remaining consistent failures. PASS CRITERIA: 95%+ pass rate (quarantined flaky tests excluded but logged). Commit: 'test: e2e stability fixes iteration 3'."
+Call the Agent tool — description: "E2E stability run" — subagent_type: `engineering-frontend-developer` — mode: "bypassPermissions" — prompt: "[CONTEXT header above — phase: 5] [COMPLEXITY: M] Final E2E stability run (3 of 3). Previous results — Iter 1: [pass/fail counts], Iter 2: [pass/fail counts], Flaky candidates: [list]. Run ALL tests with --repeat-each=3. Quarantine inconsistent tests with test.fixme(). Fix remaining consistent failures. PASS CRITERIA: 95%+ pass rate (quarantined flaky tests excluded but logged). Commit: 'test: e2e stability fixes iteration 3'."
 
 Record final results. Include in the Phase 6.0 Reality Check evidence sweep (see `commands/build.md` Phase 6 Step 6.0).
 
@@ -284,13 +329,13 @@ Run the agent-browser dogfood skill against the running app. Unlike the per-task
 
 Start the dev server if not running. Then invoke the dogfood skill:
 
-Call the Agent tool — description: "Dogfood the app" — subagent_type: `testing-evidence-collector` — mode: "bypassPermissions" — prompt: "Run the agent-browser dogfood skill against the running app at http://localhost:[port]. Explore every reachable page. Click every button. Fill every form. Check console for errors. Report a structured list of issues with severity ratings (critical/high/medium/low), screenshots, and repro steps. If dogfood skill is not available, use agent-browser manually: snapshot each page, click all interactive elements, check errors and network requests. Also evaluate UX quality: missing loading states, poor error messages, broken mobile layouts (resize to 375px), visual inconsistencies, missing empty states, form validation gaps. Report UX issues separately from functional issues."
+Call the Agent tool — description: "Dogfood the app" — subagent_type: `testing-evidence-collector` — mode: "bypassPermissions" — prompt: "[CONTEXT header above — phase: 5] Run the agent-browser dogfood skill against the running app at http://localhost:[port]. Explore every reachable page. Click every button. Fill every form. Check console for errors. Report a structured list of issues with severity ratings (critical/high/medium/low), screenshots, and repro steps. If dogfood skill is not available, use agent-browser manually: snapshot each page, click all interactive elements, check errors and network requests. Also evaluate UX quality: missing loading states, poor error messages, broken mobile layouts (resize to 375px), visual inconsistencies, missing empty states, form validation gaps. Report UX issues separately from functional issues."
 
 Classification and fix-routing of Dogfood findings is handled by the Feedback Synthesizer at `commands/build.md` Phase 5 Step 5.4 — do NOT self-classify or spawn fix agents from this step.
 
 ### Step 5.6 — Fake Data Detector
 
-Call the Agent tool — description: "Fake data audit" — subagent_type: `silent-failure-hunter` — mode: "bypassPermissions" — prompt: "Run the Fake Data Detector Protocol (protocols/fake-data-detector.md). Check for mock/hardcoded data in production paths. Static analysis: grep for Math.random() business data, hardcoded API responses, setTimeout faking async, placeholder text. Dynamic analysis: inspect HAR files from docs/plans/evidence/ for missing real API calls, static responses, absent WebSocket traffic. Report findings with file:line references and severity."
+Call the Agent tool — description: "Fake data audit" — subagent_type: `silent-failure-hunter` — mode: "bypassPermissions" — prompt: "[CONTEXT header above — phase: 5] Run the Fake Data Detector Protocol (protocols/fake-data-detector.md). Check for mock/hardcoded data in production paths. Static analysis: grep for Math.random() business data, hardcoded API responses, setTimeout faking async, placeholder text. Dynamic analysis: inspect HAR files from docs/plans/evidence/ for missing real API calls, static responses, absent WebSocket traffic. Report findings with file:line references and severity."
 
 **Fix loop:** For each CRITICAL finding:
 1. Spawn a fix agent with: the finding (file:line, what's fake, what it should be), and the relevant source files.
@@ -303,6 +348,6 @@ Remaining findings feed into the Phase 6.0 Reality Check evidence sweep (see `co
 
 ### Step 7.1 — Documentation (web)
 
-Call the Agent tool — description: "Documentation" — subagent_type: `engineering-technical-writer` — mode: "bypassPermissions" — prompt: "Write project docs: README with setup/architecture/usage, API docs if applicable, deployment notes. Commit: 'docs: project documentation'."
+Call the Agent tool — description: "Documentation" — subagent_type: `engineering-technical-writer` — mode: "bypassPermissions" — prompt: "[CONTEXT header above — phase: 7] Write project docs: README with setup/architecture/usage, API docs if applicable, deployment notes. Commit: 'docs: project documentation'."
 
 Deployment target per the design doc (Vercel/Netlify/Railway/Fly.io/etc.) — include the deploy flow specific to that target in the README.

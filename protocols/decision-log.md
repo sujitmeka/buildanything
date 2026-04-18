@@ -85,40 +85,11 @@ Three consumers, each reads a bounded slice:
 
 ## Orchestrator Never Writes
 
-The orchestrator is the router, not the author. It dispatches specialist agents, it passes decisions.jsonl rows into rehydration context, it reads nothing from this file that it does not immediately hand to a specialist. Decisions belong to whoever made them. This prevents dispatcher-paraphrase drift: the row captures the actual language of the agent that weighed the alternatives, not a second-hand restatement.
-
-If the orchestrator ever appears to need to write a decision row, the correct move is to dispatch the decision to the relevant specialist and let them write it.
+The orchestrator routes deviation_row objects to the scribe handler — specialist agents author rows to preserve original language.
 
 ## Worked Examples
 
-**Phase 1 brainstorm — tech stack choice:**
-
-```json
-{
-  "decision_id": "D-1-01",
-  "phase": "1",
-  "timestamp": "2026-04-13T14:22:10Z",
-  "decision": "chose Next.js App Router over SvelteKit for the web frontend",
-  "chosen_approach": "Next.js 15 App Router with React Server Components",
-  "rejected_alternatives": [
-    {
-      "approach": "SvelteKit",
-      "reason": "team has no Svelte production experience; ecosystem for auth/payments is thinner.",
-      "revisit_criterion": "bundle size becomes primary user complaint"
-    },
-    {
-      "approach": "Remix",
-      "reason": "overlaps Next.js capability without meaningful differentiation for this MVP.",
-      "revisit_criterion": "team adopts Remix as default elsewhere"
-    }
-  ],
-  "decided_by": "architect",
-  "ref": "2026-04-13-widget-design.md#tech-stack",
-  "status": "open"
-}
-```
-
-**Phase 2.2 architecture — persistence layer:**
+**Phase 2.2 architecture — persistence layer (cross-domain deviation):**
 
 ```json
 {
@@ -141,28 +112,6 @@ If the orchestrator ever appears to need to write a decision row, the correct mo
   ],
   "decided_by": "architect",
   "ref": "architecture.md#backend/persistence",
-  "status": "open"
-}
-```
-
-**Phase 4 build — implementer deviation:**
-
-```json
-{
-  "decision_id": "D-4-02",
-  "phase": "4",
-  "timestamp": "2026-04-13T19:48:03Z",
-  "decision": "deviated from planned Task 14 approach — used React Query instead of raw fetch in loader",
-  "chosen_approach": "TanStack Query with 30s stale time on the /api/items loader",
-  "rejected_alternatives": [
-    {
-      "approach": "raw fetch in loader as planned",
-      "reason": "list page refetched on every navigation; caused perceptible flash during tab switching.",
-      "revisit_criterion": "React Query footprint exceeds justification on bundle-size audit"
-    }
-  ],
-  "decided_by": "implementer",
-  "ref": "sprint-tasks.md#task-14",
   "status": "open"
 }
 ```
