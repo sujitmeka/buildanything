@@ -2,6 +2,28 @@
 # buildanything: SessionStart hook
 # Re-injects orchestrator identity after context compaction, resume, or clear.
 
+# SDK install-and-probe: write on/off state to sdkStateFile for the runtime to read.
+SDK_WARN=""
+SDK_STATE_FILE=$(python3 -c "import json,sys; print(json.load(open(sys.argv[1])).get('config',{}).get('sdkStateFile',''))" .claude-plugin/plugin.json 2>/dev/null)
+if [ -n "$SDK_STATE_FILE" ]; then
+  export SDK_STATE_FILE
+  mkdir -p "$(dirname "$SDK_STATE_FILE")" 2>/dev/null
+  if [ "$BUILDANYTHING_SDK" = "off" ]; then
+    printf 'off' > "$SDK_STATE_FILE"
+  elif ! command -v npm >/dev/null 2>&1; then
+    printf 'off' > "$SDK_STATE_FILE"
+    SDK_WARN="buildanything: npm CLI not available; SDK disabled."
+  elif [ ! -f "package.json" ]; then
+    printf 'off' > "$SDK_STATE_FILE"
+    SDK_WARN="buildanything: package.json missing; SDK disabled."
+  elif npm install --silent --no-audit --no-fund >/dev/null 2>&1; then
+    printf 'on' > "$SDK_STATE_FILE"
+  else
+    printf 'off' > "$SDK_STATE_FILE"
+    SDK_WARN="buildanything: SDK install failed; falling back to markdown mode."
+  fi
+fi
+
 # Dep check: warn if plugin deps (installed via bin/setup.js) are missing.
 DEPS_WARNING=""
 MISSING=()
@@ -11,6 +33,10 @@ command -v agent-browser >/dev/null 2>&1 || MISSING+=("agent-browser CLI")
 if [ ${#MISSING[@]} -gt 0 ]; then
   JOINED=$(IFS=,; echo "${MISSING[*]}"); JOINED=${JOINED//,/, }
   DEPS_WARNING="buildanything: missing deps (${JOINED}). Run /buildanything:setup to complete install."
+fi
+if [ -n "$SDK_WARN" ]; then
+  DEPS_WARNING="${DEPS_WARNING:+${DEPS_WARNING}
+}${SDK_WARN}"
 fi
 
 # Check if a build pipeline is active by looking for .build-state.md
