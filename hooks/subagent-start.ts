@@ -1,9 +1,9 @@
 #!/usr/bin/env tsx
 /*
- * buildanything: SubagentStart hook handler (tasks 3.1.1 + 3.1.3).
+ * buildanything: SubagentStart hook handler (tasks 3.1.1 + 3.1.3 + 6.2.1).
  *
- * Stage 3. Reads the Claude Code SubagentStart stdin payload plus
- * docs/plans/.build-state.json from process.cwd() and does two things:
+ * Stage 3 + Stage 6. Reads the Claude Code SubagentStart stdin payload plus
+ * docs/plans/.build-state.json from process.cwd() and does three things:
  *
  *   1) Stages the subset of state fields the CONTEXT header needs to
  *        .buildanything/subagent-start-cache/<id>.json
@@ -13,11 +13,27 @@
  *        {"additional_context": "<rendered header>"}
  *      which Claude Code injects into the spawned subagent's prompt
  *      (task 3.1.3 — same envelope shape as session-start).
+ *   3) When state.current_phase === 4 (Phase 4 — implementation sprint),
+ *      additionally renders the sprint-scoped shared-context block via
+ *      src/orchestrator/phase4-shared-context and APPENDS it to the
+ *      additional_context string (task 6.2.1). This hoists the per-sprint
+ *      refs/architecture/quality-targets block into the subagent prompt
+ *      once per dispatch, so Phase 4 implementer/reviewer/critic prompts
+ *      in commands/build.md can drop the inline refs block (cost lever).
  *
- * Render is best-effort: if the generator module fails to load (SDK off,
- * module moved) or the inputs aren't sufficient (missing project_type,
- * non-numeric phase, state absent), we skip the envelope and log to stderr
- * rather than crash the subagent spawn.
+ * Render is best-effort on BOTH renderers: if a generator module fails to
+ * load (SDK off, module moved) or the inputs aren't sufficient (missing
+ * project_type, non-numeric phase, state absent), we skip that envelope
+ * and log to stderr rather than crash the subagent spawn. A sprint-context
+ * failure does not suppress a successful header — we emit header alone.
+ *
+ * Rollback flags (per MIGRATION-PLAN-FINAL.md §Stage 6):
+ *   BUILDANYTHING_SDK_SPRINT_CONTEXT=off|false|0 — disables sprint-context
+ *     injection entirely (restore 3.1.3 behavior: header only).
+ *   BUILDANYTHING_SDK_SPRINT_CONTEXT_IOS=off|false|0 — for iOS project_type,
+ *     suppresses the iOS-features sub-section within sprint context while
+ *     keeping the rest. Web projects are unaffected by this flag.
+ * Default (no env var set) = both ON. Case-insensitive.
  *
  * Output protocol: SubagentStart hooks default exit 0 = allow. This handler
  * exits 0 on every path; rendering failures never block the subagent.
@@ -30,12 +46,23 @@ import process from "node:process";
 const CACHE_DIR_REL = ".buildanything/subagent-start-cache";
 const STATE_PATH_REL = "docs/plans/.build-state.json";
 const VISUAL_DNA_PATH_REL = "docs/plans/visual-dna.md";
+const REFS_PATH_REL = "docs/plans/refs.json";
+const ARCHITECTURE_PATH_REL = "docs/plans/architecture.md";
+const SPRINT_CONTEXT_MARKER = "\n\n--- SPRINT CONTEXT ---\n\n";
 
 // Minimal structural type for the renderer's return value. Kept local so
 // this hook file does not statically depend on src/ (hooks/ is not in the
 // tsconfig include set). The generator is loaded via dynamic import() at
 // runtime under tsx.
 interface RenderedHeaderLike {
+  content: string;
+  hash: string;
+}
+
+// Same-shape structural type for phase4-shared-context's return. Local
+// duplication keeps the hook off the src/ type graph; the runtime import
+// returns the real object.
+interface SprintContextBlockLike {
   content: string;
   hash: string;
 }
@@ -56,6 +83,10 @@ interface SubagentStartPayload {
 interface BuildState {
   schema_version?: number;
   phase?: number | string;
+  // Some state writes use `current_phase` alongside/instead of `phase` —
+  // matches hooks/pre-tool-use.ts's `state.current_phase ?? state.phase`
+  // tolerance. Read both; prefer current_phase when present.
+  current_phase?: number | string;
   step?: string;
   project_type?: string;
   session_id?: string;
@@ -258,6 +289,119 @@ async function renderHeader(
   }
 }
 
+function isFlagDisabled(value: string | undefined): boolean {
+  if (value === undefined) return false;
+  const normalized = value.trim().toLowerCase();
+  return normalized === "off" || normalized === "false" || normalized === "0";
+}
+
+function readJsonFile(path: string): Record<string, unknown> | null {
+  let text: string;
+  try {
+    text = readFileSync(path, "utf8");
+  } catch {
+    return null;
+  }
+  try {
+    const parsed = JSON.parse(text);
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      return parsed as Record<string, unknown>;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+function readTextFile(path: string): string | null {
+  try {
+    return readFileSync(path, "utf8");
+  } catch {
+    return null;
+  }
+}
+
+function extractQualityTargets(state: BuildState): Record<string, unknown> {
+  // Quality targets live under phase_artifacts.quality_targets by convention
+  // (docs/plans/quality-targets.json or similar). If absent, pass an empty
+  // object — the generator handles it (JSON.stringify({}) is "{}"). Best
+  // effort only; no cross-read of non-canonical paths.
+  const artifacts = pickPhaseArtifacts(state.phase_artifacts);
+  if (!artifacts) return {};
+  const qt = artifacts["quality_targets"];
+  if (qt && typeof qt === "object" && !Array.isArray(qt)) {
+    return qt as Record<string, unknown>;
+  }
+  return {};
+}
+
+function extractIosFeatureNames(v: unknown): string[] {
+  // state.ios_features is Record<string, boolean> (16 flags). The
+  // sprint-context generator expects the enabled feature NAMES as string[].
+  if (!v || typeof v !== "object" || Array.isArray(v)) return [];
+  const out: string[] = [];
+  for (const [k, raw] of Object.entries(v as Record<string, unknown>)) {
+    if (raw === true) out.push(k);
+  }
+  return out;
+}
+
+async function renderSprintContextBlock(
+  projectDir: string,
+  state: BuildState,
+): Promise<SprintContextBlockLike | null> {
+  if (isFlagDisabled(process.env.BUILDANYTHING_SDK_SPRINT_CONTEXT)) {
+    return null;
+  }
+
+  const projectType = pickString(state.project_type);
+  const iosFlagDisabled = isFlagDisabled(
+    process.env.BUILDANYTHING_SDK_SPRINT_CONTEXT_IOS,
+  );
+
+  let mod: typeof import("../src/orchestrator/phase4-shared-context.js");
+  try {
+    mod = await import("../src/orchestrator/phase4-shared-context.js");
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    process.stderr.write(
+      `buildanything: subagent-start could not load phase4-shared-context (${msg}); skipping sprint context\n`,
+    );
+    return null;
+  }
+
+  const refs = readJsonFile(resolve(projectDir, REFS_PATH_REL)) ?? {};
+  const architecture =
+    readTextFile(resolve(projectDir, ARCHITECTURE_PATH_REL)) ?? "";
+  const qualityTargets = extractQualityTargets(state);
+
+  // iOS features: only pass when project is iOS AND the iOS parity flag is
+  // not off. Web project_type never receives the iosFeatures param regardless
+  // of the iOS flag. Unknown project_type defers to the generator default
+  // (no iOS section).
+  let iosFeatures: string[] | undefined;
+  if (projectType === "ios" && !iosFlagDisabled) {
+    const names = extractIosFeatureNames(state.ios_features);
+    if (names.length > 0) iosFeatures = names;
+  }
+
+  try {
+    return mod.renderSprintContext({
+      buildState: state as Record<string, unknown>,
+      refs,
+      architecture,
+      qualityTargets,
+      iosFeatures,
+    });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    process.stderr.write(
+      `buildanything: subagent-start sprint-context render failed (${msg}); skipping sprint context\n`,
+    );
+    return null;
+  }
+}
+
 function emitAdditionalContext(content: string): void {
   process.stdout.write(`${JSON.stringify({ additional_context: content })}\n`);
 }
@@ -298,7 +442,18 @@ async function main(): Promise<number> {
 
   const rendered = await renderHeader(process.cwd(), state);
   if (rendered) {
-    emitAdditionalContext(rendered.content);
+    // Phase 4 sprint-context hoist (task 6.2.1). Mirrors pre-tool-use.ts's
+    // `current_phase ?? phase` precedence, since state writers on the
+    // upgrade path may populate either field.
+    const effectivePhase = coercePhase(state.current_phase ?? state.phase);
+    let combined = rendered.content;
+    if (effectivePhase === 4) {
+      const sprint = await renderSprintContextBlock(process.cwd(), state);
+      if (sprint) {
+        combined = `${rendered.content}${SPRINT_CONTEXT_MARKER}${sprint.content}`;
+      }
+    }
+    emitAdditionalContext(combined);
   }
 
   return 0;
