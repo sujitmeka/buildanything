@@ -63,17 +63,25 @@ Instruct the user to run `open -a Xcode` then **File → New → Project** (`⇧
 See `references/new-project-dialog.md` for the full click path.
 
 ### 5. Wire XcodeBuildMCP
-Check `~/.claude.json` and `./.mcp.json` for an `xcodebuildmcp` entry. If absent, guide the user to add the JSON snippet from `references/xcode-mcp-config.md`. After editing, instruct: restart Claude Code so the MCP server loads.
+Run `claude mcp list` and check for an `xcodebuildmcp` entry. If absent:
+```bash
+claude mcp add xcodebuildmcp -- npx -y xcodebuildmcp@latest
+```
+If the command succeeds, record `configured`. If it fails, fall back to showing the user the JSON snippet from `references/xcode-mcp-config.md` for manual addition. Either way, a Claude Code restart is required for the MCP to load — tell the user.
 
 ### 6. Wire apple-docs-mcp
-Same pattern — check for `apple-docs-mcp` entry, insert snippet from `references/apple-docs-mcp-config.md` if missing, restart.
+Run `claude mcp list` and check for an `apple-docs` entry. If absent:
+```bash
+claude mcp add apple-docs -- npx -y apple-docs-mcp@latest
+```
+Same fallback and restart note as Step 5.
 
 ### 7. Install Maestro
 ```bash
-brew install maestro
+which maestro || brew install maestro
 maestro --version   # verify — expect 1.x
 ```
-If `brew` missing: halt and instruct user to install Homebrew first.
+If `brew` missing: halt and instruct user to install Homebrew (`brew.sh`) first, then `brew install maestro`.
 
 ### 8. Signing defaults (conditional)
 If `ship_to_device=true`: prompt user for Team ID, write to project's `.xcconfig` or target build settings via XcodeBuildMCP. If `false` (simulator-only): skip — user can add signing later.
@@ -87,11 +95,12 @@ If `ship_to_device=true`: prompt user for Team ID, write to project's `.xcconfig
 - [ ] `.xcodeproj` exists at root, opens in Xcode, builds clean for simulator
 - [ ] `docs/plans/` and `maestro/` present
 - [ ] `maestro --version` prints a version
-- [ ] XcodeBuildMCP + apple-docs-mcp present in MCP config
+- [ ] `claude mcp list` shows `xcodebuildmcp` and `apple-docs`
+- [ ] Claude Code restarted (MCPs load on restart)
 
 ## References
-- `references/xcode-mcp-config.md` — XcodeBuildMCP JSON snippet
-- `references/apple-docs-mcp-config.md` — apple-docs-mcp JSON snippet
+- `references/xcode-mcp-config.md` — fallback JSON snippet if `claude mcp add` fails
+- `references/apple-docs-mcp-config.md` — fallback JSON snippet if `claude mcp add` fails
 - `references/new-project-dialog.md` — exact Xcode click path
 
 ---

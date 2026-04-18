@@ -1,10 +1,12 @@
 ---
-description: "Install buildanything's external dependencies — tsx, companion plugins, agent-browser CLI, Chrome for Testing, and skills"
+description: "Install buildanything's external dependencies — tsx, companion plugins, agent-browser CLI, Chrome for Testing, skills, and optional iOS toolchain (XcodeBuildMCP, apple-docs-mcp, Maestro)"
 ---
 
 # Setup
 
 You are installing buildanything's external dependencies. The plugin itself is already installed (that's how this command is running), but the companion plugins, CLI tools, and skills it depends on are not — they need to be installed separately. This command does that in one shot.
+
+**iOS project?** If the user's intent is to build an iOS app, also run Steps 7–9 below. Skip them otherwise.
 
 Run every step below. Each step is idempotent: check first, install only if missing, continue on failure. Collect results as you go and report them all at the end.
 
@@ -48,6 +50,33 @@ Run `npx skills add vercel-labs/agent-browser`. Record `installed` or `failed`.
 
 Run `npx skills add vercel-labs/agent-browser --skill dogfood`. Record `installed` or `failed`.
 
+---
+
+## Step 7: Install iOS MCP servers _(iOS only)_
+
+For each MCP server below, run `claude mcp list` first. If the name already appears, record `already configured`. Otherwise run the install command and record `configured` or `failed`.
+
+| MCP | Install command | Purpose |
+|-----|-----------------|---------|
+| `xcodebuildmcp` | `claude mcp add xcodebuildmcp -- npx -y xcodebuildmcp@latest` | Xcode build, simulator, scheme discovery, plist editing |
+| `apple-docs` | `claude mcp add apple-docs -- npx -y apple-docs-mcp@latest` | Live Apple developer documentation and API lookup |
+
+If either fails: record the failure with the exact manual-install command.
+
+## Step 8: Install Maestro _(iOS only)_
+
+Maestro runs E2E flow YAML tests against a booted iOS simulator.
+
+1. Run `which maestro`. If present, record `already installed`.
+2. Otherwise run `brew install maestro`. Record `installed` or `failed`.
+3. If `brew` is missing, record `skipped — install Homebrew first (brew.sh), then: brew install maestro`.
+
+## Step 9: Verify iOS toolchain _(iOS only)_
+
+Run `xcodebuild -version`. Record the version string. If not found, warn: "Xcode 26.3+ required — install from the Mac App Store."
+
+---
+
 ## Report
 
 Print a single summary block with three sections:
@@ -73,8 +102,13 @@ Omit any section that has no entries. For every item in the `Failed` section, in
 After the summary, print this reminder:
 
 ```
-Next: restart Claude Code so newly installed plugins/skills are loaded.
+Next: restart Claude Code so newly installed plugins and MCP servers load.
 Then try:
-  /buildanything:build <your idea>
-  /buildanything:idea-sweep <your idea>
+  /buildanything:build <your idea>       — full product pipeline
+  /buildanything:idea-sweep <your idea>  — parallel research sweep
+```
+
+If iOS steps were run, also print:
+```
+iOS: after restarting, confirm mcp__xcodebuildmcp__ and mcp__apple-docs__ tools appear.
 ```

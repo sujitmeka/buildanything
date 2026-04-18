@@ -15,6 +15,21 @@ const OFFICIAL_PLUGINS = [
   { name: "playwright", desc: "browser automation for design research and visual QA" },
 ];
 
+const IOS_MCPS = [
+  {
+    name: "xcodebuildmcp",
+    args: ["npx", "-y", "xcodebuildmcp@latest"],
+    desc: "Xcode build, simulator, and project management",
+  },
+  {
+    name: "apple-docs",
+    args: ["npx", "-y", "apple-docs-mcp@latest"],
+    desc: "Live Apple developer documentation lookup",
+  },
+];
+
+const isIos = process.argv.includes("--ios");
+
 function run(command, args) {
   try {
     return execFileSync(command, args, {
@@ -28,6 +43,7 @@ function run(command, args) {
 
 function main() {
   console.log("\n  buildanything — one command to build an entire product\n");
+  if (isIos) console.log("  iOS mode: will also install XcodeBuildMCP, apple-docs-mcp, and Maestro.\n");
 
   // Check claude is installed
   const version = run("claude", ["--version"]);
@@ -105,7 +121,6 @@ function main() {
   // Install agent-browser for behavioral verification
   console.log("\n  Installing agent-browser (behavioral testing)...");
 
-  // 1. Install the CLI globally
   process.stdout.write("    CLI... ");
   const abCheck = run("which", ["agent-browser"]);
   if (abCheck) {
@@ -119,7 +134,6 @@ function main() {
     }
   }
 
-  // 2. Download Chrome for Testing (first time only)
   process.stdout.write("    Chrome browser... ");
   const chromeResult = run("agent-browser", ["install"]);
   if (chromeResult === null) {
@@ -128,7 +142,6 @@ function main() {
     console.log("ready");
   }
 
-  // 3. Install the agent-browser skill for AI coding assistants
   process.stdout.write("    agent-browser skill... ");
   const skillResult = run("npx", ["skills", "add", "vercel-labs/agent-browser"]);
   if (skillResult === null) {
@@ -137,7 +150,6 @@ function main() {
     console.log("installed");
   }
 
-  // 4. Install dogfood skill for autonomous exploratory testing
   process.stdout.write("    dogfood skill... ");
   const dfResult = run("npx", ["skills", "add", "vercel-labs/agent-browser", "--skill", "dogfood"]);
   if (dfResult === null) {
@@ -146,11 +158,57 @@ function main() {
     console.log("installed");
   }
 
-  console.log(
-    "\n  Setup complete! Start Claude Code and use:\n" +
+  // iOS-specific deps — only when --ios flag is passed
+  if (isIos) {
+    console.log("\n  Installing iOS MCP servers...");
+    const existingMcps = run("claude", ["mcp", "list"]) ?? "";
+
+    for (const mcp of IOS_MCPS) {
+      process.stdout.write(`    ${mcp.name} (${mcp.desc})... `);
+      if (existingMcps.includes(mcp.name)) {
+        console.log("already configured");
+      } else {
+        const result = run("claude", ["mcp", "add", mcp.name, "--", ...mcp.args]);
+        if (result === null) {
+          console.log(`failed (add manually: claude mcp add ${mcp.name} -- ${mcp.args.join(" ")})`);
+        } else {
+          console.log("configured");
+        }
+      }
+    }
+
+    console.log("\n  Installing Maestro (iOS E2E test runner)...");
+    process.stdout.write("    maestro... ");
+    const maestroCheck = run("which", ["maestro"]);
+    if (maestroCheck) {
+      console.log("already installed");
+    } else {
+      const brewCheck = run("which", ["brew"]);
+      if (!brewCheck) {
+        console.log("skipped — Homebrew not found (install Homebrew first, then: brew install maestro)");
+      } else {
+        const maestroResult = run("brew", ["install", "maestro"]);
+        if (maestroResult === null) {
+          console.log("failed (install manually: brew install maestro)");
+        } else {
+          console.log("installed");
+        }
+      }
+    }
+  }
+
+  const completionMsg = isIos
+    ? "\n  Setup complete! Restart Claude Code so MCP servers load, then use:\n" +
+      "    /buildanything:build <your iOS app idea>  — full iOS pipeline\n"
+    : "\n  Setup complete! Start Claude Code and use:\n" +
       "    /buildanything:build <your idea>       — full product pipeline\n" +
-      "    /buildanything:idea-sweep <your idea>  — parallel research sweep\n"
-  );
+      "    /buildanything:idea-sweep <your idea>  — parallel research sweep\n";
+
+  console.log(completionMsg);
+
+  if (!isIos) {
+    console.log("  Building an iOS app? Re-run with: npx buildanything --ios\n");
+  }
 
   if (installed.length > 0) {
     console.log(`  Companion plugins installed: ${installed.join(", ")}`);
