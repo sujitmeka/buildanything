@@ -1088,19 +1088,3 @@ Create final commit. Mark all TodoWrite items complete. Update `.build-state.jso
 **Writes:** `docs/plans/learnings.jsonl` (late learnings only — doc friction, deploy blockers, late-surfacing gaps). If no late learnings surfaced, skip. Row schema: `{run_id, timestamp, project_type, phase_where_learning_surfaced: \"7.x\", metric, top_issue, fix_applied, score_delta, pattern_type}`.
 
 **Compaction checkpoint.** Update `.build-state.json` per the format above.
-
----
-
-## Service calls — reference
-
-The 5 callable services (invoked from phases, not slotted into the pipeline):
-
-| Service | Called by | Role |
-|---------|-----------|------|
-| **Verify Protocol** (7-check gate) | Phase 2 (architecture), Phase 4 (per-task), Phase 5 (pre-audit), Phase 7 (pre-ship) | Mechanical — spawn agent running 7 checks sequentially, stop on first FAIL |
-| **Metric Loop** (generator/critic) | Phase 3 (Design Critic loop), Phase 4 (per-task quality), Phase 5 (metric fix), Phase 7 (doc loop) | Generator + critic separation to eliminate author bias |
-| **Decision Log** (decisions.jsonl) | Row producers: Phase 1 (3 rows), Phase 2 (4 rows), Phase 4 (deviation only). Readers: Phase 0 resume, Phase 5 reality sweep, Phase 6 LRR Aggregator | Append-only; orchestrator-scribe is the sole writer; subagents return `deviation_row` objects |
-| **Learnings** (learnings.jsonl) | Writers: Phase 5 reality sweep, Phase 7 late learnings. Readers: Phase 0 Learnings Loader, Phase 5 reality sweep | Cross-run PITFALL/PATTERN/HEURISTIC capture |
-| **LRR Machinery** (chapter template + aggregator rules) | Phase 6 (primary), callable otherwise | Single parameterized chapter prompt template; 6 mechanical aggregation rules; file-completeness checkpoint |
-
-Services are invoked from phases, not slotted as numbered pipeline steps. Ownership is explicit per the writer-owner table at the top of this file.
