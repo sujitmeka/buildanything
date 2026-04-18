@@ -165,9 +165,10 @@ async function main(): Promise<void> {
   // [Task 1.2.4] scribe MCP registration
   // [Task 2.3.4] write-lease MCP registration
   // [Task 3.2.4] state-save MCP registration
+  // [Task 4.2.4] cycle-counter MCP registration
   const mcpServers: Record<string, unknown> = {};
   if (!sdkActive) {
-    console.log("[buildanything-runtime] sdk inactive — scribe + write-lease + state-save MCP registration skipped (markdown mode)");
+    console.log("[buildanything-runtime] sdk inactive — scribe + write-lease + state-save + cycle-counter MCP registration skipped (markdown mode)");
   } else {
     try {
       const sdk = await import("@anthropic-ai/claude-agent-sdk");
@@ -227,6 +228,29 @@ async function main(): Promise<void> {
     } catch (err) {
       console.warn(
         `[buildanything-runtime] warning: state-save MCP registration failed (${(err as Error).message}); continuing in markdown mode`,
+      );
+    }
+
+    try {
+      const sdk = await import("@anthropic-ai/claude-agent-sdk");
+      const {
+        buildCycleCounterCheckTool,
+        buildClearInFlightEdgeTool,
+        buildHandleStaleEdgeTool,
+      } = await import("./adapters/cycle-counter-tool.js");
+      const checkTool = buildCycleCounterCheckTool(sdk.tool);
+      const clearTool = buildClearInFlightEdgeTool(sdk.tool);
+      const staleTool = buildHandleStaleEdgeTool(sdk.tool);
+      mcpServers.cycle_counter = sdk.createSdkMcpServer({
+        name: "cycle_counter",
+        tools: [checkTool, clearTool, staleTool],
+      });
+      console.log(
+        "[buildanything-runtime] cycle-counter MCP server registered (tools: cycle_counter_check, clear_in_flight_edge, handle_stale_edge)",
+      );
+    } catch (err) {
+      console.warn(
+        `[buildanything-runtime] warning: cycle-counter MCP registration failed (${(err as Error).message}); continuing without cycle enforcement`,
       );
     }
   }
