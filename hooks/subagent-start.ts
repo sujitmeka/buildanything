@@ -1,25 +1,26 @@
 #!/usr/bin/env tsx
 /*
- * buildanything: SubagentStart staging hook handler (task 3.1.1).
+ * buildanything: SubagentStart hook handler (tasks 3.1.1 + 3.1.3).
  *
- * Stage 3 opener. Reads the Claude Code SubagentStart stdin payload plus
- * docs/plans/.build-state.json from process.cwd() and writes the subset of
- * fields the CONTEXT header will need to
+ * Stage 3. Reads the Claude Code SubagentStart stdin payload plus
+ * docs/plans/.build-state.json from process.cwd() and does two things:
  *
- *   .buildanything/subagent-start-cache/<id>.json
+ *   1) Stages the subset of state fields the CONTEXT header needs to
+ *        .buildanything/subagent-start-cache/<id>.json
+ *      (task 3.1.1 — keyed by parent_tool_use_id or session_id).
+ *   2) Renders the CONTEXT header via src/orchestrator/hooks/context-header
+ *      and emits it on stdout as
+ *        {"additional_context": "<rendered header>"}
+ *      which Claude Code injects into the spawned subagent's prompt
+ *      (task 3.1.3 — same envelope shape as session-start).
  *
- * Keyed by parent_tool_use_id (preferred) or session_id (fallback). The
- * cache file is purely a staging artifact — downstream:
- *
- *   TODO(task 3.1.2): CONTEXT header renderer + hash-cache consumes this
- *   file and produces the formatted header string.
- *   TODO(task 3.1.3): Injector wires the rendered header into the spawned
- *   subagent's prompt.
- *
- * This handler does NOT render, NOT inject, NOT hash-cache. It only stages.
+ * Render is best-effort: if the generator module fails to load (SDK off,
+ * module moved) or the inputs aren't sufficient (missing project_type,
+ * non-numeric phase, state absent), we skip the envelope and log to stderr
+ * rather than crash the subagent spawn.
  *
  * Output protocol: SubagentStart hooks default exit 0 = allow. This handler
- * is observational; any failure path exits 0 silently (best-effort).
+ * exits 0 on every path; rendering failures never block the subagent.
  */
 
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -28,6 +29,16 @@ import process from "node:process";
 
 const CACHE_DIR_REL = ".buildanything/subagent-start-cache";
 const STATE_PATH_REL = "docs/plans/.build-state.json";
+const VISUAL_DNA_PATH_REL = "docs/plans/visual-dna.md";
+
+// Minimal structural type for the renderer's return value. Kept local so
+// this hook file does not statically depend on src/ (hooks/ is not in the
+// tsconfig include set). The generator is loaded via dynamic import() at
+// runtime under tsx.
+interface RenderedHeaderLike {
+  content: string;
+  hash: string;
+}
 
 // Claude Code SubagentStart stdin shape — only the fields we consume. Anything
 // else is ignored. We do a best-effort parse; malformed stdin exits 0.
@@ -192,7 +203,66 @@ function writeStaged(projectDir: string, staged: StagedContext): void {
   writeFileSync(file, `${JSON.stringify(staged, null, 2)}\n`, "utf8");
 }
 
-function main(): number {
+function coercePhase(v: unknown): number | null {
+  if (typeof v === "number" && Number.isFinite(v)) return v;
+  if (typeof v === "string" && v.trim() !== "") {
+    const n = Number(v);
+    if (Number.isFinite(n)) return n;
+  }
+  return null;
+}
+
+function pickIosFeatures(v: unknown): Record<string, boolean> | undefined {
+  if (!v || typeof v !== "object" || Array.isArray(v)) return undefined;
+  const out: Record<string, boolean> = {};
+  for (const [k, raw] of Object.entries(v as Record<string, unknown>)) {
+    if (typeof raw === "boolean") out[k] = raw;
+  }
+  return Object.keys(out).length > 0 ? out : undefined;
+}
+
+async function renderHeader(
+  projectDir: string,
+  state: BuildState,
+): Promise<RenderedHeaderLike | null> {
+  const projectType = pickString(state.project_type);
+  if (projectType !== "web" && projectType !== "ios") return null;
+
+  const phase = coercePhase(state.phase);
+  if (phase === null) return null;
+
+  let mod: typeof import("../src/orchestrator/hooks/context-header.js");
+  try {
+    mod = await import("../src/orchestrator/hooks/context-header.js");
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    process.stderr.write(
+      `buildanything: subagent-start could not load context-header renderer (${msg}); skipping injection\n`,
+    );
+    return null;
+  }
+
+  try {
+    return mod.renderContextHeader({
+      projectType,
+      phase,
+      iosFeatures: pickIosFeatures(state.ios_features),
+      visualDnaPath: resolve(projectDir, VISUAL_DNA_PATH_REL),
+    });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    process.stderr.write(
+      `buildanything: subagent-start context-header render failed (${msg}); skipping injection\n`,
+    );
+    return null;
+  }
+}
+
+function emitAdditionalContext(content: string): void {
+  process.stdout.write(`${JSON.stringify({ additional_context: content })}\n`);
+}
+
+async function main(): Promise<number> {
   const raw = readStdin();
   const payload = parsePayload(raw);
   if (!payload) {
@@ -208,7 +278,8 @@ function main(): number {
 
   const state = loadBuildState(process.cwd());
   if (!state) {
-    // No state (build not started) or unparseable — nothing to stage.
+    // No state (build not started) or unparseable — nothing to stage and
+    // no header to inject. Subagent spawns with its normal prompt.
     return 0;
   }
 
@@ -217,15 +288,29 @@ function main(): number {
   try {
     writeStaged(process.cwd(), staged);
   } catch (err) {
-    // Staging is best-effort. Log once and exit 0 so we never block subagent
-    // spawn on a cache write failure.
+    // Staging is best-effort. Log once and continue — we never block subagent
+    // spawn on a cache write failure, and header injection is independent.
     const msg = err instanceof Error ? err.message : String(err);
     process.stderr.write(
       `buildanything: subagent-start could not write cache (${msg}); skipping\n`,
     );
   }
 
+  const rendered = await renderHeader(process.cwd(), state);
+  if (rendered) {
+    emitAdditionalContext(rendered.content);
+  }
+
   return 0;
 }
 
-process.exit(main());
+main().then(
+  (code) => process.exit(code),
+  (err) => {
+    // Last-resort guard: render path uses try/catch internally, but if
+    // anything slips through, log and exit 0 so the subagent still spawns.
+    const msg = err instanceof Error ? err.message : String(err);
+    process.stderr.write(`buildanything: subagent-start crashed (${msg})\n`);
+    process.exit(0);
+  },
+);
