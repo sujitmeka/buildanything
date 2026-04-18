@@ -14,10 +14,50 @@ interface PluginConfig {
     sdkStateFile?: string;
     claudeCodeHostRange?: string;
     sdkVersion?: string;
+    maxSupportedSchemaVersion?: number;
   };
 }
 
 const RUNTIME_VERSION = "0.1.0";
+// Hardcoded fallback if plugin.json lacks maxSupportedSchemaVersion. Keep this
+// in sync with the `schema_version` table in protocols/state-schema.md.
+const MAX_SUPPORTED_SCHEMA_VERSION_FALLBACK = 2;
+// EX_CONFIG — configuration/state mismatch.
+const EXIT_SCHEMA_VERSION_REJECT = 78;
+const BUILD_STATE_PATH_REL = "docs/plans/.build-state.json";
+
+export interface SchemaVersionCheck {
+  accepted: boolean;
+  reason?: "too_new";
+  detected?: number;
+  max?: number;
+  message?: string;
+}
+
+// Pure: evaluate whether a parsed state file's schema_version is forward-
+// compatible with this runtime. Missing / non-numeric / ≤ max → accepted.
+// Only `> max` triggers a reject. Upgrade/migration for LOWER versions is
+// explicitly out of scope here (task 4.5.2 scope note).
+export function checkSchemaVersion(
+  state: unknown,
+  maxSupported: number,
+  stateFilePath: string,
+): SchemaVersionCheck {
+  if (!state || typeof state !== "object") return { accepted: true };
+  const raw = (state as Record<string, unknown>).schema_version;
+  if (typeof raw !== "number" || !Number.isFinite(raw)) return { accepted: true };
+  if (raw <= maxSupported) return { accepted: true };
+  return {
+    accepted: false,
+    reason: "too_new",
+    detected: raw,
+    max: maxSupported,
+    message:
+      `buildanything: state file schema_version=${raw} exceeds supported maximum ${maxSupported} ` +
+      `(${stateFilePath}). Upgrade plugin to >=v${raw} or delete the state file. ` +
+      `See docs/migration/sdk-host-compat.md.`,
+  };
+}
 
 async function loadPluginConfig(): Promise<PluginConfig> {
   const scriptPath = process.argv[1] ?? "";
@@ -34,16 +74,55 @@ async function main(): Promise<void> {
   let pinned = "unknown";
   let hostRange = "unknown";
   let sdkStateFile = ".buildanything/sdk-state";
+  let maxSupportedSchemaVersion = MAX_SUPPORTED_SCHEMA_VERSION_FALLBACK;
   try {
     const plugin = await loadPluginConfig();
     if (plugin.config?.sdkVersion) pinned = plugin.config.sdkVersion;
     if (plugin.config?.claudeCodeHostRange) hostRange = plugin.config.claudeCodeHostRange;
     if (plugin.config?.sdkStateFile) sdkStateFile = plugin.config.sdkStateFile;
+    if (
+      typeof plugin.config?.maxSupportedSchemaVersion === "number" &&
+      Number.isFinite(plugin.config.maxSupportedSchemaVersion)
+    ) {
+      maxSupportedSchemaVersion = plugin.config.maxSupportedSchemaVersion;
+    }
     if (!plugin.config) {
       console.warn("[buildanything-runtime] warning: plugin.json has no 'config' block; using unknown defaults");
     }
   } catch (err) {
     console.warn(`[buildanything-runtime] warning: could not load plugin.json config (${(err as Error).message}); using unknown defaults`);
+  }
+
+  // [Task 4.5.2] Forward-reject state files with schema_version > max.
+  // Runs before any SDK/MCP wiring so an incompatible state file halts the
+  // whole session instead of silently stripping fields on next write.
+  const buildStatePath = resolve(process.cwd(), BUILD_STATE_PATH_REL);
+  try {
+    const raw = await readFile(buildStatePath, "utf8");
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(raw);
+    } catch (err) {
+      // Malformed JSON is NOT our concern here — other handlers surface it.
+      // Log for visibility and continue.
+      console.warn(
+        `[buildanything-runtime] warning: could not parse ${buildStatePath} for schema check (${(err as Error).message}); continuing`,
+      );
+      parsed = null;
+    }
+    const check = checkSchemaVersion(parsed, maxSupportedSchemaVersion, buildStatePath);
+    if (!check.accepted) {
+      process.stderr.write(`${check.message}\n`);
+      process.exit(EXIT_SCHEMA_VERSION_REJECT);
+    }
+  } catch (err) {
+    const code = (err as NodeJS.ErrnoException).code;
+    if (code !== "ENOENT") {
+      console.warn(
+        `[buildanything-runtime] warning: could not read ${buildStatePath} for schema check (${(err as Error).message}); continuing`,
+      );
+    }
+    // ENOENT → no state file yet (fresh project); nothing to reject.
   }
 
   console.log(`buildanything-runtime v${RUNTIME_VERSION} starting (sdk=${pinned}, hostRange=${hostRange})`);
@@ -128,13 +207,20 @@ async function main(): Promise<void> {
     }
   }
 
-  // [Task 4.5.2] schema_version forward-reject
   void mcpServers;
 }
 
-main()
-  .then(() => process.exit(0))
-  .catch((err) => {
-    console.error("[buildanything-runtime] fatal:", err instanceof Error ? err.stack ?? err.message : err);
-    process.exit(1);
-  });
+function isCliEntry(): boolean {
+  // Run main() only when invoked as the CLI, not when imported by tests.
+  const entry = process.argv[1] ?? "";
+  return entry.endsWith("buildanything-runtime.ts") || entry.endsWith("buildanything-runtime.js");
+}
+
+if (isCliEntry()) {
+  main()
+    .then(() => process.exit(0))
+    .catch((err) => {
+      console.error("[buildanything-runtime] fatal:", err instanceof Error ? err.stack ?? err.message : err);
+      process.exit(1);
+    });
+}
