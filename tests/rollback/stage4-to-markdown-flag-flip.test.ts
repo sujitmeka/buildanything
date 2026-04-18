@@ -21,11 +21,26 @@ describe('stage4 markdown flag-flip (A7)', () => {
   });
 
   it('mode_transitions[] records the flip', () => {
-    const transitions: { from: string; to: string; timestamp: number }[] = [];
-    transitions.push({ from: 'sdk', to: 'markdown', timestamp: Date.now() });
+    const transitions: Array<{
+      timestamp: string; session_id: string | null;
+      flag: string; old_value: string; new_value: string;
+      post_flags: Record<string, string>;
+    }> = [];
+    transitions.push({
+      timestamp: new Date().toISOString(),
+      session_id: 'test-session-id',
+      flag: 'BUILDANYTHING_SDK',
+      old_value: 'on',
+      new_value: 'off',
+      post_flags: { BUILDANYTHING_SDK: 'off', BUILDANYTHING_ENFORCE_WRITER_OWNER: 'false',
+        BUILDANYTHING_ENFORCE_WRITE_LEASE: 'false', BUILDANYTHING_SDK_SPRINT_CONTEXT: 'false',
+        BUILDANYTHING_SDK_SPRINT_CONTEXT_IOS: 'false' },
+    });
     assert.equal(transitions.length, 1);
-    assert.equal(transitions[0].from, 'sdk');
-    assert.equal(transitions[0].to, 'markdown');
-    assert.equal(typeof transitions[0].timestamp, 'number');
+    assert.equal(transitions[0].flag, 'BUILDANYTHING_SDK');
+    assert.equal(transitions[0].old_value, 'on');
+    assert.equal(transitions[0].new_value, 'off');
+    assert.equal(typeof transitions[0].timestamp, 'string');
+    assert.ok(transitions[0].post_flags.BUILDANYTHING_SDK === 'off');
   });
 });

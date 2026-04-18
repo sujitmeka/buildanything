@@ -2,7 +2,12 @@
  * Write-lease MCP handler (A5).
  * Prevents intra-phase file collisions by requiring implementer dispatches
  * to acquire exclusive leases on file paths before Write|Edit operations.
+ *
+ * Leases are persisted atomically to .build-state.json.active_write_leases[]
+ * so the PreToolUse hook (which re-reads from disk) sees them.
  */
+
+import { existsSync, readFileSync, writeFileSync, renameSync } from 'node:fs';
 
 export interface Lease {
   holder: string;       // task_id of the lease holder
@@ -21,57 +26,88 @@ export interface AcquireResult {
   conflict?: LeaseConflict;
 }
 
-/** In-memory lease store. Persisted to .build-state.json.active_write_leases[] */
+/** In-memory lease store — kept in sync with disk via persistLeases(). */
 const leases: Lease[] = [];
+
+/** Path to .build-state.json — set via init() or defaults to docs/plans/.build-state.json */
+let statePath = 'docs/plans/.build-state.json';
+
+/**
+ * Initialize the lease manager with the state file path.
+ * Loads existing leases from disk into memory.
+ */
+export function init(buildStatePath: string): void {
+  statePath = buildStatePath;
+  leases.length = 0;
+  if (!existsSync(statePath)) return;
+  try {
+    const state = JSON.parse(readFileSync(statePath, 'utf-8'));
+    const diskLeases = state?.active_write_leases;
+    if (Array.isArray(diskLeases)) {
+      for (const l of diskLeases) {
+        if (l?.holder && Array.isArray(l?.paths)) {
+          leases.push({ holder: l.holder, paths: l.paths, acquired_at: l.acquired_at ?? '' });
+        }
+      }
+    }
+  } catch { /* fresh state or parse error — start with empty leases */ }
+}
+
+/**
+ * Persist current leases to .build-state.json atomically.
+ * Uses write-to-.tmp + rename (same protocol as state_save MCP).
+ */
+function persistLeases(): void {
+  if (!existsSync(statePath)) return;
+  try {
+    const state = JSON.parse(readFileSync(statePath, 'utf-8'));
+    state.active_write_leases = leases.map(l => ({ ...l }));
+    const tmp = `${statePath}.tmp`;
+    writeFileSync(tmp, JSON.stringify(state, null, 2) + '\n', 'utf-8');
+    renameSync(tmp, statePath);
+  } catch (err) {
+    // Fail-open: log but don't crash — the in-memory state is still correct
+    process.stderr.write(`write-lease: persist failed: ${err instanceof Error ? err.message : err}\n`);
+  }
+}
 
 /**
  * Acquire a write lease for the given file paths.
- * Returns granted:true if no overlapping lease exists.
- * Returns granted:false with conflict details if overlap detected.
+ * Persists to disk atomically so the PreToolUse hook sees the lease.
  */
 export function acquireWriteLease(taskId: string, filePaths: string[]): AcquireResult {
   if (!taskId) throw new Error('task_id is required');
   if (!filePaths.length) throw new Error('file_paths must be non-empty');
 
-  // Check for overlapping leases
   for (const existing of leases) {
     const overlap = filePaths.filter(p => existing.paths.includes(p));
     if (overlap.length > 0) {
-      return {
-        granted: false,
-        conflict: { holder: existing.holder, paths: overlap },
-      };
+      return { granted: false, conflict: { holder: existing.holder, paths: overlap } };
     }
   }
 
-  // Grant the lease
-  const lease: Lease = {
-    holder: taskId,
-    paths: [...filePaths],
-    acquired_at: new Date().toISOString(),
-  };
+  const lease: Lease = { holder: taskId, paths: [...filePaths], acquired_at: new Date().toISOString() };
   leases.push(lease);
-
+  persistLeases();
   return { granted: true, lease };
 }
 
-
 /**
- * Release all leases held by a task.
+ * Release all leases held by a task. Persists to disk.
  * Called by SubagentStop hook on dispatch return.
  */
 export function releaseLease(taskId: string): boolean {
   const idx = leases.findIndex(l => l.holder === taskId);
   if (idx >= 0) {
     leases.splice(idx, 1);
+    persistLeases();
     return true;
   }
   return false;
 }
 
 /**
- * Release all leases for a specific task and paths.
- * More granular than releaseLease — releases only specified paths.
+ * Release specific paths for a task. Persists to disk.
  */
 export function releasePathsForTask(taskId: string, paths: string[]): void {
   const lease = leases.find(l => l.holder === taskId);
@@ -79,12 +115,12 @@ export function releasePathsForTask(taskId: string, paths: string[]): void {
   lease.paths = lease.paths.filter(p => !paths.includes(p));
   if (lease.paths.length === 0) {
     releaseLease(taskId);
+  } else {
+    persistLeases();
   }
 }
 
-/**
- * Get all active leases (for persisting to .build-state.json).
- */
+/** Get all active leases. */
 export function getActiveLeases(): readonly Lease[] {
   return leases;
 }
@@ -100,13 +136,10 @@ export function checkPathLease(filePath: string, callerTaskId: string): { allowe
       return { allowed: false, conflict: { holder: lease.holder, paths: [filePath] } };
     }
   }
-  // No lease exists for this path — caller should acquire one first
   return { allowed: false, conflict: undefined };
 }
 
-/**
- * Reset all leases (for testing).
- */
+/** Reset all leases (for testing). */
 export function reset(): void {
   leases.length = 0;
 }
