@@ -18,7 +18,8 @@ fi
 
 # SDK install-and-probe: write on/off state to sdkStateFile for the runtime to read.
 SDK_WARN=""
-SDK_STATE_FILE=$(python3 -c "import json,sys; print(json.load(open(sys.argv[1])).get('config',{}).get('sdkStateFile',''))" .claude-plugin/plugin.json 2>/dev/null)
+PLUGIN_ROOT_EARLY="${CLAUDE_PLUGIN_ROOT:-$(cd "$(dirname "$0")/.." && pwd)}"
+SDK_STATE_FILE=$(python3 -c "import json,sys; print(json.load(open(sys.argv[1])).get('config',{}).get('sdkStateFile',''))" "$PLUGIN_ROOT_EARLY/.claude-plugin/plugin.json" 2>/dev/null)
 if [ -n "$SDK_STATE_FILE" ]; then
   export SDK_STATE_FILE
   mkdir -p "$(dirname "$SDK_STATE_FILE")" 2>/dev/null
@@ -27,10 +28,10 @@ if [ -n "$SDK_STATE_FILE" ]; then
   elif ! command -v npm >/dev/null 2>&1; then
     printf 'off' > "$SDK_STATE_FILE"
     SDK_WARN="buildanything: npm CLI not available; SDK disabled."
-  elif [ ! -f "package.json" ]; then
+  elif ! [ -f "$PLUGIN_ROOT_EARLY/package.json" ]; then
     printf 'off' > "$SDK_STATE_FILE"
-    SDK_WARN="buildanything: package.json missing; SDK disabled."
-  elif npm install --silent --no-audit --no-fund >/dev/null 2>&1; then
+    SDK_WARN="buildanything: plugin package.json missing; SDK disabled."
+  elif (cd "$PLUGIN_ROOT_EARLY" && npm install --silent --no-audit --no-fund >/dev/null 2>&1); then
     printf 'on' > "$SDK_STATE_FILE"
   else
     printf 'off' > "$SDK_STATE_FILE"
@@ -41,6 +42,7 @@ fi
 # Dep check: warn if plugin deps (installed via bin/setup.js) are missing.
 DEPS_WARNING=""
 MISSING=()
+command -v tsx >/dev/null 2>&1 || MISSING+=("tsx (plugin hooks need it — run: npm i -g tsx)")
 command -v agent-browser >/dev/null 2>&1 || MISSING+=("agent-browser CLI")
 { [ -e "$HOME/.claude/skills/agent-browser" ] || [ -e "$HOME/.claude/skills/agent-browser.md" ]; } || MISSING+=("agent-browser skill")
 { [ -e "$HOME/.claude/skills/dogfood" ] || [ -e "$HOME/.claude/skills/dogfood.md" ]; } || MISSING+=("dogfood skill")

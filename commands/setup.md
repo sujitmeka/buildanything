@@ -1,5 +1,5 @@
 ---
-description: "Install buildanything's external dependencies — companion plugins, agent-browser CLI, Chrome for Testing, and skills"
+description: "Install buildanything's external dependencies — tsx, companion plugins, agent-browser CLI, Chrome for Testing, and skills"
 ---
 
 # Setup
@@ -22,22 +22,29 @@ For each plugin below, run `claude plugin install <name>@claude-plugins-official
 
 For each one, treat a non-zero exit as "already installed or failed" — record it as `skipped` and keep going. Treat a success as `installed`.
 
-## Step 2: Install the `agent-browser` CLI globally
+## Step 2: Install `tsx` globally
 
-1. Run `which agent-browser`. If it returns a path, record as `already present` and skip to Step 3.
+`tsx` is required by all plugin hooks (pre-tool-use, subagent-start, subagent-stop, session-start cache compiler). Hooks call `npx --no-install tsx` and silently degrade if tsx is missing.
+
+1. Run `which tsx`. If it returns a path, record as `already present` and skip to Step 3.
+2. Otherwise run `npm install -g tsx`. Record `installed` or `failed` based on exit status.
+
+## Step 3: Install the `agent-browser` CLI globally
+
+1. Run `which agent-browser`. If it returns a path, record as `already present` and skip to Step 4.
 2. Otherwise run `npm install -g agent-browser`. Record `installed` or `failed` based on exit status.
 
-## Step 3: Download Chrome for Testing
+## Step 4: Download Chrome for Testing
 
 Run `agent-browser install`. This downloads a pinned Chrome build. If `agent-browser` isn't on PATH (Step 2 failed), record `skipped (agent-browser CLI missing)` and continue. Otherwise record `ready` or `failed`.
 
 Note: this is safe to re-run — `agent-browser install` no-ops if Chrome is already downloaded.
 
-## Step 4: Install the `agent-browser` skill
+## Step 5: Install the `agent-browser` skill
 
 Run `npx skills add vercel-labs/agent-browser`. Record `installed` or `failed`.
 
-## Step 5: Install the `dogfood` skill
+## Step 6: Install the `dogfood` skill
 
 Run `npx skills add vercel-labs/agent-browser --skill dogfood`. Record `installed` or `failed`.
 

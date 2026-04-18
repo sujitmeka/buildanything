@@ -85,6 +85,23 @@ function main() {
     }
   }
 
+  // Install tsx — required by all plugin hooks (pre-tool-use, subagent-start/stop,
+  // compile-writer-owner-cache, record-mode-transitions). Hooks use
+  // `npx --no-install tsx` which silently degrades if tsx is missing.
+  console.log("\n  Installing tsx (TypeScript runner for plugin hooks)...");
+  const tsxCheck = run("which", ["tsx"]);
+  if (tsxCheck) {
+    console.log("    already installed");
+  } else {
+    process.stdout.write("    tsx... ");
+    const tsxResult = run("npm", ["install", "-g", "tsx"]);
+    if (tsxResult === null) {
+      console.log("failed (install manually: npm i -g tsx)");
+    } else {
+      console.log("installed");
+    }
+  }
+
   // Install agent-browser for behavioral verification
   console.log("\n  Installing agent-browser (behavioral testing)...");
 

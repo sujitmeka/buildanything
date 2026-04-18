@@ -51,13 +51,13 @@
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "0.2.114",
     "semver": "^7.7.4",
+    "tsx": "^4.21.0",
     "yaml": "^2.8.0",
     "zod": "^4.0.0"
   },
   "devDependencies": {
     "@types/node": "^22",
     "@types/semver": "^7.7.1",
-    "tsx": "^4.21.0",
     "typescript": "^6.0.3"
   }
 }
