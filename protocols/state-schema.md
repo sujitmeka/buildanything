@@ -14,7 +14,7 @@
 |---|---|---|---|
 | 1 | Stages 1-3 | initial schema (all pre-Stage-4 fields) | n/a |
 | 2 | Stage 4 | `backward_routing_count` (newly typed), `backward_routing_count_by_target_phase`, `in_flight_backward_edge`, `mode_transitions[]` | A7 forward-reject on `schema_version > MAX_SUPPORTED_SCHEMA_VERSION`; A3 stale-edge decrement on `--resume` |
-| 3 | Stage 5 | `lrr_cycle_state` | Stage 5 rollback flag (TBD) |
+| 3 | Stage 5 | `lrr_cycle_state` (object; interior fields loose-typed pending Stage 5 iteration — see "Fields added at v3" below) | `BUILDANYTHING_SDK_LRR=false` reverts to markdown aggregator; `lrr_cycle_state` becomes an ignored field on the orchestrator read path (additive-only, no data loss on downgrade) |
 | 4 | Stage 6 | `current_sprint_context_hash` | Stage 6 rollback flag (TBD) |
 
 **A7 forward-reject rule.** When `bin/buildanything-runtime.ts` reads `.build-state.json` at session start, if `schema_version > MAX_SUPPORTED_SCHEMA_VERSION`, the runtime refuses to proceed and emits a clear error pointing to the compat matrix (`docs/migration/sdk-host-compat.md`). This is the A7 defense against silent schema drift — an old runtime must never silently ignore fields a newer runtime persisted. See **Task 4.5.2** for the runtime implementation (out of scope for this prose-only update).
@@ -91,6 +91,18 @@ These fields are present only when `schema_version >= 2`. They support the Shape
 | `backward_routing_count_by_target_phase` | object (string → integer ≥ 0) | no | v2 | **A6 off-by-one fix.** Per-target-phase backward-routing counter keyed by target phase number (e.g., `"4"`, `"5"`). Lets the max-backward-routes guard count by destination phase rather than by decision, which previously miscounted when a single decision routed back to multiple phases. |
 | `in_flight_backward_edge` | object | no | v2 | **A3 crash-seam defense.** Present only while a backward-route dispatch is mid-flight. Written atomically with the counter increment; cleared by the target phase on re-entry. Fields: `decision_id` (string), `target_phase` (string), `counter_value` (integer ≥ 0), `started_at` (ISO 8601). On `--resume`, stale edges (>60s old) trigger a counter decrement so a crashed dispatch does not permanently inflate the guard. |
 | `mode_transitions` | array of objects | no | v2 | SDK/markdown flag-flip audit trail (Task 4.7.1). Each entry: `{flag, old_value, new_value, post_flags?, session_id?, timestamp}` — `flag` is the env-var name (e.g., `"BUILDANYTHING_SDK"`, `"BUILDANYTHING_ENFORCE_WRITER_OWNER"`); `old_value`/`new_value` are the string-typed prior and new values; `post_flags` is an optional snapshot (string→string) of all tracked flag values AFTER this flip; `session_id` is nullable; `timestamp` is ISO 8601. Append-only within a session. **A7 adversarial fix:** the v2-initial narrow shape `{from, to, timestamp}` could not identify WHICH flag flipped, making the audit trail useless for schema-rollback debugging — widened to capture `flag` + full post-flip snapshot. Canonical emitter: `hooks/record-mode-transitions.ts`. |
+
+### Fields added at v3 (Stage 5)
+
+These fields are present only when `schema_version >= 3`. They support the Shape-B SDK migration's Lazy Reference Resolution (LRR) aggregator — the Phase 6 Launch Readiness Review aggregator promoted from prose to `src/lrr/aggregator.ts` (Task 5.1). The top-level shape is documented here; the aggregator's own output file `docs/plans/evidence/lrr-aggregate.json` is governed by `protocols/launch-readiness.md` and is NOT part of this state schema.
+
+| Field | Type | Required | Added in | Notes |
+|---|---|---|---|---|
+| `lrr_cycle_state` | object | no | v3 | Per-cycle LRR bookkeeping written by the aggregator path (`src/lrr/aggregator.ts`). **Interior fields are intentionally loose-typed at v3** — the JSON Schema (`protocols/state-schema.json` `$defs.lrr_cycle_state` implied by `properties.lrr_cycle_state: {type: "object"}`) does not fix the field set because Stage 5 iteration on aggregator output fields (`combined_verdict`, `triggered_rule`, `star_rule_triggered`, `star_rule_decision_ids`, chapter-completion markers) is still in progress. Once Stage 5 lands, this entry will be tightened in a follow-up task (tracked under 5.4.2's "aggregator output fields" scope) and the `additionalProperties: true` implicit allowance will be removed. Present only when `BUILDANYTHING_SDK_LRR=true` (and hence `schema_version` has been bumped to `3`). |
+
+**v3 migration concern — none in wild.** As of this task (5.4.1), Stage 5 has not shipped. No `.build-state.json` files with `schema_version: 3` exist outside development probes. `bin/buildanything-runtime.ts` `MAX_SUPPORTED_SCHEMA_VERSION_FALLBACK` is still `2` (see Task 4.5.2) — a v3 state file would currently be forward-rejected by A7, which is the intended pre-Stage-5 behavior. The runtime will be bumped to `3` as part of Stage 5 activation, not here.
+
+**v3 rollback semantics.** Rollback is via `BUILDANYTHING_SDK_LRR=false` (see `MIGRATION-PLAN-FINAL.md` §Stage 5 rollback). Because `lrr_cycle_state` is additive and optional, a Stage 4 runtime reading a Stage 5 state file with `schema_version` downgraded to `2` will ignore the field without data loss on the read path. The persisted value survives in place until the next state write overwrites it; orchestrator code paths gated on `BUILDANYTHING_SDK_LRR` are responsible for not writing `lrr_cycle_state` under markdown aggregator mode.
 
 ## Rendering contract
 
