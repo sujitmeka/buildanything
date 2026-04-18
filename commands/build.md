@@ -687,7 +687,7 @@ Dispatch by task type and complexity:
 - Backend tasks: `subagent_type: engineering-backend-architect` (L) or `subagent_type: engineering-senior-developer` (M)
 - Hard / complex / cross-cutting tasks: `subagent_type: engineering-senior-developer`
 
-Call the Agent tool — description: "[task-id] [task name]" — subagent_type per above — mode: "bypassPermissions" — prompt: "[CONTEXT header above] [COMPLEXITY: S/M/L from sprint-tasks.md]. TASK: [task description + acceptance criteria from sprint-tasks.md]. CONTEXT MAP from Briefing Officer: [paste Briefing Officer output]. Use the Read tool to pull refs as needed — do NOT expect pasted architecture content.
+Call the Agent tool — description: "[task-id] [task name]" — subagent_type per above — mode: "bypassPermissions" — prompt: "[CONTEXT header above] [COMPLEXITY: S/M/L from sprint-tasks.md]. TASK: [task description + acceptance criteria from sprint-tasks.md].
 
 ## Prior Learnings
 [paste contents of `docs/plans/.active-learnings.md` if it exists, otherwise omit this section]
