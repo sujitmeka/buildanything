@@ -152,6 +152,15 @@ else
   echo "buildanything: phase-graph.yaml not found at $PHASE_GRAPH; writer-owner cache skipped" >&2
 fi
 
+# Record flag-flip mode transitions (task 4.7.1). Best-effort: if the TS
+# handler crashes, log to stderr and continue. No-op when .build-state.json
+# is absent (fresh project, pre-Phase-0).
+if [ -f "docs/plans/.build-state.json" ]; then
+  if ! npx --no-install tsx "$PLUGIN_ROOT/hooks/record-mode-transitions.ts" 2>/dev/null; then
+    echo "buildanything: mode-transition recorder failed; flag-flip not recorded this session" >&2
+  fi
+fi
+
 # Output as additional_context for Claude Code
 # JSON-escape the context
 ESCAPED=$(printf '%s' "$CONTEXT" | python3 -c 'import sys,json; print(json.dumps(sys.stdin.read()))')
