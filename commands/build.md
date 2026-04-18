@@ -111,6 +111,8 @@ Increment after each agent returns (parallel dispatch of 6 agents = +6). Reset t
 
 **Compaction checkpoint format:** At every phase boundary, check `dispatch_count` in `docs/plans/.build-state.json`. If >= 8: save ALL state (current phase, task statuses, metric loop scores, decisions) to `docs/plans/.build-state.json` and regenerate `.build-state.md` as the rendered view. Reset `dispatch_count` to 0. TodoWrite does NOT survive compaction — rebuild it from the JSON state file on resume. See `protocols/state-schema.md` for the full schema and rendering contract.
 
+**Cumulative-cost banner at phase boundaries:** When announcing a phase transition (e.g. "Phase N complete — proceeding to Phase N+1"), prefix the message with `[Cost so far: $X.XX • Y tokens]`. Source the values from the last-appended entry in `docs/plans/build-log.md`'s token-accounting lines (fields `cumulative_usd=...` plus the sum of `input_tokens=...` + `output_tokens=...`), written by `src/orchestrator/hooks/token-accounting.ts` (see module for exact schema). If the build-log has no token-accounting entries yet, omit the prefix rather than guessing.
+
 Input: $ARGUMENTS
 
 ### Autonomous Mode
