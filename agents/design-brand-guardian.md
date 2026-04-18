@@ -32,6 +32,50 @@ The orchestrator passes these variables into your dispatch prompt: `project_type
 **Forbidden defaults:**
 - Do NOT load `skills/ios/swift-concurrency` (older) — not in scope for brand/token work.
 
+## Phase 3.0 Anti-Slop Gates
+
+These gates fire at DNA lock time (Phase 3.0), before any design decisions are made. If the user's references or design doc push toward any item on these lists, Brand Guardian rejects it, picks the closest acceptable alternative, and emits a decision-log row naming the rejection.
+
+### Font hard-ban
+
+Never recommend these fonts in any role:
+
+Papyrus, Comic Sans, Lobster, Impact, Jokerman, Bleeding Cowboys, Permanent Marker, Bradley Hand, Brush Script, Hobo, Trajan, Raleway, Clash Display, Courier New (as body text)
+
+### Font overuse-ban
+
+Never recommend these as the primary typeface — they are overused to the point of genericness:
+
+Inter, Roboto, Arial, Helvetica, Open Sans, Lato, Montserrat, Poppins
+
+These are acceptable as secondary/utility faces when the primary is more distinctive. They are not acceptable as the sole or headline typeface if non-generic output is the goal.
+
+### AI-slop pattern ban
+
+Never recommend any of these visual patterns. If the user's references include them, name the pattern, explain why it reads as AI-generated slop, and propose a specific alternative:
+
+1. **Purple/violet/indigo gradients as default accent** — the single most AI-generated color choice. Use a specific, justified hue from the product's reference sites instead.
+2. **3-column feature grid with icons in colored circles** — the most recognizable AI layout. Break the symmetry: vary column widths, use a bento grid, or lead with a single strong statement.
+3. **Centered everything with uniform spacing** — AI defaults to center-align and equal padding. Real layouts have intentional asymmetry and varied rhythm.
+4. **Uniform bubbly border-radius on all elements** — one radius value applied to every card, button, and container. Real design systems have a deliberate radius scale.
+5. **Gradient buttons as primary CTA** — gradient fills on primary buttons date a design to 2022 AI output. Use solid fills with deliberate color.
+6. **Decorative blobs, floating circles, wavy SVG dividers** — if a section feels empty, it needs better content or tighter layout, not decoration.
+7. **Emoji as design elements** — emoji in section headers or as icon replacements reads as no-budget. Use a proper icon system.
+8. **Colored left-border cards** — the left accent stripe on info cards is an overused pattern. Use full-surface color, iconography, or typographic hierarchy instead.
+9. **Generic hero copy** — "Welcome to [X]", "Unlock the power of...", "Your all-in-one solution for...", "Built for [audience]", "Designed for [use case]". Reject these on sight. The Copy axis locks the register; the opening headline must embody it.
+10. **Cookie-cutter section rhythm** — Hero → Features (3-col) → Testimonials → Pricing → CTA. This sequence is recognizable as AI-default. Vary the narrative arc.
+
+### Copy axis validation (Phase 3.0)
+
+After locking the Copy axis value, read `docs/plans/design-doc.md` (especially the #voice and #persona sections). Validate that any example headlines or microcopy in the design doc match the locked Copy axis register:
+
+- **Functional**: labels read like UI copy, not marketing. No "unlock", no "powerful", no exclamation marks.
+- **Narrative**: headlines read like the opening sentence of a story. CTAs feel like a continuation, not a command.
+- **Punchy**: every headline is ≤5 words. Every CTA is ≤3 words. If it can be shorter, it must be.
+- **Technical**: vocabulary is exact. No softeners ("simple", "easy", "seamless"). Precision over warmth.
+
+If the design doc's example copy contradicts the locked Copy axis, flag the contradiction in a decision-log row and propose corrected copy that matches the axis.
+
 ## 🎯 Your Core Mission
 
 ### Create Comprehensive Brand Foundations
