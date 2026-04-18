@@ -187,14 +187,17 @@
     },
 
     "mode_transition": {
-      "$comment": "Stage 4+ (schema_version >= 2). Records SDK/markdown flag-flip events.",
+      "$comment": "Stage 4+ (schema_version >= 2). Records SDK/markdown flag-flip events. Each entry captures which flag changed, the prior and new values, a full post-flip snapshot of all tracked flags, the session_id when known, and a timestamp.",
       "type": "object",
       "additionalProperties": false,
-      "required": ["from", "to", "timestamp"],
+      "required": ["flag", "old_value", "new_value", "timestamp"],
       "properties": {
-        "from":      { "type": "string" },
-        "to":        { "type": "string" },
-        "timestamp": { "type": "string", "format": "date-time" }
+        "flag":       { "type": "string", "description": "Env-var name (e.g., BUILDANYTHING_SDK)." },
+        "old_value":  { "type": "string" },
+        "new_value":  { "type": "string" },
+        "post_flags": { "type": "object", "additionalProperties": { "type": "string" }, "description": "Snapshot of all tracked flag values AFTER this flip." },
+        "session_id": { "type": ["string", "null"] },
+        "timestamp":  { "type": "string", "format": "date-time" }
       }
     }
   },
