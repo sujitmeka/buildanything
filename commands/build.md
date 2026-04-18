@@ -37,7 +37,7 @@ Live downstream docs (read across Phase 3+):
   - `quality-targets.json`   — P2 writer
   - `visual-design-spec.md`  — P3 writer (web) / `ios-design-board.md` P3 writer (iOS)
   - `refs.json`              — P2 writer + P3 writer (P3 extends after visual spec lands)
-  - `decisions.jsonl`        — orchestrator-scribe ONLY (subagents return `deviation_row` objects; orchestrator allocates IDs and appends)
+  - `decisions.jsonl`        — orchestrator-scribe ONLY via `scribe_decision` MCP tool (subagents return `deviation_row` objects; the orchestrator forwards each row through the MCP, which owns ID allocation and atomic append)
   - `learnings.jsonl`        — P5, P7 writers
   - `evidence/*.json`        — P5 writer (P4 contributes per-task, P6/P7 readers)
   - `lrr/*.json`             — P6 writer (1 per chapter + Aggregator)
@@ -152,7 +152,7 @@ The 7-check verification gate is called by Phase 2 (architecture check), Phase 4
 
 ### Decision Log (callable service)
 
-`docs/plans/decisions.jsonl` — append-only, ORCHESTRATOR-SCRIBE ONLY. Subagents return `deviation_row` objects in their structured result; the orchestrator allocates `D-{phase}-<seq>` IDs and appends. Row-producing phases: Phase 1 synthesis (3 rows), Phase 2 architecture synthesis (4 rows), Phase 4 implementers (only on deviation). Readers: Phase 0 resume handler, Phase 5 Reality Checker, Phase 6 LRR Aggregator (the ⭐⭐ backward-routing read). Schema at `protocols/decision-log.md`. Scribe handler: see Phase 4 "Orchestrator-scribe handler" section.
+`docs/plans/decisions.jsonl` — append-only, ORCHESTRATOR-SCRIBE ONLY via the `scribe_decision` MCP tool. Subagents return `deviation_row` objects in their structured result; the orchestrator forwards each row through `scribe_decision`, which allocates `D-{phase}-<seq>` IDs and atomically appends. The orchestrator MUST NOT Write or Edit this file directly. Row-producing phases: Phase 1 synthesis (3 rows), Phase 2 architecture synthesis (4 rows), Phase 4 implementers (only on deviation). Readers: Phase 0 resume handler, Phase 5 Reality Checker, Phase 6 LRR Aggregator (the ⭐⭐ backward-routing read). Schema at `protocols/decision-log.md`. Dispatch flow: see Phase 4 "Orchestrator-scribe dispatch" section.
 
 ### Learnings (callable service)
 
@@ -413,9 +413,9 @@ OUTPUT 2 — `CLAUDE.md` (project root, NOT `docs/plans/`). <200-line product br
 CLAUDE.md must be under 200 lines. Not a wiki, not a conventions doc, not a dump of everything. Minimum context an agent needs to make correct decisions about this specific product.
 </HARD-GATE>
 
-Return 3 decision rows in your structured result under a `phase_1_decisions` field — one each for tech stack, data model, and scope boundary. Each row shape: `{phase: 1, author: \"architect\", type: \"tech-stack\" | \"data-model\" | \"scope-boundary\", summary, rationale, related_files: [\"docs/plans/design-doc.md\"]}`. The orchestrator-scribe handler (see Phase 4) allocates IDs and appends. DO NOT write `decisions.jsonl` directly."
+Return 3 decision rows in your structured result under a `phase_1_decisions` field — one each for tech stack, data model, and scope boundary. Each row shape: `{phase: 1, author: \"architect\", type: \"tech-stack\" | \"data-model\" | \"scope-boundary\", summary, rationale, related_files: [\"docs/plans/design-doc.md\"]}`. The orchestrator forwards each row through the `scribe_decision` MCP tool (see Phase 4 "Orchestrator-scribe dispatch"). DO NOT write `decisions.jsonl` directly."
 
-**Writes:** `docs/plans/design-doc.md` (PRD), `CLAUDE.md`. Decision rows flow through the orchestrator-scribe handler.
+**Writes:** `docs/plans/design-doc.md` (PRD), `CLAUDE.md`. Decision rows flow through the orchestrator's `scribe_decision` MCP calls.
 
 **Post-Step 1.4 — CLAUDE.md size enforcement (mechanical check):**
 After the Design Doc Writer returns, run `wc -l < CLAUDE.md` and capture the line count. If the count exceeds 200 lines:
@@ -563,9 +563,9 @@ For each doc, extract section anchors into a flat index. Schema: `[{\"anchor\": 
 
 **Architecture Metric Loop (callable service):** Run the Metric Loop Protocol (`protocols/metric-loop.md`) on `architecture.md`. Define a metric: coverage of PRD requirements, specificity, consistency across the 6 architects, and **simplicity** — is this the simplest architecture that meets the requirements? Could any service, abstraction, or dependency be eliminated? Penalize over-engineering. Max 3 iterations.
 
-**Architecture decisions:** The Implementation Blueprint synthesizer returns 4 `deviation_row` objects (or a `phase_2_decisions` array of row objects) in its structured result — one per cross-cutting Phase 2 decision (API contract, persistence layer, auth model, framework choice). The orchestrator-scribe handler (see Phase 4) allocates `D-2-<seq>` IDs and appends them to `docs/plans/decisions.jsonl`. Author = `architect`. Each row carries a `ref` anchor pointing into `architecture.md` per `protocols/decision-log.md`. Total: 4 rows.
+**Architecture decisions:** The Implementation Blueprint synthesizer returns 4 `deviation_row` objects (or a `phase_2_decisions` array of row objects) in its structured result — one per cross-cutting Phase 2 decision (API contract, persistence layer, auth model, framework choice). The orchestrator forwards each row through the `scribe_decision` MCP tool (see Phase 4 "Orchestrator-scribe dispatch"); the MCP allocates `D-2-<seq>` IDs and atomically appends to `docs/plans/decisions.jsonl`. Author = `architect`. Each row carries a `ref` anchor pointing into `architecture.md` per `protocols/decision-log.md`. Total: 4 rows.
 
-**Writes:** `docs/plans/architecture.md`, `docs/plans/sprint-tasks.md`, `docs/plans/quality-targets.json`, `docs/plans/refs.json`. Decision rows (4) flow through the orchestrator-scribe handler.
+**Writes:** `docs/plans/architecture.md`, `docs/plans/sprint-tasks.md`, `docs/plans/quality-targets.json`, `docs/plans/refs.json`. Decision rows (4) flow through the orchestrator's `scribe_decision` MCP calls.
 
 ### Quality Gate 2
 
@@ -740,26 +740,22 @@ Run the Verify Protocol (INTERNAL inline — "Verify scaffolding") after the met
 
 Update TodoWrite and `.build-state.json`. Write a compact summary to `docs/plans/.task-outputs/[task-id].json` with {files-changed, tests-passing, verify-status}.
 
-**Writes:** source code, `docs/plans/.task-outputs/`. Deviation rows flow through the orchestrator-scribe handler below — implementers do NOT touch `decisions.jsonl`.
+**Writes:** source code, `docs/plans/.task-outputs/`. Deviation rows flow through the orchestrator's `scribe_decision` MCP calls below — implementers do NOT touch `decisions.jsonl`.
 
 <HARD-GATE>
-DECISIONS.JSONL — ORCHESTRATOR-SCRIBE ONLY. Only the orchestrator appends to `docs/plans/decisions.jsonl`. Any dispatch prompt asking a subagent to write this file is a bug. Subagents return `deviation_row` objects in their structured result; the orchestrator allocates IDs and appends.
+DECISIONS.JSONL — ORCHESTRATOR-SCRIBE ONLY via `scribe_decision` MCP. Only the orchestrator may cause appends to `docs/plans/decisions.jsonl`, and it does so exclusively by invoking the `scribe_decision` MCP tool. Any dispatch prompt asking a subagent to write this file is a bug. The orchestrator itself MUST NOT Write or Edit the file directly. Subagents return `deviation_row` objects in their structured result; the orchestrator forwards them through the MCP, which owns ID allocation and atomic append.
 </HARD-GATE>
 
-#### Orchestrator-scribe handler (decisions.jsonl append)
+#### Orchestrator-scribe dispatch (route deviation rows through `scribe_decision` MCP)
 
-Runs after every Phase 4 parallel batch returns (and anywhere else a subagent returns a `deviation_row`). The orchestrator is the single writer — no lock needed because there is only one writer thread in the orchestration model.
+Runs after every Phase 4 parallel batch returns (and anywhere else a subagent returns a `deviation_row`, including Phase 1 synthesis and Phase 2 architecture synthesis). The scribe MCP is the single writer for `docs/plans/decisions.jsonl`; the orchestrator is the single caller of the MCP.
 
 1. Walk `batch_results`. Collect every non-null `deviation_row` from each subagent return.
-2. Read `.build-state.json.decisions_next_id.P{N}` where `{N}` is the current phase number. Call this `next`.
-3. For the `k` deviation rows collected, allocate IDs `D-{N}-{next}` through `D-{N}-{next+k-1}`.
-4. For each row, assemble the final jsonl line by merging the allocated `decision_id` + `timestamp` (ISO-8601) + `status: "open"` with the subagent-returned shape: `{decision_id, phase, timestamp, author, type, summary, rationale, related_files, status}`.
-5. Atomically append all `k` lines to `docs/plans/decisions.jsonl` in one write.
-6. Update `.build-state.json.decisions_next_id.P{N}` to `next + k`. Regenerate `.build-state.md`.
+2. For each row, invoke the `scribe_decision` MCP tool with the row's fields (`phase`, `category`/`type`, `summary`, `decided_by`/`author`, `impact_level`, `rationale`, `related_files`) per the MCP's documented schema. One MCP call per row.
+3. The MCP allocates the `decision_id` (`D-{N}-<seq>`), stamps `timestamp` (ISO-8601) and `status: "open"`, validates against `decisions.schema.json`, and atomically appends the line. The orchestrator MUST NOT Write or Edit `docs/plans/decisions.jsonl` directly, MUST NOT pre-compute decision IDs, and MUST NOT read or allocate `.build-state.json.decisions_next_id.P{N}` — ID allocation is the MCP's responsibility.
+4. Regenerate `.build-state.md` after the batch completes so the rendered view reflects the newly appended rows.
 
-**On resume:** read `docs/plans/decisions.jsonl` and for each phase `N` in the file, set `.build-state.json.decisions_next_id.P{N}` to `max(seq)+1` across rows whose `decision_id` matches `D-{N}-<seq>`. This keeps the allocator correct after compaction.
-
-**State schema note:** `.build-state.json` gains `decisions_next_id` as a top-level object keyed by phase number, e.g. `{"1": 4, "2": 5, "4": 12}`. Initialized at Phase 0 to `{}`; populated lazily on first append per phase.
+**On resume:** the scribe MCP reconstructs its ID allocator internally on first invocation by scanning `docs/plans/decisions.jsonl` (for each phase `N`, `max(seq)+1` across rows whose `decision_id` matches `D-{N}-<seq>`). The orchestrator no longer maintains `decisions_next_id` in `.build-state.json`; the field is effectively deprecated under Stage 2 (scribe owns ID allocation end-to-end) and is scheduled for formal removal in Stage 4 schema bump A7 (see Task 4.5.1 in `docs/migration/sdk-hybrid/TASK-BREAKDOWN.md`). TODO(stage-4-A7): drop `decisions_next_id` from the state schema.
 
 <HARD-GATE>
 LRR NEEDS_WORK backward edge: `LRR NEEDS_WORK (code-level) → back to Phase 4 target task`. The Aggregator classifies the finding and routes to the specific task via `related_decision_id` lookup; Phase 4 re-opens that task with the finding as input.
