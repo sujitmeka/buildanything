@@ -36,6 +36,18 @@
         ]
       }
     ],
+    "SubagentStop": [
+      {
+        "matcher": ".*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "'${CLAUDE_PLUGIN_ROOT}/hooks/subagent-stop'",
+            "async": false
+          }
+        ]
+      }
+    ],
     "PreCompact": [
       {
         "matcher": ".*",
