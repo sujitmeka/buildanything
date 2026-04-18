@@ -687,7 +687,7 @@ Dispatch by task type and complexity:
 - Backend tasks: `subagent_type: engineering-backend-architect` (L) or `subagent_type: engineering-senior-developer` (M)
 - Hard / complex / cross-cutting tasks: `subagent_type: engineering-senior-developer`
 
-Call the Agent tool — description: "[task-id] [task name]" — subagent_type per above — mode: "bypassPermissions" — prompt: "[CONTEXT header above] [COMPLEXITY: S/M/L from sprint-tasks.md]. TASK: [task description + acceptance criteria from sprint-tasks.md].
+Call the Agent tool — description: "[task-id] [task name]" — subagent_type per above — mode: "bypassPermissions" — prompt: "[CONTEXT header above] [COMPLEXITY: S/M/L from sprint-tasks.md]. TASK: [task description + acceptance criteria from sprint-tasks.md]. Sprint context is prepended; focus on this task.
 
 ## Prior Learnings
 [paste contents of `docs/plans/.active-learnings.md` if it exists, otherwise omit this section]
