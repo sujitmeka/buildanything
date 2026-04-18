@@ -1,0 +1,21 @@
+name: lint-phase-graph
+
+on:
+  pull_request:
+    paths:
+      - commands/build.md
+      - protocols/**/*.md
+      - docs/migration/phase-graph.yaml
+      - docs/migration/agents.yaml
+      - eval/lint_phase_graph.py
+
+jobs:
+  lint-phase-graph:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Lint SSOT drift (prose vs YAML)
+        run: python eval/lint_phase_graph.py
