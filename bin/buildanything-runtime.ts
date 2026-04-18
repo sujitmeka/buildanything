@@ -84,7 +84,28 @@ async function main(): Promise<void> {
   console.log(`[buildanything-runtime] sdkActive=${sdkActive} (stateFile=${stateFileActive}, hostCompat=${hostCompat})`);
 
   // [Task 1.2.4] scribe MCP registration
+  const mcpServers: Record<string, unknown> = {};
+  if (!sdkActive) {
+    console.log("[buildanything-runtime] sdk inactive — scribe MCP registration skipped (markdown mode)");
+  } else {
+    try {
+      const sdk = await import("@anthropic-ai/claude-agent-sdk");
+      const { buildScribeTool } = await import("./adapters/scribe-tool.js");
+      const scribeTool = buildScribeTool(process.cwd());
+      mcpServers.scribe = sdk.createSdkMcpServer({
+        name: "scribe",
+        tools: [scribeTool],
+      });
+      console.log("[buildanything-runtime] scribe MCP server registered (tool: scribe_decision)");
+    } catch (err) {
+      console.warn(
+        `[buildanything-runtime] warning: scribe MCP registration failed (${(err as Error).message}); continuing in markdown mode`,
+      );
+    }
+  }
+
   // [Task 4.5.2] schema_version forward-reject
+  void mcpServers;
 }
 
 main()
