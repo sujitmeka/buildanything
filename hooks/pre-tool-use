@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+# buildanything: PreToolUse writer-owner hook (task 2.1.1)
+# Enforces the writer-owner table from docs/migration/phase-graph.yaml on
+# Write|Edit|MultiEdit tool calls. Shim delegates to Node via tsx.
+#
+# Claude Code hook protocol: exit 2 with stderr = deny. Exit 0 = allow.
+# Rollback: BUILDANYTHING_ENFORCE_WRITER_OWNER=false degrades deny to warn.
+
+set -u
+
+HANDLER="${CLAUDE_PLUGIN_ROOT:-$(cd "$(dirname "$0")/.." && pwd)}/hooks/pre-tool-use.ts"
+
+if [ ! -f "$HANDLER" ]; then
+  # Handler missing — fail open so the hook never bricks the session.
+  echo "buildanything: pre-tool-use handler missing at $HANDLER — allowing" >&2
+  exit 0
+fi
+
+exec npx --no-install tsx "$HANDLER"
