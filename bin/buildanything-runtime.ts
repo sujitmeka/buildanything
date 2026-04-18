@@ -185,6 +185,19 @@ async function main(): Promise<void> {
       );
     }
 
+    // Hydrate in-memory lease store from disk so it matches persisted state
+    // across runtime restarts. init() no-ops on missing file and swallows
+    // parse errors internally; we still guard so a surprise throw doesn't
+    // block MCP registration.
+    try {
+      const writeLeaseModule = await import("../src/orchestrator/mcp/write-lease.js");
+      writeLeaseModule.init(buildStatePath);
+    } catch (err) {
+      console.warn(
+        `[buildanything-runtime] warning: write-lease init failed (${(err as Error).message}); continuing with empty in-memory leases`,
+      );
+    }
+
     try {
       const sdk = await import("@anthropic-ai/claude-agent-sdk");
       const {
