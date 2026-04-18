@@ -1,6 +1,6 @@
 #!/usr/bin/env tsx
 /*
- * buildanything: PreToolUse writer-owner hook handler (tasks 2.1.1–2.1.3).
+ * buildanything: PreToolUse writer-owner hook handler (tasks 2.1.1–2.1.3, 2.4.1).
  *
  * Reads a Claude Code tool-call JSON from stdin, consults the writer-owner
  * table in docs/migration/phase-graph.yaml, and denies Write|Edit|MultiEdit
@@ -14,19 +14,29 @@
  * surfaced as cache.scratch_globs) are exempt from default-deny. Source code
  * under the user's project (outside the protected prefix set) is allowed.
  *
+ * Task 2.4.1 layers a task-level write-lease check on top of the phase-level
+ * decision. After the phase-level check returns ALLOW (either via a matching
+ * writer-owner entry or by falling outside PROTECTED_PREFIXES), the handler
+ * consults docs/plans/.build-state.json.active_write_leases[] and denies when
+ * the calling task_id lacks a lease covering file_path. task_id is derived
+ * (best-effort for 2.4.1 — strict SDK-spec derivation lands in 2.4.2) from:
+ *   1. stdin payload parent_tool_use_id / tool_use_id
+ *   2. env BUILDANYTHING_TASK_ID
+ *   3. none — lease check skipped (backward compat for Phase 0/1/2)
+ *
  * Exit codes per Claude Code PreToolUse protocol:
  *   0 — allow
  *   2 — deny (stderr shown to Claude)
  *
- * Rollback: BUILDANYTHING_ENFORCE_WRITER_OWNER=false downgrades denies (both
- * phase-mismatch AND default-deny) to stdout warnings and exits 0.
+ * Rollback:
+ *   BUILDANYTHING_ENFORCE_WRITER_OWNER=false → ALL denies (writer-owner AND
+ *     lease) downgrade to stdout warnings and exit 0.
+ *   BUILDANYTHING_ENFORCE_WRITE_LEASE=false → only the lease check downgrades
+ *     to stdout warning; writer-owner denies still block.
  *
  * Task 2.1.2: boot-compiled cache at .buildanything/writer-owner.json is the
  * fast path. Cache misses (missing / corrupt / stale-mtime) fall back to live
  * YAML parse with a single stderr warning.
- *
- * Still deliberately does NOT:
- *   - Consult active_write_leases (task 2.4.1).
  */
 
 import { readFileSync, realpathSync, statSync } from "node:fs";
@@ -36,6 +46,8 @@ import { parse as parseYaml } from "yaml";
 
 const WATCHED_TOOLS = new Set(["Write", "Edit", "MultiEdit"]);
 const ENFORCE_ENV = "BUILDANYTHING_ENFORCE_WRITER_OWNER";
+const ENFORCE_LEASE_ENV = "BUILDANYTHING_ENFORCE_WRITE_LEASE";
+const TASK_ID_ENV = "BUILDANYTHING_TASK_ID";
 
 // Claude Code PreToolUse stdin shape (only the fields we consume).
 interface ToolInput {
@@ -44,6 +56,27 @@ interface ToolInput {
 interface ToolCall {
   tool_name?: string;
   tool_input?: ToolInput;
+  // Claude Code propagates the calling tool_use_id when a hook fires for a
+  // tool invocation spawned by a Task dispatch. 2.4.2 will nail down the
+  // exact field per SDK spec; for 2.4.1 we accept either shape.
+  parent_tool_use_id?: string;
+  tool_use_id?: string;
+}
+
+// Persisted lease shape per MIGRATION-PLAN-FINAL §4 A5:
+// `.build-state.json.active_write_leases[] = {task_id, file_paths[], ...}`.
+// We also accept the in-memory shape from write-lease.ts (`{holder, paths[]}`)
+// for robustness during cutover.
+interface PersistedLease {
+  task_id?: string;
+  file_paths?: string[];
+  holder?: string;
+  paths?: string[];
+}
+
+interface NormalizedLease {
+  task_id: string;
+  file_paths: string[];
 }
 
 interface ArtifactEntry {
@@ -107,6 +140,7 @@ const CACHE_REL_PATH = ".buildanything/writer-owner.json";
 interface BuildState {
   current_phase?: string | number;
   phase?: string | number;
+  active_write_leases?: PersistedLease[];
 }
 
 function readStdin(): string {
@@ -200,20 +234,48 @@ function ownerPhases(entry: ArtifactEntry): string[] {
   return raw.map((w) => String(w).trim()).filter(Boolean);
 }
 
-function loadBuildStatePhase(projectDir: string): string | null {
+interface LoadedState {
+  phase: string | null;
+  leases: NormalizedLease[];
+}
+
+function normalizeLease(raw: PersistedLease): NormalizedLease | null {
+  const taskId = raw.task_id ?? raw.holder;
+  const paths = raw.file_paths ?? raw.paths;
+  if (typeof taskId !== "string" || !taskId.trim()) return null;
+  if (!Array.isArray(paths)) return null;
+  const cleaned = paths
+    .filter((p): p is string => typeof p === "string" && p.length > 0);
+  if (cleaned.length === 0) return null;
+  return { task_id: taskId, file_paths: cleaned };
+}
+
+function loadBuildState(projectDir: string): LoadedState {
   const path = resolve(projectDir, "docs/plans/.build-state.json");
   let text: string;
   try {
     text = readFileSync(path, "utf8");
   } catch {
-    return null;
+    return { phase: null, leases: [] };
   }
+  let state: BuildState;
   try {
-    const state = JSON.parse(text) as BuildState;
-    return normalizePhase(state.current_phase ?? state.phase);
+    state = JSON.parse(text) as BuildState;
   } catch {
-    return null;
+    return { phase: null, leases: [] };
   }
+  const rawLeases = Array.isArray(state.active_write_leases)
+    ? state.active_write_leases
+    : [];
+  const leases: NormalizedLease[] = [];
+  for (const r of rawLeases) {
+    const n = normalizeLease(r);
+    if (n) leases.push(n);
+  }
+  return {
+    phase: normalizePhase(state.current_phase ?? state.phase),
+    leases,
+  };
 }
 
 function phaseGraphPath(pluginDir: string): string {
@@ -316,6 +378,98 @@ function enforceMode(): "deny" | "warn" {
   return process.env[ENFORCE_ENV] === "false" ? "warn" : "deny";
 }
 
+function leaseEnforceMode(): "deny" | "warn" {
+  // Either rollback flag downgrades the lease decision. The writer-owner
+  // flag is the umbrella "turn off all enforcement" switch; the lease flag
+  // is the targeted "keep writer-owner, soften only the lease layer" switch.
+  if (process.env[ENFORCE_ENV] === "false") return "warn";
+  if (process.env[ENFORCE_LEASE_ENV] === "false") return "warn";
+  return "deny";
+}
+
+function deriveTaskId(call: ToolCall): string | null {
+  const fromCall = call.parent_tool_use_id ?? call.tool_use_id;
+  if (typeof fromCall === "string" && fromCall.trim()) return fromCall.trim();
+  const fromEnv = process.env[TASK_ID_ENV];
+  if (typeof fromEnv === "string" && fromEnv.trim()) return fromEnv.trim();
+  return null;
+}
+
+function leaseCoversPath(lease: NormalizedLease, candidates: Iterable<string>): boolean {
+  const candidateList = [...candidates];
+  for (const entry of lease.file_paths) {
+    const isGlob = entry.includes("*") || /\[[^\]]+\]/.test(entry);
+    if (!isGlob) {
+      if (candidateList.includes(entry)) return true;
+      continue;
+    }
+    const normalized = entry.replace(/\[[^\]]+\]/g, "*");
+    const re = globToRegex(normalized);
+    if (candidateList.some((c) => re.test(c))) return true;
+  }
+  return false;
+}
+
+interface LeaseDecision {
+  kind: "allow" | "deny" | "warn";
+  message?: string;
+}
+
+function evaluateLease(
+  taskId: string | null,
+  leases: NormalizedLease[],
+  toolName: string,
+  displayPath: string,
+  candidates: Iterable<string>,
+): LeaseDecision {
+  // No task_id known → preserves backward compat for Phase 0/1/2 and any
+  // non-SDK invocation path. 2.4.2 tightens this.
+  if (!taskId) return { kind: "allow" };
+
+  if (leases.length === 0) {
+    // TODO(task-2.4.2-tightening): once Phase 4 orchestrator reliably
+    // acquires leases before dispatching implementers, flip this to a
+    // hard deny. For now, warn + allow so the system doesn't break
+    // during cutover from Stage 1 to Stage 2.
+    return {
+      kind: "warn",
+      message: `buildanything: write-lease WARNING on ${toolName} ${displayPath} — task_id '${taskId}' has no active leases in .build-state.json; lease acquisition will be required once Phase 4 implementer dispatches are fully cut over (see task 2.4.2)`,
+    };
+  }
+
+  const mine = leases.find((l) => l.task_id === taskId);
+  if (!mine) {
+    return {
+      kind: "deny",
+      message: `buildanything: write lease required — current task_id '${taskId}' has no active lease covering ${displayPath}`,
+    };
+  }
+
+  if (!leaseCoversPath(mine, candidates)) {
+    return {
+      kind: "deny",
+      message: `buildanything: write lease for task '${taskId}' does not include path ${displayPath}`,
+    };
+  }
+
+  return { kind: "allow" };
+}
+
+function applyLeaseDecision(decision: LeaseDecision): number {
+  if (decision.kind === "allow") return 0;
+  if (decision.kind === "warn") {
+    if (decision.message) process.stdout.write(`${decision.message}\n`);
+    return 0;
+  }
+  // deny
+  if (leaseEnforceMode() === "warn") {
+    if (decision.message) process.stdout.write(`WARNING: ${decision.message}\n`);
+    return 0;
+  }
+  if (decision.message) process.stderr.write(`${decision.message}\n`);
+  return 2;
+}
+
 function main(): number {
   const raw = readStdin();
   if (!raw.trim()) return 0;
@@ -380,6 +534,9 @@ function main(): number {
     }
   }
 
+  const { phase: currentPhase, leases } = loadBuildState(project);
+  const taskId = deriveTaskId(call);
+
   if (!hit) {
     // Task 2.1.3: default-deny for unknown paths under PROTECTED_PREFIXES.
     // Exemptions: scratch globs (phase_internal_scratch) and any path outside
@@ -387,10 +544,18 @@ function main(): number {
     const scratchMatched = [...relCandidates].some((c) =>
       matchesScratch(c, scratchRegexes),
     );
-    if (scratchMatched) return 0;
+    if (scratchMatched) {
+      return applyLeaseDecision(
+        evaluateLease(taskId, leases, toolName, filePath, relCandidates),
+      );
+    }
 
     const underProtected = [...relCandidates].some((c) => isProtectedPath(c));
-    if (!underProtected) return 0;
+    if (!underProtected) {
+      return applyLeaseDecision(
+        evaluateLease(taskId, leases, toolName, filePath, relCandidates),
+      );
+    }
 
     const denyPath = [...relCandidates].find((c) => isProtectedPath(c)) ?? filePath;
     const msg = `buildanything: writer-owner hook denied ${toolName} on ${denyPath} — path not in writer-owner table. Please add an entry to docs/migration/phase-graph.yaml or route the write through the scribe_decision MCP.`;
@@ -403,21 +568,32 @@ function main(): number {
     return 2;
   }
 
-  const currentPhase = loadBuildStatePhase(project);
   // Boot-time race: no state file yet. Fail open on phase-mismatch check so
   // Phase 1's first write isn't blocked before .build-state.json exists.
   if (!currentPhase) return 0;
 
   const owners = ownerPhases(hit).map((w) => normalizePhase(w) ?? w);
-  if (owners.length === 0) return 0;
+  if (owners.length === 0) {
+    return applyLeaseDecision(
+      evaluateLease(taskId, leases, toolName, hitPath, relCandidates),
+    );
+  }
 
   // Non-phase owners (e.g. "orchestrator", "orchestrator-scribe",
   // "every-phase", "auto-rendered-view") are out of scope for this phase-vs-
   // phase check. Leave them to task 2.2.x / 2.4.x.
   const phaseOwners = owners.filter((o) => /^phase--?\d+$/.test(o));
-  if (phaseOwners.length === 0) return 0;
+  if (phaseOwners.length === 0) {
+    return applyLeaseDecision(
+      evaluateLease(taskId, leases, toolName, hitPath, relCandidates),
+    );
+  }
 
-  if (phaseOwners.includes(currentPhase)) return 0;
+  if (phaseOwners.includes(currentPhase)) {
+    return applyLeaseDecision(
+      evaluateLease(taskId, leases, toolName, hitPath, relCandidates),
+    );
+  }
 
   const ownerStr = phaseOwners.join(" | ");
   const msg = `buildanything: writer-owner hook denied ${toolName} on ${hitPath} — current phase ${currentPhase}, path owned by ${ownerStr}`;
