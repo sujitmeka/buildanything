@@ -56,6 +56,12 @@ export function init(buildStatePath: string): void {
 /**
  * Persist current leases to .build-state.json atomically.
  * Uses write-to-.tmp + rename (same protocol as state_save MCP).
+ *
+ * CRITICAL: If persist fails, the in-memory lease exists but the PreToolUse
+ * hook (a separate process) reads from disk and won't see it — creating a
+ * silent fail-closed where legitimate writes are denied. On persist failure,
+ * we roll back the in-memory state to match disk and re-throw so the caller
+ * knows the acquire didn't stick.
  */
 function persistLeases(): void {
   if (!existsSync(statePath)) return;
@@ -66,8 +72,22 @@ function persistLeases(): void {
     writeFileSync(tmp, JSON.stringify(state, null, 2) + '\n', 'utf-8');
     renameSync(tmp, statePath);
   } catch (err) {
-    // Fail-open: log but don't crash — the in-memory state is still correct
-    process.stderr.write(`write-lease: persist failed: ${err instanceof Error ? err.message : err}\n`);
+    // Persist failed — roll back in-memory state to match what's on disk,
+    // then re-throw. This prevents the MCP thinking a lease exists while
+    // the hook (reading disk) sees nothing and denies writes.
+    try {
+      const diskState = JSON.parse(readFileSync(statePath, 'utf-8'));
+      const diskLeases = diskState?.active_write_leases;
+      leases.length = 0;
+      if (Array.isArray(diskLeases)) {
+        for (const l of diskLeases) {
+          if (l?.holder && Array.isArray(l?.paths)) {
+            leases.push({ holder: l.holder, paths: l.paths, acquired_at: l.acquired_at ?? '' });
+          }
+        }
+      }
+    } catch { /* disk unreadable — empty leases is the safest state */ leases.length = 0; }
+    throw new Error(`write-lease: persist failed, in-memory rolled back: ${err instanceof Error ? err.message : err}`);
   }
 }
 
@@ -93,17 +113,19 @@ export function acquireWriteLease(taskId: string, filePaths: string[]): AcquireR
 }
 
 /**
- * Release all leases held by a task. Persists to disk.
- * Called by SubagentStop hook on dispatch return.
+ * Release ALL leases held by a task (handles multiple leases per task).
+ * Persists to disk. Called by SubagentStop hook on dispatch return.
  */
 export function releaseLease(taskId: string): boolean {
-  const idx = leases.findIndex(l => l.holder === taskId);
-  if (idx >= 0) {
-    leases.splice(idx, 1);
-    persistLeases();
-    return true;
+  let released = false;
+  for (let i = leases.length - 1; i >= 0; i--) {
+    if (leases[i].holder === taskId) {
+      leases.splice(i, 1);
+      released = true;
+    }
   }
-  return false;
+  if (released) persistLeases();
+  return released;
 }
 
 /**
