@@ -20,6 +20,7 @@ pip install -r requirements.txt
 | `similarity.py` | TF-IDF cosine similarity matrix across agent prompts. Flags redundant agents. |
 | `graph.py` | Builds agent→skill/agent DAG. Reports orphans, cycles, fan-out hotspots, dead nodes. |
 | `lint_frontmatter.py` | Checks required YAML frontmatter fields on every agent. |
+| `lint_phase_graph.py` | SSOT lint: detects drift between prose (`commands/build.md`, `protocols/*.md`) and machine-readable `phase-graph.yaml` / `agents.yaml`. Exits 1 on any mismatch. |
 | `density.py` | Readability (Flesch-Kincaid) + imperative density per prompt. |
 | `simulate.py` | Workflow token-budget simulator. Takes a YAML workflow spec, outputs cost/tokens per phase. |
 | `report.py` | Runs everything, emits `report.md` dashboard. |
