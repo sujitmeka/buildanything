@@ -9,6 +9,7 @@ _Wholesale copies from `research/swift-skills/` per `research/swift-skills/_docs
 | swift-security-expert | ivan-magda/swift-security-skill | MIT | Ivan Magda | 2026-04-04 |
 | swiftdata-pro | twostraws/SwiftData-Agent-Skill | MIT | Paul Hudson | 2026-04-04 |
 | swift-testing-expert | AvdLee/Swift-Testing-Agent-Skill | MIT | Antoine van der Lee | 2026-04-04 |
+| swift-testing | bocato/swift-testing-agent-skill | MIT | bocato | 2026-04-18 |
 | swift-accessibility | PasqualeVittoriosi/swift-accessibility-skill | MIT | Pasquale Vittoriosi | 2026-04-04 |
 | swiftui-ui-patterns | Dimillian/Skills | MIT | Dimillian | 2026-04-04 |
 | swiftui-view-refactor | Dimillian/Skills | MIT | Dimillian | 2026-04-04 |
@@ -58,3 +59,4 @@ Authored in-house for the buildanything plugin. Not vendored from upstream.
 | ios-entitlements-generator | expanding | Derive `.entitlements` file from required iOS capabilities (Keychain, Push, HealthKit, etc.) | stub | 2026-04-04 |
 | ios-info-plist-hardening | expanding | Populate Info.plist usage-description strings, ATS settings, privacy manifest alignment | stub | 2026-04-04 |
 | ios-maestro-flow-author | expanding | Author Maestro `.yaml` E2E flows for critical user journeys | stub | 2026-04-04 |
+| writing-for-interfaces | ready | Microcopy + tone review for iOS interface text | stub | 2026-04-18 |
