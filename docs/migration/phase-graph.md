@@ -244,7 +244,7 @@ The orchestrator builds a DAG from `sprint-tasks.md` Dependencies fields and exe
 | metric-loop | Metric Loop (generator/critic) | loop (callable service) | generator: same implementer re-invoked. critic: measurement agent dispatched fresh. Max 5 iters. For UI: web uses agent-browser; iOS uses SwiftUI Preview captures. THIS IS THE AUTHORITATIVE BEHAVIORAL VERIFICATION |
 | smoke | Behavioral Smoke Test (iOS) | dispatch-single | Maestro flow against booted simulator. Preconditions: Maestro CLI installed, flow files exist, booted simulator available. On precondition fail → BLOCKED (not SKIPPED, not PASS) |
 | verify | Verify Service (static checks only) | gate (callable service) | type-check + lint + build. Behavioral verification already done in metric loop. Max 3 fix attempts. Build-fix: `swift-build-resolver` (iOS) |
-| scribe | Orchestrator-scribe handler | internal | walks batch_results, collects non-null `deviation_row`s, allocates IDs `D-{phase}-<seq>`, atomically appends to `decisions.jsonl`, updates `.build-state.json.decisions_next_id.P{N}` |
+| scribe | Orchestrator-scribe handler | internal | walks batch_results, collects non-null `deviation_row`s, invokes the `scribe_decision` MCP tool once per row. The MCP is the single writer for `decisions.jsonl` — it allocates `D-{phase}-<seq>` IDs, stamps timestamp + status, validates against `decisions.schema.json`, and atomically appends. `.build-state.json.decisions_next_id` is deprecated under Stage 2 (removed Stage 4 A7) |
 
 **HARD-GATE: `decisions.jsonl` is orchestrator-scribe ONLY.** Subagents return `deviation_row` objects in their structured result. Any prompt asking a subagent to write `decisions.jsonl` directly is a bug.
 

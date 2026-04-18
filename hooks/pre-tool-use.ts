@@ -1,6 +1,6 @@
 #!/usr/bin/env tsx
 /*
- * buildanything: PreToolUse writer-owner hook handler (tasks 2.1.1–2.1.3, 2.4.1, 2.4.2).
+ * buildanything: PreToolUse writer-owner hook handler (tasks 2.1.1–2.1.3, 2.2.2, 2.4.1, 2.4.2).
  *
  * Reads a Claude Code tool-call JSON from stdin, consults the writer-owner
  * table in docs/migration/phase-graph.yaml, and denies Write|Edit|MultiEdit
@@ -39,6 +39,11 @@
  *     lease) downgrade to stdout warnings and exit 0.
  *   BUILDANYTHING_ENFORCE_WRITE_LEASE=false → only the lease check downgrades
  *     to stdout warning; writer-owner denies still block.
+ *   BUILDANYTHING_SCRIBE_SINGLE_WRITER=off → only the decisions.jsonl
+ *     writer-owner deny downgrades to stdout warning (task 2.2.2). Every
+ *     other artifact still blocks on mismatch. Use this flag to regress to
+ *     dual-write mode if the scribe MCP pipeline misbehaves in production
+ *     without disabling the rest of the writer-owner table.
  *   BUILDANYTHING_STRICT_TASK_ID=off → restore 2.4.1 env fallback: when
  *     stdin lacks `parent_tool_use_id`, consult env BUILDANYTHING_TASK_ID
  *     before giving up. Default is on (strict, SDK-only). The `tool_use_id`
@@ -57,6 +62,8 @@ import { parse as parseYaml } from "yaml";
 const WATCHED_TOOLS = new Set(["Write", "Edit", "MultiEdit"]);
 const ENFORCE_ENV = "BUILDANYTHING_ENFORCE_WRITER_OWNER";
 const ENFORCE_LEASE_ENV = "BUILDANYTHING_ENFORCE_WRITE_LEASE";
+const SCRIBE_SINGLE_WRITER_ENV = "BUILDANYTHING_SCRIBE_SINGLE_WRITER";
+const DECISIONS_JSONL_PATH = "docs/plans/decisions.jsonl";
 const TASK_ID_ENV = "BUILDANYTHING_TASK_ID";
 // Task 2.4.2: default ON (strict, parent_tool_use_id only). Set to "off" to
 // restore 2.4.1's env-var fallback. The per-invocation `tool_use_id` fallback
@@ -391,6 +398,16 @@ function enforceMode(): "deny" | "warn" {
   return process.env[ENFORCE_ENV] === "false" ? "warn" : "deny";
 }
 
+// Task 2.2.2: scoped rollback for decisions.jsonl writer-owner enforcement.
+// Returns true when the candidate path set includes docs/plans/decisions.jsonl
+// AND the operator has set the scoped flag off. Lets users regress to Stage 1
+// dual-write without disabling the rest of the writer-owner table.
+function decisionsJsonlDowngrade(candidates: Iterable<string>): boolean {
+  if (process.env[SCRIBE_SINGLE_WRITER_ENV] !== "off") return false;
+  for (const c of candidates) if (c === DECISIONS_JSONL_PATH) return true;
+  return false;
+}
+
 function leaseEnforceMode(): "deny" | "warn" {
   // Either rollback flag downgrades the lease decision. The writer-owner
   // flag is the umbrella "turn off all enforcement" switch; the lease flag
@@ -587,7 +604,7 @@ function main(): number {
     const denyPath = [...relCandidates].find((c) => isProtectedPath(c)) ?? filePath;
     const msg = `buildanything: writer-owner hook denied ${toolName} on ${denyPath} — path not in writer-owner table. Please add an entry to docs/migration/phase-graph.yaml or route the write through the scribe_decision MCP.`;
 
-    if (enforceMode() === "warn") {
+    if (enforceMode() === "warn" || decisionsJsonlDowngrade(relCandidates)) {
       process.stdout.write(`WARNING: ${msg}\n`);
       return 0;
     }
@@ -625,7 +642,7 @@ function main(): number {
   const ownerStr = phaseOwners.join(" | ");
   const msg = `buildanything: writer-owner hook denied ${toolName} on ${hitPath} — current phase ${currentPhase}, path owned by ${ownerStr}`;
 
-  if (enforceMode() === "warn") {
+  if (enforceMode() === "warn" || decisionsJsonlDowngrade(relCandidates)) {
     process.stdout.write(`WARNING: ${msg}\n`);
     return 0;
   }

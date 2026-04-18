@@ -83,9 +83,9 @@ Three consumers, each reads a bounded slice:
 
 3. **Step 6.0.1 Learnings Harvester** — reads the Reality Checker's triggered findings and appends one PITFALL row per trigger to `learnings.jsonl` with `provenance.decision_id` back-referencing the source row. This is the cross-run PITFALL capture path, distinct from the in-run metric-loop post-hoc harvest.
 
-## Orchestrator Never Writes
+## Subagents Never Write Directly
 
-The orchestrator routes deviation_row objects to the scribe handler — specialist agents author rows to preserve original language.
+Subagents return `deviation_row` objects in their structured result. The orchestrator forwards each row through the `scribe_decision` MCP tool — the single writer for `docs/plans/decisions.jsonl`. The MCP owns `decision_id` allocation (`D-{phase}-<seq>`), stamps `timestamp` and `status: "open"`, validates against `decisions.schema.json`, and atomically appends the line. The orchestrator MUST NOT Write or Edit this file directly; subagents MUST NOT either. Specialist agents still author the row fields to preserve original language — they just don't touch the file.
 
 ## Worked Examples
 

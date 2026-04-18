@@ -62,9 +62,13 @@ artifacts:
     contributors: [phase-4]
     readers: [phase-6, phase-7]
   - path: docs/plans/evidence/lrr/*.json
-    writer: phase-6
-    readers: [phase-6-aggregator]
-    notes: one file per chapter
+    writers: [code-reviewer, security-reviewer, engineering-sre, a11y-architect, design-brand-guardian]
+    readers: [phase-6-aggregator, orchestrator]
+    notes: |
+      One file per LRR chapter. Writer set = the 5 chapter subagents (aka
+      "chapter-judge" role per MIGRATION-PLAN-FINAL §Stage 5). Aggregator and
+      orchestrator are READ-ONLY on chapter files. Enforced agent-role match
+      in hooks/pre-tool-use.ts against subagent_type staged by subagent-start.
   - path: docs/plans/evidence/lrr-aggregate.json
     writer: phase-6-aggregator
     readers: [phase-7]
@@ -596,9 +600,14 @@ phases:
           kind: internal
           role: orchestrator-scribe
           action: |
-            Walks batch_results, collects non-null deviation_row objects,
-            allocates IDs D-{phase}-<seq>, atomically appends to decisions.jsonl,
-            updates .build-state.json.decisions_next_id.P{N}.
+            Walks batch_results, collects non-null deviation_row objects, and
+            invokes the scribe_decision MCP tool once per row. The MCP is the
+            single writer for decisions.jsonl — it allocates D-{phase}-<seq>
+            IDs, stamps timestamp + status, validates against
+            decisions.schema.json, and atomically appends. The orchestrator
+            MUST NOT Write/Edit decisions.jsonl directly and MUST NOT
+            pre-compute IDs. .build-state.json.decisions_next_id is
+            deprecated under Stage 2 and removed at Stage 4 A7.
     hard_gates:
       - decisions.jsonl is orchestrator-scribe ONLY. Subagents return deviation_row objects.
       - "Web compositional: component-manifest.md variants MUST be imported; writing from scratch triggers cleanup revert."
