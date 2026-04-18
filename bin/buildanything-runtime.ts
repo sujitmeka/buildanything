@@ -91,7 +91,7 @@ async function main(): Promise<void> {
     try {
       const sdk = await import("@anthropic-ai/claude-agent-sdk");
       const { buildScribeTool } = await import("./adapters/scribe-tool.js");
-      const scribeTool = buildScribeTool(process.cwd());
+      const scribeTool = buildScribeTool(sdk.tool, process.cwd());
       mcpServers.scribe = sdk.createSdkMcpServer({
         name: "scribe",
         tools: [scribeTool],

@@ -12,8 +12,9 @@
 
 import { resolve } from "node:path";
 import { z } from "zod";
-import { tool } from "@anthropic-ai/claude-agent-sdk";
 import { scribeDecision, loadCounters } from "../../src/orchestrator/mcp/scribe.js";
+
+type ToolConstructor = typeof import("@anthropic-ai/claude-agent-sdk").tool;
 
 const DEFAULT_DECISIONS_PATH = "docs/plans/decisions.jsonl";
 
@@ -34,7 +35,7 @@ const scribeInputShape = {
   ref: z.string().optional(),
 };
 
-export function buildScribeTool(cwd: string) {
+export function buildScribeTool(tool: ToolConstructor, cwd: string) {
   const decisionsPath = resolve(cwd, DEFAULT_DECISIONS_PATH);
   loadCounters(decisionsPath);
 
