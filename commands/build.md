@@ -164,6 +164,8 @@ The 7-check verification gate is called by Phase 2 (architecture check), Phase 4
 
 For Phase 3+ agents, the orchestrator passes REFS to live downstream docs (`design-doc.md`, `architecture.md`, `visual-design-spec.md`, `sprint-tasks.md`, `quality-targets.json`, `decisions.jsonl`) — NOT pasted content. The orchestrator reads `docs/plans/refs.json` (produced by the Phase 2 Refs Indexer), resolves the task topic against the flat anchor index, and passes a short ref list to the agent. The agent uses the Read tool to pull refs it needs. This keeps orchestrator context lean and lets the agent widen its view on demand. Phase 1-2 agents still receive full documents because the architecture anchors don't exist yet.
 
+**refs.json mutation invalidates sprint-context hash (Stage 6 / task 6.3.2).** Any orchestrator update to `docs/plans/refs.json` (Phase 2 Refs Indexer initial write, Phase 3 extension after `visual-design-spec.md` lands, or any subsequent correction) MUST be IMMEDIATELY followed by a `state_save` call that sets `.build-state.json.current_sprint_context_hash = null`. This invalidates the cached Phase 4 sprint-scoped shared-context block so the next subagent dispatch re-renders with fresh references. See `src/orchestrator/phase4-shared-context.ts#shouldInvalidate` for how the hash is consulted at render time. Skipping this invalidation causes Phase 4 implementers to read stale anchor indices — a silent correctness failure.
+
 ### Complexity Routing (Advisory)
 
 Tag agent prompts with `[COMPLEXITY: S/M/L]` based on task size from `docs/plans/sprint-tasks.md`. This is advisory — the tag documents intent for future model routing support.
