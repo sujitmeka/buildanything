@@ -125,7 +125,7 @@ Match the symptom to exactly one row. Dispatch the skill in the rightmost column
 | Data race, actor isolation warning, `Sendable` violation, hang on main | Concurrency | `skills/ios/swift-concurrency` |
 | `@Query` not updating, predicate wrong, migration failure, CloudKit sync | SwiftData | `skills/ios/swiftdata-pro` |
 | VoiceOver silent/wrong, Dynamic Type clipping, contrast fail, Reduce Motion ignored | Accessibility | `skills/ios/swift-accessibility` |
-| Touch target <44pt, no dark mode, hard-coded padding, HIG violation | HIG | `skills/ios/ios-hig` |
+| Touch target <44pt, no dark mode, hard-coded padding, HIG violation | HIG | `skills/ios/hig-foundations` |
 | Build fails, signing error, entitlement / Info.plist / provisioning | Build/infra | dispatch `build-error-resolver` agent |
 | Keychain/Crypto misuse, ATS exception, insecure storage, secret leak | Security | `skills/ios/swift-security-expert` |
 

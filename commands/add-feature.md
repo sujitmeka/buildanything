@@ -96,3 +96,5 @@ Evidence: [paths to screenshots/logs]
 ```
 
 If the feature expands the product scope, update `CLAUDE.md` to reflect the new capability.
+
+**After any CLAUDE.md update:** Run `wc -l < CLAUDE.md`. If the count exceeds 200 lines, trim it back to ≤200 lines — cut the least-critical content, not the new addition. CLAUDE.md is auto-loaded into every subagent; bloat here multiplies across all dispatches.

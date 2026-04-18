@@ -49,6 +49,35 @@ Phase-internal scaffolding (lives in `docs/plans/phase1-scratch/` after Gate 1, 
 Phase 4 implementers never reference Phase 1 raw research files. They are SPENT after Phase 2 dispatch.
 </HARD-GATE>
 
+<HARD-GATE>
+CONTEXT HEADER — RENDER ONCE, HOIST AS STABLE PREFIX.
+
+Every phase uses a CONTEXT header prepended to dispatch prompts. The orchestrator MUST render this header ONCE at the start of each phase by reading `.build-state.json` (and `visual-dna.md` for web, Phase 4+) and resolving all values into concrete strings. The rendered header is then reused verbatim for every dispatch in that phase.
+
+DO NOT paste `{read from .build-state.json}` placeholders into dispatch prompts. DO NOT re-read state files per dispatch. The values do not change within a phase.
+
+**Canonical template** (orchestrator resolves before first dispatch of each phase):
+```
+CONTEXT:
+  project_type: <resolved value>
+  phase: <current phase number>
+  dna: <resolved from docs/plans/visual-dna.md — INCLUDE only if project_type=web AND phase >= 4>
+  ios_features: <resolved from .build-state.json — INCLUDE only if project_type=ios>
+  archetype: <resolved from .build-state.json>
+
+TASK:
+```
+
+**Rendering procedure** (run once per phase boundary):
+1. Read `docs/plans/.build-state.json`. Extract `project_type`, `ios_features`, `archetype`.
+2. If `project_type=web` AND phase >= 4: read `docs/plans/visual-dna.md` and extract the DNA summary (first 5 lines or the `## Summary` section). Otherwise omit the `dna` field.
+3. If `project_type=ios`: include `ios_features`. Otherwise omit.
+4. Substitute all values into the template above. Store the result as `rendered_context_header`.
+5. For every dispatch in this phase, prepend `rendered_context_header` — do NOT re-read or re-interpolate.
+
+This keeps the prefix stable across parallel batches (enabling KV-cache reuse) and eliminates redundant state-file reads (~300K–1M tokens saved per build).
+</HARD-GATE>
+
 ### Orchestrator Discipline
 
 Your context window is precious. Protect it.
@@ -122,7 +151,7 @@ The 7-check verification gate is called by Phase 2 (architecture check), Phase 4
 
 ### Learnings (callable service)
 
-`docs/plans/learnings.jsonl` — append-only cross-run learnings store. Writers: Phase 5 reality sweep, Phase 7. Readers: Phase 0 Learnings Loader (Step 0.1c) and Phase 5 reality sweep.
+`docs/plans/learnings.jsonl` — append-only cross-run learnings store. Writers: Phase 5 reality sweep, Phase 7. Readers: Phase 0 Learnings Loader (Step 0.1d) and Phase 5 reality sweep.
 
 ### Refs-Not-Pastes Rule
 
@@ -215,7 +244,24 @@ Record the classification in `docs/plans/.build-state.json` as the top-level `pr
 
 **Mode-specific additions to Phase 0:** See `protocols/ios-phase-branches.md` §Phase 0 additions (iOS only).
 
-### Step 0.1c — Learnings Loader (PITFALL replay)
+### Step 0.1c — Project Archetype Classification (H1/H2/H3/H4)
+
+Classify the product **archetype**. This is orthogonal to `project_type` (which is the platform) and gates a different set of skills (e.g. `seo`, `cost-aware-llm-pipeline`, `mcp-server-patterns`). The CONTEXT header injected into every dispatch block downstream includes `archetype: {...}` and will not resolve unless this step writes a value.
+
+Read the build request AND, if it exists, `docs/plans/phase1-scratch/idea-draft.md` (may not exist yet on first pass — that's fine; re-run this step after Step 1.0 if the initial classification was ambiguous). Apply these heuristics in order; first match wins:
+
+| Archetype | Signals | Skill gating summary |
+|---|---|---|
+| **H4 — AI-Powered SaaS** | LLM in the critical path; chat/agent interface, RAG, tool-use, AI-powered automation is the core value prop (not just a sprinkled feature) | `cost-aware-llm-pipeline` required; `mcp-server-patterns` optional; `seo` optional per H1/H2 overlap |
+| **H3 — Infra / Dev tool / CLI / Backend** | Dev tools, internal APIs, CLIs, libraries, infra; no end-user UI surface | `seo` excluded; `mcp-server-patterns` optional |
+| **H1 — Marketing site / Landing page** | Static content, sales pages, landing pages with lead forms; content-first, SEO-critical; no user accounts/dashboards | `seo` required; `mcp-server-patterns` excluded |
+| **H2 — Product / SaaS app** | User accounts, dashboards, CRUD data, per-user state, auth, billing — standard SaaS. Default when no stronger signal matches. | `seo` optional; `mcp-server-patterns` excluded |
+
+**Ambiguity rule:** if two archetypes look plausible (e.g. H2 SaaS with an AI assistant bolted on — is it H2 or H4?), ask the user one short question: "Is the AI/LLM layer the core value prop (H4) or a supporting feature inside a standard SaaS (H2)?" and use their answer. In autonomous mode, default to the *less* AI-heavy choice (H2 over H4, H2 over H1) and log the inference to `docs/plans/build-log.md`.
+
+Write the result to `docs/plans/.build-state.json` as the top-level `archetype` field with value `"H1" | "H2" | "H3" | "H4"`. Regenerate `.build-state.md` after the write. This field survives compaction and is consumed by every dispatch block's CONTEXT header.
+
+### Step 0.1d — Learnings Loader (PITFALL replay)
 
 Read `docs/plans/learnings.jsonl` (cross-run learnings store). If the project-local file does not exist, fall back to `~/.claude/buildanything/learnings.jsonl`. If neither exists, proceed with an empty active-learnings file and skip the rest of this step.
 
@@ -287,13 +333,15 @@ Skip if context level is "Decision brief" (research already done).
 
 Call the Agent tool 4 times in a single message. Each gets the build request + `docs/plans/phase1-scratch/idea-draft.md`. Each writes its own output file. Raw files are NOT read by the orchestrator in Step 1.2 — a separate Research Synthesizer reads them. They ARE routed by domain to Phase 2 architects (hybrid routing — see Phase 2 Step 2.2).
 
-1. Description: "Feature intel" — subagent_type: `feature-intel` — Prompt: "Extract competitor feature matrix for: [build request]. Idea draft: [paste idea-draft.md]. Walk 5-10 rivals. Return must-haves (features present in >=80% of rivals — table stakes) + stand-outs (features unique to individual rivals — differentiation opportunities), sorted by competitor. Save to `docs/plans/phase1-scratch/feature-intel.md`."
+**CONTEXT header:** Render `rendered_context_header` for phase 1 per the canonical template (see CONTEXT HEADER HARD-GATE above). Prepend to every Phase 1 research prompt below.
 
-2. Description: "Tech feasibility" — subagent_type: `tech-feasibility` — Prompt: "Evaluate hard technical problems (Solved/Hard/Unsolved), build-vs-buy decisions, MVP scope, stack validation for: [build request]. Idea draft: [paste idea-draft.md]. Verify APIs and libraries from the draft exist and are maintained. Save to `docs/plans/phase1-scratch/tech-feasibility.md`. Report with a Technical Verdict."
+1. Description: "Feature intel" — subagent_type: `feature-intel` — Prompt: "[CONTEXT header above] Extract competitor feature matrix for: [build request]. Idea draft: read docs/plans/phase1-scratch/idea-draft.md with your Read tool. Walk 5-10 rivals. Return must-haves (features present in >=80% of rivals — table stakes) + stand-outs (features unique to individual rivals — differentiation opportunities), sorted by competitor. Save to `docs/plans/phase1-scratch/feature-intel.md`."
 
-3. Description: "UX research" — subagent_type: `design-ux-researcher` — Prompt: "Analyze target persona, jobs-to-be-done, current alternatives, and behavioral barriers for: [build request]. Idea draft: [paste idea-draft.md]. Save to `docs/plans/phase1-scratch/ux-research.md`. Report with a User Verdict."
+2. Description: "Tech feasibility" — subagent_type: `tech-feasibility` — Prompt: "[CONTEXT header above] Evaluate hard technical problems (Solved/Hard/Unsolved), build-vs-buy decisions, MVP scope, stack validation for: [build request]. Idea draft: read docs/plans/phase1-scratch/idea-draft.md with your Read tool. Verify APIs and libraries from the draft exist and are maintained. Save to `docs/plans/phase1-scratch/tech-feasibility.md`. Report with a Technical Verdict."
 
-4. Description: "Business model" — subagent_type: `business-model` — Prompt: "Light-touch revenue/channels/unit-economics analysis for: [build request]. Idea draft: [paste idea-draft.md]. Surface product-impact conclusions only — which features the business model requires, which channels gate the feature set. Do not write full financial modeling. Save to `docs/plans/phase1-scratch/business-model.md`."
+3. Description: "UX research" — subagent_type: `design-ux-researcher` — Prompt: "[CONTEXT header above] Analyze target persona, jobs-to-be-done, current alternatives, and behavioral barriers for: [build request]. Idea draft: read docs/plans/phase1-scratch/idea-draft.md with your Read tool. Save to `docs/plans/phase1-scratch/ux-research.md`. Report with a User Verdict."
+
+4. Description: "Business model" — subagent_type: `business-model` — Prompt: "[CONTEXT header above] Light-touch revenue/channels/unit-economics analysis for: [build request]. Idea draft: read docs/plans/phase1-scratch/idea-draft.md with your Read tool. Surface product-impact conclusions only — which features the business model requires, which channels gate the feature set. Do not write full financial modeling. Save to `docs/plans/phase1-scratch/business-model.md`."
 
 ### Step 1.2 — RESEARCH DIGEST (context protection)
 
@@ -380,6 +428,12 @@ CLAUDE.md must be under 200 lines. Not a wiki, not a conventions doc, not a dump
 Return 3 decision rows in your structured result under a `phase_1_decisions` field — one each for tech stack, data model, and scope boundary. Each row shape: `{phase: 1, author: \"architect\", type: \"tech-stack\" | \"data-model\" | \"scope-boundary\", summary, rationale, related_files: [\"docs/plans/design-doc.md\"]}`. The orchestrator-scribe handler (see Phase 4) allocates IDs and appends. DO NOT write `decisions.jsonl` directly."
 
 **Writes:** `docs/plans/design-doc.md` (PRD), `CLAUDE.md`. Decision rows flow through the orchestrator-scribe handler.
+
+**Post-Step 1.4 — CLAUDE.md size enforcement (mechanical check):**
+After the Design Doc Writer returns, run `wc -l < CLAUDE.md` and capture the line count. If the count exceeds 200 lines:
+1. FAIL the step. Log to `docs/plans/build-log.md`: `"CLAUDE.md size violation: {count} lines (limit: 200)"`.
+2. Re-dispatch the Design Doc Writer with this additional instruction prepended: `"CLAUDE.md EXCEEDED 200 LINES ({count} lines). Rewrite CLAUDE.md to ≤200 lines. Cut aggressively — keep only what a subagent needs to make correct product decisions. No conventions, no wiki content, no boilerplate."`.
+3. Max 2 retries. If still over 200 after 2 retries, HARD-FAIL and surface to user: `"CLAUDE.md is {count} lines after 2 rewrites. Please manually trim to ≤200 lines before proceeding — this file is auto-loaded into every subagent and bloat here multiplies across all Phases 2-7 dispatches."`.
 
 ### Quality Gate 1
 
@@ -471,17 +525,20 @@ OUTPUT:
 
 Per-architect dispatches:
 
-1. Description: "Backend architecture" — subagent_type: `engineering-backend-architect` — team_name: `phase-2-architects` — name: `backend-architect` — Prompt: "Design system architecture. PRD: [paste docs/plans/design-doc.md]. DIGEST: [paste docs/plans/phase1-scratch/findings-digest.md]. YOUR DOMAIN RAW: [paste tech-feasibility.md + feature-intel.md]. Include services, data models, API contracts, database schema, integration points. Respect stack choices from PRD.\n\n[paste shared team brief above]"
+**CONTEXT header:** Render `rendered_context_header` for phase 2 per the canonical template (see CONTEXT HEADER HARD-GATE above). Prepend to every Phase 2 architect prompt below.
 
-2. Description: "Frontend architecture" — subagent_type: `engineering-frontend-developer` — team_name: `phase-2-architects` — name: `frontend-architect` — Prompt: "Design frontend architecture. PRD: [paste design-doc.md]. DIGEST: [paste findings-digest.md]. YOUR DOMAIN RAW: [paste ux-research.md + feature-intel.md]. Include component hierarchy, layout strategy, responsive approach, state management, routing. Align UX with the persona from research.\n\n[paste shared team brief above]"
 
-3. Description: "Data engineering" — subagent_type: `engineering-data-engineer` — team_name: `phase-2-architects` — name: `data-engineer` — Prompt: "Design data architecture. PRD: [paste design-doc.md]. DIGEST: [paste findings-digest.md]. YOUR DOMAIN RAW: [paste tech-feasibility.md]. Include ETL/ELT patterns, schema versioning, query patterns, indexing strategy, data lineage, migration plan.\n\n[paste shared team brief above]"
+1. Description: "Backend architecture" — subagent_type: `engineering-backend-architect` — team_name: `phase-2-architects` — name: `backend-architect` — Prompt: "[CONTEXT header above] Design system architecture. Read these files via your Read tool before starting — do NOT expect pasted content:\n  - PRD: `docs/plans/design-doc.md`\n  - DIGEST: `docs/plans/phase1-scratch/findings-digest.md`\n  - YOUR DOMAIN RAW: `docs/plans/phase1-scratch/tech-feasibility.md`, `docs/plans/phase1-scratch/feature-intel.md`\nInclude services, data models, API contracts, database schema, integration points. Respect stack choices from PRD.\n\n[paste shared team brief above]"
 
-4. Description: "Security architecture" — subagent_type: `engineering-security-engineer` — team_name: `phase-2-architects` — name: `security-engineer` — Prompt: "Security review. PRD: [paste design-doc.md]. DIGEST: [paste findings-digest.md]. Cover auth model, input validation, secrets management, threat model, dependency hygiene. Note: no raw research file routed — digest only (security architecture is a cross-cutting concern).\n\n[paste shared team brief above]"
+2. Description: "Frontend architecture" — subagent_type: `engineering-frontend-developer` — team_name: `phase-2-architects` — name: `frontend-architect` — Prompt: "[CONTEXT header above] Design frontend architecture. Read these files via your Read tool before starting — do NOT expect pasted content:\n  - PRD: `docs/plans/design-doc.md`\n  - DIGEST: `docs/plans/phase1-scratch/findings-digest.md`\n  - YOUR DOMAIN RAW: `docs/plans/phase1-scratch/ux-research.md`, `docs/plans/phase1-scratch/feature-intel.md`\nInclude component hierarchy, layout strategy, responsive approach, state management, routing. Align UX with the persona from research.\n\n[paste shared team brief above]"
 
-5. Description: "A11y constraints" — subagent_type: `a11y-architect` — team_name: `phase-2-architects` — name: `accessibility-auditor` — Prompt: "Accessibility-driven architecture constraints. PRD: [paste design-doc.md]. DIGEST: [paste findings-digest.md]. YOUR DOMAIN RAW: [paste ux-research.md]. Identify WCAG 2.2 AA requirements that affect component choice, navigation structure, form patterns, focus management, landmark regions.\n\n[paste shared team brief above]"
+3. Description: "Data engineering" — subagent_type: `engineering-data-engineer` — team_name: `phase-2-architects` — name: `data-engineer` — Prompt: "[CONTEXT header above] Design data architecture. Read these files via your Read tool before starting — do NOT expect pasted content:\n  - PRD: `docs/plans/design-doc.md`\n  - DIGEST: `docs/plans/phase1-scratch/findings-digest.md`\n  - YOUR DOMAIN RAW: `docs/plans/phase1-scratch/tech-feasibility.md`\nInclude ETL/ELT patterns, schema versioning, query patterns, indexing strategy, data lineage, migration plan.\n\n[paste shared team brief above]"
 
-6. Description: "Performance constraints" — subagent_type: `testing-performance-benchmarker` — team_name: `phase-2-architects` — name: `performance-benchmarker` — Prompt: "Define quality targets for this build. PRD: [paste design-doc.md]. DIGEST: [paste findings-digest.md]. YOUR DOMAIN RAW: [paste tech-feasibility.md]. Write `docs/plans/quality-targets.json` covering bundle budget, LCP, TTI, API p95, Lighthouse scores. Use per-Scope budgets from `orchestration-proposed-state.md` §11: Marketing 500KB / Product 300KB / Dashboard 400KB / Internal 200KB gzipped.\n\n[paste shared team brief above]"
+4. Description: "Security architecture" — subagent_type: `engineering-security-engineer` — team_name: `phase-2-architects` — name: `security-engineer` — Prompt: "[CONTEXT header above] Security review. Read these files via your Read tool before starting — do NOT expect pasted content:\n  - PRD: `docs/plans/design-doc.md`\n  - DIGEST: `docs/plans/phase1-scratch/findings-digest.md`\nCover auth model, input validation, secrets management, threat model, dependency hygiene. Note: no raw research file routed — digest only (security architecture is a cross-cutting concern).\n\n[paste shared team brief above]"
+
+5. Description: "A11y constraints" — subagent_type: `a11y-architect` — team_name: `phase-2-architects` — name: `accessibility-auditor` — Prompt: "[CONTEXT header above] Accessibility-driven architecture constraints. Read these files via your Read tool before starting — do NOT expect pasted content:\n  - PRD: `docs/plans/design-doc.md`\n  - DIGEST: `docs/plans/phase1-scratch/findings-digest.md`\n  - YOUR DOMAIN RAW: `docs/plans/phase1-scratch/ux-research.md`\nIdentify WCAG 2.2 AA requirements that affect component choice, navigation structure, form patterns, focus management, landmark regions.\n\n[paste shared team brief above]"
+
+6. Description: "Performance constraints" — subagent_type: `testing-performance-benchmarker` — team_name: `phase-2-architects` — name: `performance-benchmarker` — Prompt: "[CONTEXT header above] Define quality targets for this build. Read these files via your Read tool before starting — do NOT expect pasted content:\n  - PRD: `docs/plans/design-doc.md`\n  - DIGEST: `docs/plans/phase1-scratch/findings-digest.md`\n  - YOUR DOMAIN RAW: `docs/plans/phase1-scratch/tech-feasibility.md`\nWrite `docs/plans/quality-targets.json` covering bundle budget, LCP, TTI, API p95, Lighthouse scores. Use per-Scope budgets from `orchestration-proposed-state.md` §11: Marketing 500KB / Product 300KB / Dashboard 400KB / Internal 200KB gzipped.\n\n[paste shared team brief above]"
 
 **Step 2.2c — Wait for all 6 teammates to idle**, then proceed to synthesis. The `docs/plans/phase-2-contracts/*.md` files now contain post-debate positions (initial draft plus any SendMessage-driven revisions). The orchestrator does NOT read these files — the synthesizer below does.
 
@@ -493,9 +550,11 @@ After all 6 teammates are idle, the 4 raw research files are **SPENT**. They sit
 
 Four sequential dispatches.
 
-1. Description: "Implementation blueprint" — subagent_type: `code-architect` — Prompt: "Implementation blueprint. PRD: [paste design-doc.md]. Read all 6 post-debate architect positions via your own Read tool from `docs/plans/phase-2-contracts/`:\n  - `backend-architect.md`\n  - `frontend-architect.md`\n  - `data-engineer.md`\n  - `security-engineer.md`\n  - `accessibility-auditor.md`\n  - `performance-benchmarker.md`\n\nThese files are the authoritative team positions AFTER any SendMessage-driven revisions — the architects already cross-checked each other's contract boundaries, so you can stitch without re-debating. Your job is to assemble, not adjudicate. Include specific files to create/modify, build sequence, dependency order. Write `docs/plans/architecture.md` with stable section anchors per `protocols/architecture-schema.md`. Required top-level sections: Overview, Frontend, Backend, Data Model, Security, Infrastructure, MVP Scope, Out of Scope. Scope to MVP boundary from the PRD."
+**CONTEXT header:** Reuse `rendered_context_header` from phase 2 (already rendered above). Prepend to Step 2.3 synthesizer + sprint-breakdown prompts.
 
-2. Description: "Sprint breakdown" — subagent_type: `planner` — Prompt: "Break this architecture into ordered, atomic tasks. Each task needs: description, acceptance criteria, **dependencies** (list of task IDs this depends on), size (S/M/L), **Behavioral Test** field for every UI task (concrete interaction: 'Navigate to [page], click [element], verify [outcome]') or curl-based acceptance test for API tasks. ARCHITECTURE: [paste docs/plans/architecture.md]. PRD: [paste docs/plans/design-doc.md]. Scope to MVP only. Save to `docs/plans/sprint-tasks.md`. Dependencies field is load-bearing — Phase 4 uses it to batch independent tasks in parallel."
+1. Description: "Implementation blueprint" — subagent_type: `code-architect` — Prompt: "[CONTEXT header above] Implementation blueprint. Read the PRD via your Read tool: `docs/plans/design-doc.md`. Read all 6 post-debate architect positions via your own Read tool from `docs/plans/phase-2-contracts/`:\n  - `backend-architect.md`\n  - `frontend-architect.md`\n  - `data-engineer.md`\n  - `security-engineer.md`\n  - `accessibility-auditor.md`\n  - `performance-benchmarker.md`\n\nThese files are the authoritative team positions AFTER any SendMessage-driven revisions — the architects already cross-checked each other's contract boundaries, so you can stitch without re-debating. Your job is to assemble, not adjudicate. Include specific files to create/modify, build sequence, dependency order. Write `docs/plans/architecture.md` with stable section anchors per `protocols/architecture-schema.md`. Required top-level sections: Overview, Frontend, Backend, Data Model, Security, Infrastructure, MVP Scope, Out of Scope. Scope to MVP boundary from the PRD."
+
+2. Description: "Sprint breakdown" — subagent_type: `planner` — Prompt: "[CONTEXT header above] Break this architecture into ordered, atomic tasks. Each task needs: description, acceptance criteria, **dependencies** (list of task IDs this depends on), size (S/M/L), **Behavioral Test** field for every UI task (concrete interaction: 'Navigate to [page], click [element], verify [outcome]') or curl-based acceptance test for API tasks. Read these files via your Read tool before starting:\n  - ARCHITECTURE: `docs/plans/architecture.md`\n  - PRD: `docs/plans/design-doc.md`\nScope to MVP only. Save to `docs/plans/sprint-tasks.md`. Dependencies field is load-bearing — Phase 4 uses it to batch independent tasks in parallel."
 
 3. Description: "Task DAG validator" — INTERNAL inline role-string — Prompt: "You are the Task DAG Validator. Read `docs/plans/sprint-tasks.md`. Validate for DAG correctness:
   - No circular dependencies
@@ -588,11 +647,13 @@ Before starting Phase 4: Phase 2 must be approved, Phase 3 must have produced th
 
 Scaffolding is project skeleton + design system + acceptance test stubs. Three sequential dispatches (full details in the mode-specific branch file):
 
-1. Description: "Project scaffolding" — subagent_type: `engineering-rapid-prototyper` — mode: "bypassPermissions" — prompt per branch file (web: Next.js/Vite/etc; iOS: Xcode project from bootstrap). [COMPLEXITY: M]
+**CONTEXT header:** Render `rendered_context_header` for phase 4 per the canonical template (see CONTEXT HEADER HARD-GATE above). Includes `dna` field for web projects. Prepend to every Phase 4 scaffold prompt below; branch files do the same for per-task flow.
 
-2. Description: "Design system setup" — subagent_type: `engineering-frontend-developer` — mode: "bypassPermissions" — prompt per branch file. Implements design tokens from `visual-design-spec.md` or `ios-design-board.md`. The living style guide from Phase 3 is the reference implementation — components must match. [COMPLEXITY: M]
+1. Description: "Project scaffolding" — subagent_type: `engineering-rapid-prototyper` — mode: "bypassPermissions" — prompt per branch file (web: Next.js/Vite/etc; iOS: Xcode project from bootstrap). Prepend CONTEXT header above. [COMPLEXITY: M]
 
-3. Description: "Scaffold acceptance tests" — INTERNAL inline role-string — mode: "bypassPermissions" — prompt: "Scaffold acceptance tests from sprint-tasks.md. Use Page Object Model. Read `docs/plans/sprint-tasks.md`. For every task with a Behavioral Test field, create a Playwright test stub (web) or Maestro flow stub (iOS). Each stub: navigate → interact → assert. Stubs must FAIL right now (features aren't built yet) — that's correct. Commit: 'test: scaffold acceptance tests from sprint tasks'."
+2. Description: "Design system setup" — subagent_type: `engineering-frontend-developer` — mode: "bypassPermissions" — prompt per branch file. Prepend CONTEXT header above. Implements design tokens from `visual-design-spec.md` or `ios-design-board.md`. The living style guide from Phase 3 is the reference implementation — components must match. [COMPLEXITY: M]
+
+3. Description: "Scaffold acceptance tests" — INTERNAL inline role-string — mode: "bypassPermissions" — prompt: "[CONTEXT header above] Scaffold acceptance tests from sprint-tasks.md. Use Page Object Model. Read `docs/plans/sprint-tasks.md`. For every task with a Behavioral Test field, create a Playwright test stub (web) or Maestro flow stub (iOS). Each stub: navigate → interact → assert. Stubs must FAIL right now (features aren't built yet) — that's correct. Commit: 'test: scaffold acceptance tests from sprint tasks'."
 
 **Scaffold verification:** Run the Verify Protocol (INTERNAL inline — "Verify scaffolding") — 7 checks sequentially, stop on first FAIL. Do not proceed to Step 4.1 until PASS.
 
@@ -634,36 +695,34 @@ Dispatch by task type and complexity:
 - Backend tasks: `subagent_type: engineering-backend-architect` (L) or `subagent_type: engineering-senior-developer` (M)
 - Hard / complex / cross-cutting tasks: `subagent_type: engineering-senior-developer`
 
-Call the Agent tool — description: "[task-id] [task name]" — subagent_type per above — mode: "bypassPermissions" — prompt: "[COMPLEXITY: S/M/L from sprint-tasks.md]. TASK: [task description + acceptance criteria from sprint-tasks.md]. CONTEXT MAP from Briefing Officer: [paste Briefing Officer output]. Use the Read tool to pull refs as needed — do NOT expect pasted architecture content.
+Call the Agent tool — description: "[task-id] [task name]" — subagent_type per above — mode: "bypassPermissions" — prompt: "[CONTEXT header above] [COMPLEXITY: S/M/L from sprint-tasks.md]. TASK: [task description + acceptance criteria from sprint-tasks.md]. CONTEXT MAP from Briefing Officer: [paste Briefing Officer output]. Use the Read tool to pull refs as needed — do NOT expect pasted architecture content.
 
 ## Prior Learnings
 [paste contents of `docs/plans/.active-learnings.md` if it exists, otherwise omit this section]
 
-## Decision Log — Deviation Reporting
-If your implementation deviates from the planned task — e.g., the acceptance criteria force a different approach than `architecture.md` assumes — return a `deviation_row` object in your structured agent result with this exact shape:
-```json
-{\"phase\": 4, \"author\": \"<task-id>\", \"type\": \"<api-shape|data-shape|auth-flow|dep-swap|scope-cut|other>\", \"summary\": \"<what you changed>\", \"rationale\": \"<why the planned approach didn't work + revisit_criterion in 1 sentence>\", \"related_files\": [\"<path>\", ...]}
-```
-If no deviation, return `deviation_row: null`. DO NOT write `docs/plans/decisions.jsonl` directly — the orchestrator is the sole appender and allocates decision IDs. Return the deviation row in your result payload only.
+## Deviation Reporting
+If your implementation deviates from the planned architecture, return a `deviation_row` object per the schema in `protocols/decision-log.md`. If no deviation, return `deviation_row: null`. Do NOT write `decisions.jsonl` directly.
 
 Implement fully with real code and tests. Commit: 'feat: [task]'. Report what you built, files changed, and test results.
 
 ## On Re-entry (from LRR backward routing)
+**[ORCHESTRATOR: Include the "On Re-entry" section below ONLY when this is a re-entry dispatch from LRR backward routing. For normal Phase 4 execution, OMIT it.]**
+
 If this dispatch is a re-entry (the orchestrator passes `blocking_finding`, `prior_output`, and `decision_row` in the prompt), DO NOT treat this as a fresh task. Read `prior_output` (the path to your previous task artifact under `.task-outputs/[task-id].json` + changed files) and `decision_row` (the original deviation rationale from decisions.jsonl). Revise ONLY what `blocking_finding` requires — do not redo unaffected code, do not re-run acceptance tests that already passed, do not touch files outside the blast radius of the finding. Return a fresh `deviation_row` in your result payload documenting the revision rationale (author=this task-id, type and summary describing the revision)."
 
 #### Per-task security review (auth/PII tasks only)
 
 FOR tasks touching auth, PII, secrets, or payment flows — add a per-task security review BEFORE Senior Dev cleanup:
 
-Call the Agent tool — description: "Security review for [task-id]" — subagent_type: `security-reviewer` — prompt: "Review changed files from [task-id] for security issues. Scope: auth logic, input validation, secrets handling, dependency hygiene, OWASP Top 10 for web (or iOS Keychain / ATS / data protection for iOS). Return blocking findings only — 80%+ confidence threshold. Files to review: [list from implementer's changeset]."
+Call the Agent tool — description: "Security review for [task-id]" — subagent_type: `security-reviewer` — prompt: "[CONTEXT header above] Review changed files from [task-id] for security issues. Scope: auth logic, input validation, secrets handling, dependency hygiene, OWASP Top 10 for web (or iOS Keychain / ATS / data protection for iOS). Return blocking findings only — 80%+ confidence threshold. Files to review: [list from implementer's changeset]."
 
 #### Senior Dev cleanup (simplifier + refactor-cleaner if TS)
 
 Two-pass cleanup. Scope is sacred: ONLY files from the implementation changeset. Zero exceptions.
 
-1. Call the Agent tool — description: "Simplify [task-id]" — subagent_type: `code-simplifier` — mode: "bypassPermissions" — prompt: "Simplify changed files from [task-id]. Remove dead code, unused imports, redundant abstractions. Do NOT add features. Do NOT change architecture. Do NOT touch files outside the changeset. If simplification breaks acceptance criteria, revert and skip. Files: [list]."
+1. Call the Agent tool — description: "Simplify [task-id]" — subagent_type: `code-simplifier` — mode: "bypassPermissions" — prompt: "[CONTEXT header above] Simplify changed files from [task-id]. Remove dead code, unused imports, redundant abstractions. Do NOT add features. Do NOT change architecture. Do NOT touch files outside the changeset. If simplification breaks acceptance criteria, revert and skip. Files: [list]."
 
-2. If TS/JS task: Call the Agent tool — description: "Refactor [task-id]" — subagent_type: `refactor-cleaner` — mode: "bypassPermissions" — prompt: "Run knip/depcheck/ts-prune on changed files from [task-id]. Remove orphaned exports, unused deps, dead files. Same scope rules as simplifier — changeset only. Files: [list]."
+2. If TS/JS task: Call the Agent tool — description: "Refactor [task-id]" — subagent_type: `refactor-cleaner` — mode: "bypassPermissions" — prompt: "[CONTEXT header above] Run knip/depcheck/ts-prune on changed files from [task-id]. Remove orphaned exports, unused deps, dead files. Same scope rules as simplifier — changeset only. Files: [list]."
 
 Skip cleanup if trivial (< 20 lines, single file).
 
@@ -671,9 +730,9 @@ Skip cleanup if trivial (< 20 lines, single file).
 
 Call the Agent tool 2 times in one message after Senior Dev cleanup:
 
-1. Description: "Code review for [task-id]" — subagent_type: `code-reviewer` — Prompt: "Review changed files from [task-id]. Report findings with 80%+ confidence threshold only — skip low-confidence nitpicks. Scope: changeset only. Acceptance criteria: [paste from task]. Files: [list]."
+1. Description: "Code review for [task-id]" — subagent_type: `code-reviewer` — Prompt: "[CONTEXT header above] Review changed files from [task-id]. Report findings with 80%+ confidence threshold only — skip low-confidence nitpicks. Scope: changeset only. Acceptance criteria: [paste from task]. Files: [list]."
 
-2. Description: "Silent failure hunt for [task-id]" — subagent_type: `silent-failure-hunter` — Prompt: "Hunt silent failures in changed files from [task-id]. Targets: empty catch blocks, try/catch returning null, swallowed errors, unhandled promise rejections, assertions disabled in production. Files: [list]. Report blocking findings only."
+2. Description: "Silent failure hunt for [task-id]" — subagent_type: `silent-failure-hunter` — Prompt: "[CONTEXT header above] Hunt silent failures in changed files from [task-id]. Targets: empty catch blocks, try/catch returning null, swallowed errors, unhandled promise rejections, assertions disabled in production. Files: [list]. Report blocking findings only."
 
 #### Metric Loop (generator/critic) — authoritative behavioral check
 
@@ -738,19 +797,21 @@ Before starting Phase 5: run the Verify Protocol (7 checks) one more time. All c
 
 Read the NFRs from `docs/plans/quality-targets.json`. Pass the relevant targets to each audit agent so they have concrete thresholds, not generic checks.
 
+**CONTEXT header:** Render `rendered_context_header` for phase 5 per the canonical template (see CONTEXT HEADER HARD-GATE above). Prepend to every Phase 5 prompt below.
+
 Call the Agent tool 6 times in one message:
 
-1. Description: "API testing" — subagent_type: `testing-api-tester` — Prompt: "Comprehensive API validation: all endpoints, edge cases, error responses, auth flows. NFR targets: [paste from quality-targets.json]. Report findings with severity counts."
+1. Description: "API testing" — subagent_type: `testing-api-tester` — Prompt: "[CONTEXT header above] Comprehensive API validation: all endpoints, edge cases, error responses, auth flows. NFR targets: Read `docs/plans/quality-targets.json` via your Read tool for performance and reliability thresholds. Report findings with severity counts."
 
-2. Description: "Performance audit" — subagent_type: `testing-performance-benchmarker` — Prompt: "Measure response times, identify bottlenecks, flag performance issues. NFR targets from quality-targets.json: [paste]. Bundle size per-Scope budgets apply (Marketing 500KB / Product 300KB / Dashboard 400KB / Internal 200KB gzipped). Report benchmarks AGAINST these targets, not generic metrics."
+2. Description: "Performance audit" — subagent_type: `testing-performance-benchmarker` — Prompt: "[CONTEXT header above] Measure response times, identify bottlenecks, flag performance issues. NFR targets: Read `docs/plans/quality-targets.json` via your Read tool for performance thresholds. Bundle size per-Scope budgets apply (Marketing 500KB / Product 300KB / Dashboard 400KB / Internal 200KB gzipped). Report benchmarks AGAINST these targets, not generic metrics."
 
-3. Description: "A11y audit" — subagent_type: `a11y-architect` — Prompt: "WCAG 2.2 AA runtime compliance audit on all interfaces. Check screen reader, keyboard nav, contrast, focus order, touch targets (>=44px), reduced-motion variants. Report issues with severity (Critical/Serious/Moderate/Minor)."
+3. Description: "A11y audit" — subagent_type: `a11y-architect` — Prompt: "[CONTEXT header above] WCAG 2.2 AA runtime compliance audit on all interfaces. Check screen reader, keyboard nav, contrast, focus order, touch targets (>=44px), reduced-motion variants. Report issues with severity (Critical/Serious/Moderate/Minor)."
 
-4. Description: "Security audit" — subagent_type: `engineering-security-engineer` — Prompt: "Security review at app level: auth, input validation, data exposure, dependency vulnerabilities. NFR targets: [paste security section from quality-targets.json]. Report findings with severity."
+4. Description: "Security audit" — subagent_type: `engineering-security-engineer` — Prompt: "[CONTEXT header above] Security review at app level: auth, input validation, data exposure, dependency vulnerabilities. NFR targets: Read `docs/plans/quality-targets.json` via your Read tool for security thresholds. Report findings with severity."
 
-5. Description: "UX quality audit" — subagent_type: `design-ux-researcher` — Prompt: "UX quality review of every user-facing page. First, screenshot the living style guide at /design-system (web) as your reference. Then review every product page: loading states (every async action shows a loading indicator), error states (every form and API call shows user-friendly feedback), empty states (lists/tables handle zero items), mobile responsiveness (test at 375px — touch targets >= 44px, no horizontal scroll), form validation (inline feedback, not alert()), transition smoothness, visual consistency vs style guide (buttons, inputs, cards, colors, spacing should match). Report issues with page, severity, and screenshot."
+5. Description: "UX quality audit" — subagent_type: `design-ux-researcher` — Prompt: "[CONTEXT header above] UX quality review of every user-facing page. First, screenshot the living style guide at /design-system (web) as your reference. Then review every product page: loading states (every async action shows a loading indicator), error states (every form and API call shows user-friendly feedback), empty states (lists/tables handle zero items), mobile responsiveness (test at 375px — touch targets >= 44px, no horizontal scroll), form validation (inline feedback, not alert()), transition smoothness, visual consistency vs style guide (buttons, inputs, cards, colors, spacing should match). Report issues with page, severity, and screenshot."
 
-6. Description: "Brand Guardian drift check" — subagent_type: `design-brand-guardian` — Prompt: "You are the Phase 5 drift check. Read docs/plans/visual-dna.md (the DNA card locked at Phase 3.0) + the actually-built pages via Playwright screenshots under docs/plans/evidence/. Score whether Phase 4 implementers stayed true to the DNA or drifted away from it. Specifically check: does the built Character axis match the DNA? Does Density match? Is Material consistent? Is Motion aligned? Report drift count and specific elements. Save findings to docs/plans/evidence/brand-drift.md. Note: this is a drift check only — the Phase 6 LRR Brand Guardian chapter does the verdict. You do NOT issue a pass/fail here, only surface findings."
+6. Description: "Brand Guardian drift check" — subagent_type: `design-brand-guardian` — Prompt: "[CONTEXT header above] You are the Phase 5 drift check. Read docs/plans/visual-dna.md (the DNA card locked at Phase 3.0) + the actually-built pages via Playwright screenshots under docs/plans/evidence/. Score whether Phase 4 implementers stayed true to the DNA or drifted away from it. Specifically check: does the built Character axis match the DNA? Does Density match? Is Material consistent? Is Motion aligned? Report drift count and specific elements. Save findings to docs/plans/evidence/brand-drift.md. Note: this is a drift check only — the Phase 6 LRR Brand Guardian chapter does the verdict. You do NOT issue a pass/fail here, only surface findings."
 
 ### Step 5.2 — Sequence: Eval Harness → Metric Loop
 
@@ -774,7 +835,7 @@ Call the Agent tool 3 times in one message:
 
 The Dogfood findings used to dead-end. Now route them to fix loops.
 
-Call the Agent tool — description: "Synthesize dogfood findings" — subagent_type: `product-feedback-synthesizer` — Prompt: "Interpret Dogfood output. Input: `docs/plans/evidence/dogfood/findings.md`. For each finding, classify it and assign a target phase for the fix:
+Call the Agent tool — description: "Synthesize dogfood findings" — subagent_type: `product-feedback-synthesizer` — Prompt: "[CONTEXT header above] Interpret Dogfood output. Input: `docs/plans/evidence/dogfood/findings.md`. For each finding, classify it and assign a target phase for the fix:
   - Code-level bug (broken feature, failing logic, fake data) → `target_phase: 4`, assign to the specific task that owns the affected file
   - Visual/design issue (styling drift, missing state, a11y gap) → `target_phase: 3`, assign to the Phase 3 step that owns the relevant artifact
   - Structural/architecture issue (missing feature, wrong data flow, API mismatch) → `target_phase: 2`, assign to the architecture section
@@ -824,7 +885,9 @@ REQUIRED EVIDENCE FOR `project_type=ios`:
 If any required file does not exist or is empty, do NOT dispatch Reality Checker. Log "REALITY CHECK BLOCKED" with missing-file list. Interactive: present blocker to user. Autonomous: return to the failing step and re-dispatch once; if still missing, abort.
 </HARD-GATE>
 
-Call the Agent tool — description: "Evidence sweep" — subagent_type: `testing-reality-checker` — Prompt: "You are the Reality Checker — evidence-sweep role only. Default verdict: NONE. You receive evidence by FILE PATH only — never by paste. Use Read and Glob tools to verify each file exists, is non-empty, was modified within this build session, contains no placeholder strings ('TODO', 'PLACEHOLDER', 'TBD', 'FIXME', 'XXX').
+**CONTEXT header:** Render `rendered_context_header` for phase 6 per the canonical template (see CONTEXT HEADER HARD-GATE above). Prepend to every Phase 6 prompt below (Reality Checker + the 5 LRR chapters).
+
+Call the Agent tool — description: "Evidence sweep" — subagent_type: `testing-reality-checker` — Prompt: "[CONTEXT header above] You are the Reality Checker — evidence-sweep role only. Default verdict: NONE. You receive evidence by FILE PATH only — never by paste. Use Read and Glob tools to verify each file exists, is non-empty, was modified within this build session, contains no placeholder strings ('TODO', 'PLACEHOLDER', 'TBD', 'FIXME', 'XXX').
 
 Evidence paths to verify: [orchestrator pastes the precondition list per project_type].
 
@@ -847,7 +910,7 @@ Dispatch 5 chapter judges in parallel. Each receives fresh context, its own evid
 
 Call the Agent tool 5 times in ONE message. Note: the Eng-Quality chapter dispatches `code-reviewer` as primary, with a parallel `pr-test-analyzer` sub-dispatch for test-coverage adequacy evidence that feeds into the Eng-Quality verdict file.
 
-1. Description: "LRR Eng-Quality chapter" — subagent_type: `code-reviewer` — Prompt: "You are the Eng-Quality chapter of the Launch Readiness Review. Your natural tendency is to be encouraging. Fight it. Default verdict: NEEDS WORK.
+1. Description: "LRR Eng-Quality chapter" — subagent_type: `code-reviewer` — Prompt: "[CONTEXT header above] You are the Eng-Quality chapter of the Launch Readiness Review. Your natural tendency is to be encouraging. Fight it. Default verdict: NEEDS WORK.
 
 Read: `docs/plans/architecture.md`, `docs/plans/design-doc.md` (PRD — needed for requirements coverage evaluation), `docs/plans/sprint-tasks.md`, `docs/plans/.task-outputs/`, `protocols/verify.md` check outputs from `.build-state.json`, test results from Phase 4 and 5, eval-harness results from `docs/plans/evidence/eval-harness/`. Also read `docs/plans/decisions.jsonl` for cross-chapter context.
 
@@ -859,19 +922,19 @@ Evaluate code quality + test coverage adequacy + architecture conformance + requ
 
 Write verdict to `docs/plans/evidence/lrr/eng-quality.json` per `protocols/launch-readiness.md` schema. Fields: `chapter=eng-quality`, `verdict` (PASS|CONCERNS|BLOCK), `override_blocks_launch` (false unless BLOCK), `evidence_files_read` (non-empty, MUST include eng-quality-coverage.json), `findings[]` (each with `severity`, `description`, `evidence_ref`, `related_decision_id` if blocker ties to a decisions.jsonl row), `requirements_coverage[]` (one entry per MVP feature with `{feature, status}`), `follow_up_spawned=false`, `follow_up_findings=null`. Eng-Quality CANNOT spawn follow-ups."
 
-2. Description: "LRR Security chapter" — subagent_type: `security-reviewer` — Prompt: "You are the Security chapter of the LRR. Read: `docs/plans/evidence/fake-data-audit.md`, Phase 5 security audit output (from Step 5.1), eval-harness security cases. Also read `docs/plans/decisions.jsonl` for context.
+2. Description: "LRR Security chapter" — subagent_type: `security-reviewer` — Prompt: "[CONTEXT header above] You are the Security chapter of the LRR. Read: `docs/plans/evidence/fake-data-audit.md`, Phase 5 security audit output (from Step 5.1), eval-harness security cases. Also read `docs/plans/decisions.jsonl` for context.
 
 Evaluate auth model, input validation, secrets management, dependency vulnerabilities. Write verdict to `docs/plans/evidence/lrr/security.json` per schema. Fields: `chapter=security`, `verdict`, `override_blocks_launch`, `evidence_files_read` (non-empty), `findings[]` (with `related_decision_id` when applicable), `follow_up_spawned` (boolean), `follow_up_findings` (null or typed object).
 
 Security MAY spawn ONE read-only follow-up investigation, but ONLY if verdict would be BLOCK — NOT on suspicion. This is tightened from current behavior. Follow-up: read-only, Read/Grep/Glob only, max 15 tool calls, self-report tool_calls_used. See `protocols/launch-readiness.md` for follow-up flow."
 
-3. Description: "LRR SRE chapter" — subagent_type: `engineering-sre` — Prompt: "You are the SRE chapter of the LRR. Read: performance-audit outputs from Phase 5 (Step 5.1 performance auditor + Step 5.2 eval-harness perf cases), Performance Benchmarker evidence, NFRs from `docs/plans/quality-targets.json` and `docs/plans/sprint-tasks.md`, reliability checks. Also read `docs/plans/decisions.jsonl` for context.
+3. Description: "LRR SRE chapter" — subagent_type: `engineering-sre` — Prompt: "[CONTEXT header above] You are the SRE chapter of the LRR. Read: performance-audit outputs from Phase 5 (Step 5.1 performance auditor + Step 5.2 eval-harness perf cases), Performance Benchmarker evidence, NFRs from `docs/plans/quality-targets.json` and `docs/plans/sprint-tasks.md`, reliability checks. Also read `docs/plans/decisions.jsonl` for context.
 
 Evaluate whether the build meets NFR targets (response time, load handling, error rates) and is production-ready under load. Bundle-size budget violations (>25% over Scope budget) auto-block. Write verdict to `docs/plans/evidence/lrr/sre.json` per schema.
 
 SRE MAY spawn ONE read-only follow-up investigation, but ONLY if verdict would be BLOCK. Same caps as Security."
 
-4. Description: "LRR A11y chapter" — subagent_type: `a11y-architect` — Prompt: "You are the A11y chapter of the LRR (NEW SEAT in this panel — closes the biggest coverage gap). Read: Phase 5 a11y audit output (from Step 5.1), WCAG 2.2 AA runtime check, per-page accessibility findings, `docs/plans/quality-targets.json` a11y section.
+4. Description: "LRR A11y chapter" — subagent_type: `a11y-architect` — Prompt: "[CONTEXT header above] You are the A11y chapter of the LRR (NEW SEAT in this panel — closes the biggest coverage gap). Read: Phase 5 a11y audit output (from Step 5.1), WCAG 2.2 AA runtime check, per-page accessibility findings, `docs/plans/quality-targets.json` a11y section.
 
 Scoring rules:
   - PASS if zero Serious + zero Critical findings
@@ -880,7 +943,7 @@ Scoring rules:
 
 Write verdict to `docs/plans/evidence/lrr/a11y.json` per schema. A11y CANNOT spawn follow-ups."
 
-5. Description: "LRR Brand Guardian chapter" — subagent_type: `design-brand-guardian` — Prompt: "You are the Brand Guardian chapter of the LRR (REPLACES the old Design mechanical check — real taste judgment, not a 15-line mechanical gate). Your natural tendency is to be encouraging. Fight it. Default verdict: NEEDS WORK.
+5. Description: "LRR Brand Guardian chapter" — subagent_type: `design-brand-guardian` — Prompt: "[CONTEXT header above] You are the Brand Guardian chapter of the LRR (REPLACES the old Design mechanical check — real taste judgment, not a 15-line mechanical gate). Your natural tendency is to be encouraging. Fight it. Default verdict: NEEDS WORK.
 
 Read: `docs/plans/visual-design-spec.md`, `docs/plans/visual-dna.md` (the 6-axis DNA card locked at Phase 3.0), `docs/plans/design-references.md`, Playwright screenshots under `docs/plans/evidence/` matching production pages, Phase 3.6 Design Critic final score from `.build-state.json`.
 
@@ -976,21 +1039,25 @@ Do not loop forever.
 
 ## Phase 7: Ship
 
+**Pre-ship Verify gate:** Run the Verify Protocol (INTERNAL inline — "Verify scaffolding") before any Step 7.1 dispatch. All 7 checks (Build → Type-Check → Lint → Test → Security → Diff Review → Artifacts) must pass. If any check FAILS, dispatch a fix agent with the error, re-verify. Max 2 fix attempts. Do not proceed to Step 7.1 until PASS.
+
 **Mode-specific branch:**
 - `project_type=ios`: follow `protocols/ios-phase-branches.md` §Phase 7 — ship pipeline is optional (simulator-only is a valid end-state). If shipping, run asc-* agents + fastlane.
 - `project_type=web`: follow `protocols/web-phase-branches.md` §Phase 7 (Step 7.1 documentation + deploy notes).
 
 ### Step 7.1 — Sequence: Documentation → Doc Metric Loop → ASO (iOS) → Deploy → Completion Report
 
-1. Description: "Technical Writer" — subagent_type: `engineering-technical-writer` — mode: "bypassPermissions" — Prompt: "Write project docs: README with setup/architecture/usage, API docs if applicable, deployment notes. The README is the first thing a new developer reads — optimize for that reader. Commit: 'docs: project documentation'. Deployment target per the PRD (Vercel/Netlify/Railway/Fly.io/etc.) — include the deploy flow specific to that target in the README."
+**CONTEXT header:** Render `rendered_context_header` for phase 7 per the canonical template (see CONTEXT HEADER HARD-GATE above). Prepend to every Phase 7 prompt below.
+
+1. Description: "Technical Writer" — subagent_type: `engineering-technical-writer` — mode: "bypassPermissions" — Prompt: "[CONTEXT header above] Write project docs: README with setup/architecture/usage, API docs if applicable, deployment notes. The README is the first thing a new developer reads — optimize for that reader. Commit: 'docs: project documentation'. Deployment target per the PRD (Vercel/Netlify/Railway/Fly.io/etc.) — include the deploy flow specific to that target in the README."
 
 2. Documentation Metric Loop: Run the Metric Loop Protocol (callable service) on documentation. Define a metric based on completeness and whether a new developer could follow the README end-to-end. Max 3 iterations.
 
-3. Description: "App Store Optimizer" (iOS only, conditional on ship) — subagent_type: `marketing-app-store-optimizer` — Prompt per `protocols/ios-phase-branches.md` §Phase 7 (asc-* flow — app name, subtitle, keywords, description, screenshots, privacy labels). Skip entirely for web.
+3. Description: "App Store Optimizer" (iOS only, conditional on ship) — subagent_type: `marketing-app-store-optimizer` — Prompt per `protocols/ios-phase-branches.md` §Phase 7 (asc-* flow — app name, subtitle, keywords, description, screenshots, privacy labels). Prepend CONTEXT header above. Skip entirely for web.
 
-4. Description: "Deploy" — subagent_type: `engineering-devops-automator` — mode: "bypassPermissions" — Prompt: "Deploy the app to the target from the PRD (`docs/plans/design-doc.md#tech-stack`). Run pre-deploy checks: build, env vars, secrets. Execute deploy. Verify the deployed URL returns 200 and serves the built app (not the placeholder). Report deploy URL and any smoke-test findings."
+4. Description: "Deploy" — subagent_type: `engineering-devops-automator` — mode: "bypassPermissions" — Prompt: "[CONTEXT header above] Deploy the app to the target from the PRD (`docs/plans/design-doc.md#tech-stack`). Run pre-deploy checks: build, env vars, secrets. Execute deploy. Verify the deployed URL returns 200 and serves the built app (not the placeholder). Report deploy URL and any smoke-test findings."
 
-5. Description: "Completion Report" — INTERNAL inline role-string — Prompt: "You are the Completion Report writer. Draw verification surface from the LRR Aggregator's structured output (`docs/plans/evidence/lrr-aggregate.json`) and the Reality Checker evidence manifest (`docs/plans/evidence/reality-check-manifest.json`) — NOT from orchestrator summary prose. Present:
+5. Description: "Completion Report" — INTERNAL inline role-string — Prompt: "[CONTEXT header above] You are the Completion Report writer. Draw verification surface from the LRR Aggregator's structured output (`docs/plans/evidence/lrr-aggregate.json`) and the Reality Checker evidence manifest (`docs/plans/evidence/reality-check-manifest.json`) — NOT from orchestrator summary prose. Present:
 
 ```
 BUILD COMPLETE

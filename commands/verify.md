@@ -67,22 +67,19 @@ Every dispatched agent below inherits `protocols/ios-context.md` (Senior iOS Eng
 
 Run in order. Stop on first hard blocker; soft findings accumulate into the report.
 
-**a. Test triage — `skills/ios/swift-testing-expert`**
-> Load `protocols/ios-context.md`. Triage existing `@Test` / XCTest suites: parallel-safety, isolation correctness, missing coverage on critical paths, test-plan wiring. Output: list of test issues with severity.
+**a. Test triage + snapshot/doubles review — `skills/ios/swift-testing-expert`**
+> Load `protocols/ios-context.md`. Triage existing `@Test` / XCTest suites: parallel-safety, isolation correctness, missing coverage on critical paths, test-plan wiring. Also review snapshot tests and Fowler-style test doubles for correctness, isolation, and coverage gaps. Output: list of test + snapshot/doubles issues with severity.
 
-**b. Snapshot / doubles review — `skills/ios/swift-testing` _(TBD — bocato cherry-pick not yet ported; skip with a note if absent)_**
-> If skill exists: review snapshot tests and Fowler-style test doubles. If absent: log `swift-testing (bocato) — PENDING PORT` in the report and continue.
-
-**c. Security audit — `skills/ios/swift-security-expert` (audit mode)**
+**b. Security audit — `skills/ios/swift-security-expert` (audit mode)**
 > Load `protocols/ios-context.md`. Audit Keychain usage, CryptoKit calls, ATS exceptions in Info.plist, biometric gating. Report any hardcoded secrets or weak primitives. Severity: P0 / P1 / P2.
 
-**d. App Review compliance — `agents/ios-app-review-guardian`**
+**c. App Review compliance — `agents/ios-app-review-guardian`**
 > Load `protocols/ios-context.md`. Check App Review guidelines, privacy manifest (`PrivacyInfo.xcprivacy`), IAP/StoreKit rules, required usage-description strings, tracking/ATT compliance. Report blockers vs. warnings.
 
-**e. Maestro flow authoring — `skills/ios/ios-maestro-flow-author`** _(conditional)_
+**d. Maestro flow authoring — `skills/ios/ios-maestro-flow-author`** _(conditional)_
 > If a critical user journey lacks E2E coverage, author a `.yaml` Maestro flow for it. Skip if coverage is adequate.
 
-**f. Build + test run — XcodeBuildMCP**
+**e. Build + test run — XcodeBuildMCP**
 > `BuildProject` all targets → run the active test plan via XcodeBuildMCP → capture failures, warnings, and test output. This is the hard gate.
 
 ### Pass/fail gates

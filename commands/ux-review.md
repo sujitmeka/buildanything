@@ -121,10 +121,10 @@ For scoped reviews (single screen/issue from `$ARGUMENTS`), capture only that sc
 Run all four in parallel, each inheriting `protocols/ios-context.md`:
 
 a. **`skills/ios/ios-debugger-agent`** — simulator screenshot sweep + UI state capture + console/log scrape for runtime UI warnings.
-b. **`skills/ios/ios-hig`** (audit mode) — HIG severity audit. Return findings framed as **P0** (blocker / ships broken), **P1** (fix-before-ship), **P2** (polish).
+b. **`skills/ios/hig-foundations`** (audit mode) — HIG severity audit across color, typography, SF Symbols, dark mode, layout, motion. Return findings framed as **P0** (blocker / ships broken), **P1** (fix-before-ship), **P2** (polish).
 c. **`skills/ios/swift-accessibility`** (Mode 3: audit pass) — VoiceOver labels, Dynamic Type scaling, contrast ratios, hit-target sizes across all SwiftUI screens in scope.
 d. **`skills/ios/swiftui-design-principles`** — 10-rule visual polish checklist (spacing, hierarchy, alignment, color, type, motion, consistency, affordance, feedback, restraint).
-e. **`writing-for-interfaces`** — microcopy + tone review. If `skills/ios/writing-for-interfaces/` does not exist, skip microcopy review and log a NOTE in the UX report: "Microcopy review skipped — writing-for-interfaces not yet ported."
+e. **`skills/ios/writing-for-interfaces`** — microcopy + tone review. Audit button labels, error messages, empty states, alerts, permission prompts, and navigation titles for clarity, brevity, and tone consistency.
 
 ### Step 5: Compare Against Design Board
 
