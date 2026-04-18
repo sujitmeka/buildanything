@@ -13,17 +13,35 @@ export interface RenderedHeader {
   hash: string;
 }
 
-/** Cache: one rendered header per phase boundary */
+/** Cache: rendered header keyed by phase + input hash for automatic invalidation */
 let cachedHeader: RenderedHeader | null = null;
 let cachedPhase: number | null = null;
+let cachedInputHash: string | null = null;
+
+/**
+ * Compute a hash of the variable inputs that affect the rendered header.
+ * Used to detect mid-phase mutations (e.g., ios_features changing within a phase).
+ */
+function inputHash(input: ContextHeaderInput): string {
+  const key = JSON.stringify({
+    projectType: input.projectType,
+    phase: input.phase,
+    iosFeatures: input.iosFeatures ?? null,
+    visualDnaPath: input.visualDnaPath ?? null,
+  });
+  return createHash('sha256').update(key).digest('hex').slice(0, 16);
+}
 
 /**
  * Render the CONTEXT header for a phase.
  * Called once at phase boundary; result reused for all dispatches in that phase.
+ * Automatically invalidates if inputs change within the same phase
+ * (e.g., ios_features mutating mid-build per spec pass criteria).
  */
 export function renderContextHeader(input: ContextHeaderInput): RenderedHeader {
-  // Return cached if same phase
-  if (cachedPhase === input.phase && cachedHeader) return cachedHeader;
+  const currentInputHash = inputHash(input);
+  // Return cached if same phase AND same inputs
+  if (cachedPhase === input.phase && cachedInputHash === currentInputHash && cachedHeader) return cachedHeader;
 
   const lines: string[] = ['CONTEXT:'];
   lines.push(`  project_type: ${input.projectType}`);
@@ -56,6 +74,7 @@ export function renderContextHeader(input: ContextHeaderInput): RenderedHeader {
 
   cachedHeader = { content, hash };
   cachedPhase = input.phase;
+  cachedInputHash = currentInputHash;
   return cachedHeader;
 }
 
@@ -65,6 +84,7 @@ export function renderContextHeader(input: ContextHeaderInput): RenderedHeader {
 export function invalidateCache(): void {
   cachedHeader = null;
   cachedPhase = null;
+  cachedInputHash = null;
 }
 
 /**

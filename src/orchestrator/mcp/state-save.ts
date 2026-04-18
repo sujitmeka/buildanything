@@ -88,7 +88,9 @@ export function stateSave(path: string, state: Record<string, unknown>): StateSa
     writeFileSync(tmp, content, 'utf-8');
 
     // 4. fsync — flush kernel buffers to disk (task 3.2.2)
-    const fd = openSync(tmp, 'r');
+    // Open with 'r+' (read-write) to guarantee data buffer flush on all platforms.
+    // Opening with 'r' (read-only) may only flush metadata on some systems.
+    const fd = openSync(tmp, 'r+');
     try {
       fsyncSync(fd);
     } finally {

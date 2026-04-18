@@ -21,8 +21,25 @@ export function aggregate(chapters: ChapterResult[]): AggregateResult {
   if (chapters.some(c => c.override_blocks_launch))
     return { combined_verdict: 'BLOCKED', triggered_rule: 1, chapters };
 
-  // Rule 6: contradictions between chapters → BLOCKED
-  // (simplified: check for conflicting verdicts on same finding)
+  // Rule 6: contradictions between chapters on typed fields → BLOCKED
+  // Two chapters contradict if they reference the same finding description
+  // but assign conflicting verdicts (one PASS, one BLOCK on the same topic).
+  const findingsByDesc = new Map<string, Set<Verdict>>();
+  for (const ch of chapters) {
+    for (const f of ch.findings) {
+      const key = f.description.toLowerCase().trim();
+      if (!findingsByDesc.has(key)) findingsByDesc.set(key, new Set());
+      findingsByDesc.get(key)!.add(ch.verdict);
+    }
+  }
+  for (const [desc, verdicts] of findingsByDesc) {
+    if (verdicts.has('PASS') && verdicts.has('BLOCK')) {
+      return {
+        combined_verdict: 'BLOCKED', triggered_rule: 6, chapters,
+        cross_chapter_contradiction: desc,
+      } as AggregateResult;
+    }
+  }
 
   // Rule 5: follow_up spawned AND confirmed → treat as BLOCK
   const effectiveChapters = chapters.map(c => ({
