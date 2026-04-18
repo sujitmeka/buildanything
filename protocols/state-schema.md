@@ -15,7 +15,7 @@
 | 1 | Stages 1-3 | initial schema (all pre-Stage-4 fields) | n/a |
 | 2 | Stage 4 | `backward_routing_count` (newly typed), `backward_routing_count_by_target_phase`, `in_flight_backward_edge`, `mode_transitions[]` | A7 forward-reject on `schema_version > MAX_SUPPORTED_SCHEMA_VERSION`; A3 stale-edge decrement on `--resume` |
 | 3 | Stage 5 | `lrr_cycle_state` (object; interior fields loose-typed pending Stage 5 iteration — see "Fields added at v3" below) | `BUILDANYTHING_SDK_LRR=false` reverts to markdown aggregator; `lrr_cycle_state` becomes an ignored field on the orchestrator read path (additive-only, no data loss on downgrade) |
-| 4 | Stage 6 | `current_sprint_context_hash` | Stage 6 rollback flag (TBD) |
+| 4 | Stage 6 | `current_sprint_context_hash` | `BUILDANYTHING_SDK_SPRINT_CONTEXT=false` (web) and/or `BUILDANYTHING_SDK_SPRINT_CONTEXT_IOS=false` (iOS parity gate) reverts Phase 4 to per-task refs re-send; `current_sprint_context_hash` becomes an ignored field on the orchestrator read path (additive-only, no data loss on downgrade) |
 
 **A7 forward-reject rule.** When `bin/buildanything-runtime.ts` reads `.build-state.json` at session start, if `schema_version > MAX_SUPPORTED_SCHEMA_VERSION`, the runtime refuses to proceed and emits a clear error pointing to the compat matrix (`docs/migration/sdk-host-compat.md`). This is the A7 defense against silent schema drift — an old runtime must never silently ignore fields a newer runtime persisted. See **Task 4.5.2** for the runtime implementation (out of scope for this prose-only update).
 
@@ -103,6 +103,20 @@ These fields are present only when `schema_version >= 3`. They support the Shape
 **v3 migration concern — none in wild.** As of this task (5.4.1), Stage 5 has not shipped. No `.build-state.json` files with `schema_version: 3` exist outside development probes. `bin/buildanything-runtime.ts` `MAX_SUPPORTED_SCHEMA_VERSION_FALLBACK` is still `2` (see Task 4.5.2) — a v3 state file would currently be forward-rejected by A7, which is the intended pre-Stage-5 behavior. The runtime will be bumped to `3` as part of Stage 5 activation, not here.
 
 **v3 rollback semantics.** Rollback is via `BUILDANYTHING_SDK_LRR=false` (see `MIGRATION-PLAN-FINAL.md` §Stage 5 rollback). Because `lrr_cycle_state` is additive and optional, a Stage 4 runtime reading a Stage 5 state file with `schema_version` downgraded to `2` will ignore the field without data loss on the read path. The persisted value survives in place until the next state write overwrites it; orchestrator code paths gated on `BUILDANYTHING_SDK_LRR` are responsible for not writing `lrr_cycle_state` under markdown aggregator mode.
+
+### Fields added at v4 (Stage 6)
+
+These fields are present only when `schema_version >= 4`. They support the Shape-B SDK migration's archetype-aware Phase 4 shared-context hoisting (Stage 6, `MIGRATION-PLAN-FINAL.md` §11) — a sprint-scoped shared-context block is rendered once per sprint by `src/orchestrator/phase4-shared-context.ts` (Task 6.1.1) and injected into Phase 4 implementer/reviewer/critic dispatches via the Stage 3 SubagentStart hook. The hash is persisted in state so re-renders only fire on sprint boundary (or when refs mutate mid-sprint via the `state_save` invalidation callback).
+
+| Field | Type | Required | Added in | Notes |
+|---|---|---|---|---|
+| `current_sprint_context_hash` | string | no | v4 | 16-char SHA-256 prefix (per `phase4-shared-context.ts`) of the rendered sprint-scoped shared-context block. Written by the Phase 4 orchestrator path when `BUILDANYTHING_SDK_SPRINT_CONTEXT=true` (web) / `BUILDANYTHING_SDK_SPRINT_CONTEXT_IOS=true` (iOS). Compared on each Phase 4 dispatch against a fresh render of `{buildState, refs, architecture, qualityTargets, iosFeatures?}`; mismatch forces re-render and rewrite before dispatch. Present only under Stage 6 flag; absent on markdown / Stage 5 runs. |
+
+**v4 migration concern — none in wild.** As of this task (6.5.1), Stage 6 has not shipped. No `.build-state.json` files with `schema_version: 4` exist outside development probes (P6 Habita/Pacely evals per `MIGRATION-PLAN-FINAL.md` §11.3). `bin/buildanything-runtime.ts` `MAX_SUPPORTED_SCHEMA_VERSION_FALLBACK` is still `2` (see Task 4.5.2) — a v4 state file would currently be forward-rejected by A7, which is the intended pre-Stage-6 behavior. The runtime will be bumped to `4` as part of Stage 6 activation (after P6 probe gate passes), not here.
+
+**v4 rollback semantics.** Rollback is via `BUILDANYTHING_SDK_SPRINT_CONTEXT=false` (web) and/or `BUILDANYTHING_SDK_SPRINT_CONTEXT_IOS=false` (iOS parity gate; see `MIGRATION-PLAN-FINAL.md` §Stage 6 rollback and Risk 2). Because `current_sprint_context_hash` is additive and optional, a Stage 5 runtime reading a Stage 6 state file with `schema_version` downgraded to `3` will ignore the field without data loss on the read path — Phase 4 simply reverts to per-task refs re-send. The persisted value survives in place until the next state write overwrites it; orchestrator code paths gated on the Stage 6 flags are responsible for not writing `current_sprint_context_hash` under per-task-refs mode.
+
+**SSOT note.** Kiro-owned `protocols/state-schema.json` is authoritative: `properties.current_sprint_context_hash` (string) is already declared, `schema_version.maximum` is already `4`, and the top-level `$comment` migration table already lists Stage 6. This prose mirrors that shape; any future interior fields (should the sprint-context module persist more than a hash) will be documented by tightening this entry alongside a JSON Schema update.
 
 ## Rendering contract
 
