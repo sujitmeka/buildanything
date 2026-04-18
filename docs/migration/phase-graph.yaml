@@ -1,0 +1,1106 @@
+version: 1
+source_prose: docs/migration/phase-graph.md
+generated_at: 2026-04-18
+policy: |
+  Mirror of docs/migration/phase-graph.md. Prose is source of truth until the SDK
+  orchestrator flips polarity. If prose changes, this file changes in the same
+  commit. A drift-lint script (eval/lint_phase_graph.py — TBD) will fail CI if
+  structured data diverges from prose tables.
+
+# ---------------------------------------------------------------------------
+# 1. Artifact writer-owner table
+# ---------------------------------------------------------------------------
+artifacts:
+  - path: CLAUDE.md
+    writer: phase-1
+    readers: [all-subagents-auto]
+  - path: docs/plans/design-doc.md
+    alias: PRD
+    writer: phase-1
+    readers: [phase-2, phase-3, phase-4, phase-5, phase-6, phase-7]
+  - path: docs/plans/architecture.md
+    writer: phase-2
+    readers: [phase-3, phase-4, phase-5, phase-6, phase-7]
+  - path: docs/plans/sprint-tasks.md
+    writer: phase-2
+    readers: [phase-4, phase-5, phase-6]
+  - path: docs/plans/quality-targets.json
+    writer: phase-2
+    readers: [phase-4, phase-5, phase-6]
+  - path: docs/plans/visual-design-spec.md
+    platform: web
+    writer: phase-3
+    readers: [phase-4, phase-5, phase-6]
+  - path: docs/plans/ios-design-board.md
+    platform: ios
+    writer: phase-3
+    readers: [phase-4, phase-5, phase-6]
+  - path: docs/plans/component-manifest.md
+    platform: web
+    writer: phase-3
+    readers: [phase-4]
+    notes: HARD-GATE import source
+  - path: docs/plans/visual-dna.md
+    platform: web
+    writer: phase-3
+    readers: [phase-3, phase-4, phase-5, phase-6]
+  - path: docs/plans/refs.json
+    writer: phase-2
+    extended_by: phase-3
+    readers: [phase-4-briefing-officer]
+  - path: docs/plans/decisions.jsonl
+    writer: orchestrator-scribe
+    write_mode: append-only
+    readers: [phase-0-resume, phase-5-reality-checker, phase-6-lrr-aggregator]
+    hard_gate: Subagents return deviation_row in structured result; they never write this file directly.
+  - path: docs/plans/learnings.jsonl
+    writers: [phase-5, phase-7]
+    readers: [phase-0-learnings-loader, phase-5-reality-sweep]
+  - path: docs/plans/evidence/*.json
+    writer: phase-5
+    contributors: [phase-4]
+    readers: [phase-6, phase-7]
+  - path: docs/plans/evidence/lrr/*.json
+    writer: phase-6
+    readers: [phase-6-aggregator]
+    notes: one file per chapter
+  - path: docs/plans/evidence/lrr-aggregate.json
+    writer: phase-6-aggregator
+    readers: [phase-7]
+  - path: docs/plans/.build-state.json
+    writer: orchestrator
+    write_frequency: every-phase-boundary
+    readers: [all-phases, resume-handler]
+  - path: docs/plans/.build-state.md
+    writer: auto-rendered-view
+    readers: [read-only]
+    notes: regenerated from .build-state.json on every update
+  - path: docs/plans/.task-outputs/[task-id].json
+    writer: phase-4
+    readers: [phase-5, phase-6]
+  - path: docs/plans/build-log.md
+    writer: every-phase
+    write_mode: append-on-transition
+    readers: [user, resume]
+
+phase_internal_scratch:
+  path_glob: docs/plans/phase1-scratch/*.{md,json}
+  files:
+    - idea-draft.md
+    - feature-intel.md
+    - tech-feasibility.md
+    - ux-research.md
+    - business-model.md
+    - findings-digest.md
+    - suggested-questions.md
+    - user-decisions.md
+    - prereqs.json
+  readers: [phase-1-only]
+  notes: Never read by phase 3+.
+
+# ---------------------------------------------------------------------------
+# 2. Classification matrix
+# ---------------------------------------------------------------------------
+classifications:
+  project_type:
+    values: [web, ios]
+    default: web
+    rules:
+      - signal: "iOS keywords in prompt (iOS, iPhone, SwiftUI, Xcode, App Store, TestFlight, Apple, SwiftData, HIG, Liquid Glass, watchOS, visionOS)"
+        mode: interactive_confirm_or_autonomous_infer
+        value: ios
+      - signal: ".xcodeproj OR Package.swift OR *.swift in repo"
+        mode: auto
+        value: ios
+    branch_load:
+      ios: [protocols/ios-phase-branches.md, protocols/ios-context.md]
+      web: [protocols/web-phase-branches.md]
+
+  archetype:
+    values: [H1, H2, H3, H4]
+    match: first-wins
+    rules:
+      - value: H4
+        label: AI-Powered SaaS
+        signals: [LLM in critical path, chat, agent, RAG, tool-use as core value]
+        gated_skills_required: [cost-aware-llm-pipeline]
+      - value: H3
+        label: Infra / Dev tool / CLI / Backend
+        signals: [no end-user UI]
+        gated_skills_excluded: [seo]
+      - value: H1
+        label: Marketing site / Landing page
+        signals: [static content, SEO-critical, no user accounts]
+        gated_skills_required: [seo]
+      - value: H2
+        label: Product / SaaS app
+        signals: [user accounts, dashboards, CRUD, auth]
+        default: true
+
+  ios_features:
+    platform: ios
+    resolved_at: end-of-phase-2
+    flags:
+      - widgets
+      - liveActivities
+      - appIntents
+      - foundationModels
+      - storekit
+      - healthkit
+      - push
+      - cloudkit
+      - siri
+      - location
+      - background
+      - cameraPhoto
+      - microphone
+      - contacts
+      - calendar
+      - appleWatch
+    gates: [phase-4-skill-bundles, entitlement-generation]
+
+# ---------------------------------------------------------------------------
+# 3. Phase graph
+# ---------------------------------------------------------------------------
+phases:
+  - id: "0"
+    name: Pre-flight
+    kind: classify-only
+    skip_conditions: []
+    steps:
+      - id: resume-check
+        name: Resume handler
+        kind: internal
+        fires_on: [--resume, post-compaction-SessionStart-hook]
+        writes: []
+        reads: [.build-state.json, decisions.jsonl top-5, TodoWrite]
+      - id: "0.1"
+        name: Read the Room
+        kind: classify
+        writes_state: context_level
+        value_domain: [full-design, decision-brief, partial, raw-idea]
+        reads: [$ARGUMENTS, docs/plans/, docs/briefs/]
+      - id: "0.1b"
+        name: Project Type Classification
+        kind: classify
+        writes_state: project_type
+        value_domain: [web, ios]
+      - id: "0.1c"
+        name: Archetype Classification
+        kind: classify
+        writes_state: archetype
+        value_domain: [H1, H2, H3, H4]
+        ambiguity_resolution: ask_user_one_question
+      - id: "0.1d"
+        name: Learnings Loader
+        kind: read
+        reads: [learnings.jsonl, ~/.claude/buildanything/learnings.jsonl]
+        writes: [docs/plans/.active-learnings.md]
+      - id: "0.2"
+        name: Initialize
+        kind: write
+        writes: [docs/plans/.build-state.json, TodoWrite]
+    notes:
+      - No prereq collection here; stack decision happens in phase 1 step 1.4.
+
+  - id: "-1"
+    name: iOS Bootstrap
+    kind: bootstrap
+    skip_conditions:
+      - project_type != ios
+      - .xcodeproj exists
+    steps:
+      - id: "-1.1"
+        name: Environment Check
+        kind: internal
+        verifies: [Xcode 26.3+, XcodeBuildMCP, apple-docs-mcp, Maestro CLI]
+        on_failure: hard-fail
+      - id: "-1.2"
+        name: Xcode Project Creation
+        kind: dispatch-single-internal
+        constraints: [iOS 26.0+, Swift 6.2+, SwiftUI, SwiftData, no Tuist, no XcodeGen]
+      - id: "-1.2b"
+        name: Overwrite Apple template tests
+        kind: write
+        writes: ["<target>Tests/<target>Tests.swift", "<target>UITests/<target>UITests.swift"]
+        notes: inserts AUTOGENERATED HARNESS marker so stub detector treats as MARKER not STUB
+      - id: "-1.3"
+        name: Bootstrap Verification
+        kind: internal
+        verifies: [xcode-ok, xcodeproj-exists, mcp-servers-respond, maestro-installed, first-build-launch-succeeded]
+        on_failure: HARD-STOP
+
+  - id: "1"
+    name: Discover
+    kind: sequential-with-parallel-research
+    skip_conditions: [context_level == full-design]
+    decision_rows_written: 3
+    backward_edges:
+      - from: GATE-1-NO
+        to: phase-1.step-1.0
+    steps:
+      - id: "1.0"
+        name: Initial Brainstorm
+        kind: dispatch-single-internal
+        role: brainstorm-facilitator-round-1
+        reads: [$ARGUMENTS, conversation]
+        writes: [phase1-scratch/idea-draft.md]
+      - id: "1.1"
+        name: Research (4 parallel)
+        kind: dispatch-parallel
+        dispatch_mode: single-message
+        dispatches:
+          - feature-intel
+          - tech-feasibility
+          - design-ux-researcher
+          - business-model
+        reads: [idea-draft.md]
+        writes:
+          - phase1-scratch/feature-intel.md
+          - phase1-scratch/tech-feasibility.md
+          - phase1-scratch/ux-research.md
+          - phase1-scratch/business-model.md
+      - id: "1.2"
+        name: Research Digest
+        kind: dispatch-single-internal
+        role: research-synthesizer
+        reads: [4-raw-research-files]
+        writes: [phase1-scratch/findings-digest.md, phase1-scratch/suggested-questions.md]
+      - id: "1.3"
+        name: Informed Brainstorm
+        kind: dispatch-single-internal
+        role: brainstorm-facilitator-round-2
+        reads: [phase1-scratch/findings-digest.md, phase1-scratch/suggested-questions.md]
+        writes: [phase1-scratch/user-decisions.md]
+      - id: "1.4"
+        name: Design Doc + CLAUDE.md
+        kind: dispatch-single-internal
+        role: design-doc-writer
+        writes: [docs/plans/design-doc.md, CLAUDE.md]
+        hard_gates:
+          - CLAUDE.md < 200 lines
+        emits_decision_rows: [tech-stack, data-model, scope-boundary]
+      - id: GATE-1
+        name: Quality Gate 1
+        kind: gate
+        interactive: user-approves-design
+        autonomous: auto-approve
+      - id: "1.5"
+        name: Prereq Collector
+        kind: dispatch-single-internal
+        reads: [design-doc.md#tech-stack]
+        writes: [phase1-scratch/prereqs.json]
+    ios_branch:
+      applies_to: phase-1
+      changes:
+        - prompt_additions: [App Store category landscape, TestFlight constraints, iOS 26 API availability]
+        - conditional_dispatch:
+            when: AI-or-Foundation-Models-build
+            agent: ios-foundation-models-specialist
+
+  - id: "2"
+    name: Plan / Architect
+    kind: team-then-sequence
+    skip_conditions: []
+    decision_rows_written: 4
+    backward_edges:
+      - from: GATE-2-NO
+        to: phase-2
+      - from: LRR-BLOCK-decided_by==architect
+        to: phase-2
+        template: re-entry
+    steps:
+      - id: "2.1"
+        name: Explore existing codebase
+        kind: dispatch-single-internal
+        conditional_on: existing-code-detected
+      - id: "2.2a"
+        name: Team create
+        kind: internal
+        call: 'TeamCreate(team_name: "phase-2-architects")'
+      - id: "2.2b"
+        name: 6 architects as teammates
+        kind: dispatch-team
+        dispatch_mode: single-message
+        parallel_count: 6
+        teammates:
+          - slot: backend-architect
+            subagent_type: engineering-backend-architect
+            domain: services, API contracts, DB schema
+          - slot: frontend-architect
+            subagent_type: engineering-frontend-developer
+            domain: component hierarchy, state mgmt, routing
+          - slot: data-engineer
+            subagent_type: engineering-data-engineer
+            domain: ETL/ELT, schema versioning, query patterns
+          - slot: security-engineer
+            subagent_type: engineering-security-engineer
+            domain: auth model, input validation, threat model
+          - slot: accessibility-auditor
+            subagent_type: a11y-architect
+            domain: WCAG 2.2 AA constraints on component/nav choice
+          - slot: performance-benchmarker
+            subagent_type: testing-performance-benchmarker
+            domain: quality-targets.json, bundle + latency budgets
+        cross_check_pairings:
+          - [backend, frontend, API contract shape]
+          - [security, backend, auth flow]
+          - [accessibility, frontend, component patterns]
+          - [performance, "backend+data", query shapes]
+      - id: "2.2c"
+        name: Wait for all idle
+        kind: internal
+      - id: "2.2d"
+        name: Team teardown
+        kind: internal
+        call: 'TeamDelete("phase-2-architects")'
+      - id: "2.3.1"
+        name: Implementation Blueprint
+        kind: dispatch-single
+        subagent_type: code-architect
+        reads: [6-post-debate-contracts]
+        writes: [architecture.md]
+      - id: "2.3.2"
+        name: Sprint Breakdown
+        kind: dispatch-single
+        subagent_type: planner
+        writes: [sprint-tasks.md]
+        required_fields: [Dependencies, Behavioral Test]
+      - id: "2.3.3"
+        name: Task DAG Validator
+        kind: dispatch-single-internal
+        validates: [no-circular-deps, IDs-exist, sizing-consistent, behavioral-tests-present]
+      - id: "2.3.4"
+        name: Refs Indexer
+        kind: dispatch-single-internal
+        writes: [refs.json]
+      - id: "2.3.loop"
+        name: Architecture Metric Loop
+        kind: loop
+        service: metric-loop
+        metric: PRD-coverage + specificity + simplicity
+        max_iterations: 3
+      - id: GATE-2
+        name: Quality Gate 2
+        kind: gate
+        interactive: approval
+        autonomous: auto-approve
+      - id: "2.ios-flags"
+        name: iOS Feature Flag Resolution
+        kind: classify
+        platform: ios
+        source: protocols/ios-phase-branches.md
+    ios_branch:
+      applies_to: phase-2
+      overrides:
+        - description: replaces Backend+Frontend architect dispatches with a single ios-swift-architect dispatch
+          covers: [SwiftUI view hierarchy + navigation, SwiftData schema + CloudKit, Swift Concurrency / actor isolation, iOS security (Keychain, entitlements, ATS)]
+        - security: engineering-security-engineer
+    writes:
+      - docs/plans/phase-2-contracts/*.md
+      - architecture.md
+      - sprint-tasks.md
+      - quality-targets.json
+      - refs.json
+    re_entry_rule: |
+      Only the architect whose domain matches decision_row.author re-runs.
+      Synthesizer re-runs once. Unaffected domains NOT re-run.
+
+  - id: "3"
+    name: Design
+    kind: dna-first-sequence
+    skip_conditions:
+      - project has no user-facing frontend (CLI tools, pure APIs, backend services)
+    backward_edges:
+      - from: LRR-BLOCK-decided_by==design-brand-guardian-or-phase-3-writer
+        to: phase-3
+        precision: re-entry to specific step by decision_row.author
+    web_branch:
+      source: protocols/web-phase-branches.md
+      steps:
+        - id: "3.0"
+          name: Visual DNA Selection
+          kind: dispatch-single
+          subagent_type: design-brand-guardian
+          produces: 6-axis DNA card (Scope, Density, Character, Material, Motion, Type)
+          source: protocols/visual-dna.md
+        - id: "3.1"
+          name: Visual Research (2 parallel, Playwright-driven)
+          kind: dispatch-parallel
+          dispatches:
+            - {subagent_type: visual-research, mode: competitive-audit}
+            - {subagent_type: visual-research, mode: inspiration-mining}
+        - id: "3.2"
+          name: Component Library Mapping (HARD-GATE source)
+          kind: dispatch-single
+          subagent_type: design-ui-designer
+          writes: [component-manifest.md]
+        - id: "3.2b"
+          name: DNA Persona Check
+          kind: dispatch-single
+          subagent_type: design-ux-researcher
+          may_route_to: "3.0"
+        - id: "3.3"
+          name: UX Architecture
+          kind: dispatch-single
+          subagent_type: design-ux-architect
+          writes: [ux-architecture.md]
+        - id: "3.4"
+          name: Visual Design Spec
+          kind: dispatch-single
+          subagent_type: design-ui-designer
+          role: writer
+          writes: [visual-design-spec.md]
+          contains: [tokens, material, motion, typography, state-matrix]
+        - id: "3.5"
+          name: Inclusive Visuals Check
+          kind: dispatch-single
+          subagent_type: design-inclusive-visuals-specialist
+          writes: [inclusive-visuals-audit.md]
+        - id: "3.6"
+          name: Style Guide Implementation
+          kind: loop
+          service: metric-loop
+          generator: engineering-frontend-developer
+          critic: design-critic
+          metric: 6-DNA-axes x 5-craft-dims = /220
+          target: 180
+          max_iterations: 5
+        - id: "3.7"
+          name: A11y Design Review
+          kind: dispatch-single
+          subagent_type: a11y-architect
+          scope: /design-system + key pages
+        - id: "3.8"
+          name: Autonomous Quality Gate
+          kind: gate
+          action: log-summary-to-build-log.md
+          user_pause: false
+      hard_gates:
+        - UI/UX IS THE PRODUCT — do NOT skip this phase.
+        - Compositional not reconstructive — every element with a library variant MUST be mapped to that variant in component-manifest.md.
+      phase_4_entry_requirements:
+        - visual-dna.md
+        - visual-design-spec.md
+        - component-manifest.md
+    ios_branch:
+      source: protocols/ios-phase-branches.md
+      steps:
+        - id: "3.1-ios"
+          name: Visual research
+          kind: dispatch-single
+          subagent_type: visual-research
+          tooling: agent-browser -p desktop
+          sources: [screenlane.com, App Store web listings, Apple HIG pages, SF Symbols browser]
+          constraints: [no paid sources]
+        - id: "3.2-ios"
+          name: iOS Design Board
+          kind: dispatch-single
+          subagent_type: ios-swift-ui-design
+          writes: [ios-design-board.md]
+          grounded_in: [HIG, Liquid Glass, SF Symbols]
+        - id: "3.4-ios"
+          name: Visual QA loop
+          kind: loop
+          service: metric-loop
+          generator: ios-swift-ui-design
+          critic: design-critic
+          tooling: XcodeBuildMCP SwiftUI Preview captures
+          max_iterations: 3
+      phase_4_entry_requirements:
+        - ios-design-board.md
+
+  - id: "4"
+    name: Build
+    kind: scaffold-then-parallel-task-batches
+    skip_conditions: []
+    scaffold:
+      steps:
+        - id: "4.0.a"
+          name: Project scaffolding
+          kind: dispatch-single
+          web: {subagent_type: engineering-rapid-prototyper}
+          ios: {notes: done by Phase -1; XcodeBuildMCP creates Views/ Models/ Services/ Resources/}
+        - id: "4.0.b"
+          name: Design system setup
+          kind: dispatch-single
+          web: {subagent_type: engineering-frontend-developer, produces: CSS tokens from visual-design-spec}
+          ios: {subagent_type: engineering-senior-developer, produces: SwiftUI Color/Font/ShapeStyle tokens from ios-design-board.md}
+        - id: "4.0.c"
+          name: Acceptance test scaffolding
+          kind: dispatch-single-internal
+          web: {produces: Playwright stubs in tests/e2e/acceptance/ (one per sprint-task Behavioral Test)}
+          ios:
+            produces: Maestro YAML stubs in maestro/
+            hard_gate: "find maestro -name '*.yaml' | wc -l >= 2"
+        - id: "4.0.d"
+          name: Scaffold metric loop (iOS only)
+          kind: loop
+          platform: ios
+          metric: clean build + @Test pass
+          max_iterations: 3
+          fix_agent: swift-build-resolver
+        - id: "4.0.e"
+          name: Verify gate
+          kind: gate
+          service: verify-protocol
+          notes: 7 checks must PASS before Step 4.1
+    per_task_flow:
+      executes: every task in every dependency-ordered batch
+      parallelism: Independent sibling tasks run in parallel (~30-50% wall-clock saving)
+      sub_steps:
+        - id: briefing
+          kind: dispatch-single
+          subagent_type: briefing-officer-internal
+          reads: [refs.json, task-row]
+          writes: ~40-line CONTEXT MAP
+        - id: impl
+          kind: dispatch-single
+          dispatch_table:
+            web:
+              ui_SM: engineering-frontend-developer
+              ui_L: engineering-senior-developer
+              backend: engineering-backend-architect OR engineering-senior-developer
+              ai_ml: engineering-ai-engineer
+            ios:
+              ui_planner: ios-swift-ui-design
+              ui_impl: [engineering-senior-developer, engineering-mobile-app-builder]
+              foundation_models: ios-foundation-models-specialist
+              storekit: ios-storekit-specialist
+        - id: impl.re-entry
+          kind: dispatch-single
+          trigger: LRR backward-routing
+          inputs: [blocking_finding, prior_output, decision_row]
+          constraint: revise ONLY what finding requires
+        - id: sec-review
+          kind: dispatch-single
+          subagent_type: security-reviewer
+          conditional_on: [auth, PII, Keychain, credential tasks]
+        - id: swift-review
+          kind: dispatch-single
+          platform: ios
+          subagent_type: swift-reviewer
+          checklist: [Swift concurrency 6.2, SwiftUI, protocol DI, Foundation Models]
+        - id: cleanup
+          kind: dispatch-parallel
+          parallel_count: 2
+          dispatches:
+            - code-simplifier
+            - refactor-cleaner
+          scope: changeset-only
+        - id: review
+          kind: dispatch-parallel
+          parallel_count: 2
+          dispatch_mode: single-message
+          dispatches:
+            - code-reviewer
+            - silent-failure-hunter
+          confidence_threshold: 80
+        - id: metric-loop
+          kind: loop
+          service: metric-loop
+          max_iterations: 5
+          notes: THIS IS THE AUTHORITATIVE BEHAVIORAL VERIFICATION
+          ui_tooling:
+            web: agent-browser
+            ios: SwiftUI Preview captures
+        - id: smoke
+          kind: dispatch-single
+          platform: ios
+          tooling: Maestro flow against booted simulator
+          preconditions: [Maestro CLI installed, flow files exist, booted simulator available]
+          on_precondition_fail: BLOCKED
+        - id: verify
+          kind: gate
+          service: verify-protocol
+          scope: static-only
+          checks: [type-check, lint, build]
+          max_fix_attempts: 3
+          build_fix:
+            ios: swift-build-resolver
+        - id: scribe
+          kind: internal
+          role: orchestrator-scribe
+          action: |
+            Walks batch_results, collects non-null deviation_row objects,
+            allocates IDs D-{phase}-<seq>, atomically appends to decisions.jsonl,
+            updates .build-state.json.decisions_next_id.P{N}.
+    hard_gates:
+      - decisions.jsonl is orchestrator-scribe ONLY. Subagents return deviation_row objects.
+      - "Web compositional: component-manifest.md variants MUST be imported; writing from scratch triggers cleanup revert."
+    writes_per_task:
+      - source-code
+      - docs/plans/.task-outputs/[task-id].json
+    backward_edges:
+      - from: LRR-NEEDS_WORK-code-level
+        to: phase-4.target-task
+      - from: phase-5-dogfood-feedback-synthesizer
+        to: phase-4.target-task
+
+  - id: "5"
+    name: Audit
+    kind: team-then-eval-then-parallel-then-synth
+    skip_conditions: []
+    precondition: verify-protocol passes
+    web_branch:
+      steps:
+        - id: "5.1"
+          name: TEAM of 6 parallel auditors
+          kind: dispatch-parallel
+          dispatch_mode: single-message
+          parallel_count: 6
+          dispatches:
+            - subagent_type: testing-api-tester
+              focus: API validation, edge cases, error responses, auth flows
+            - subagent_type: testing-performance-benchmarker
+              focus: response times, bottlenecks, Per-Scope bundle budgets
+              bundle_budgets:
+                Marketing: 500KB
+                Product: 300KB
+                Dashboard: 400KB
+                Internal: 200KB
+              block_threshold: ">25% over -> auto-blocks LRR SRE"
+            - subagent_type: a11y-architect
+              focus: WCAG 2.2 AA runtime
+              checks: [contrast, keyboard, focus, touch-targets>=44px, reduced-motion]
+            - subagent_type: engineering-security-engineer
+              focus: auth, input validation, data exposure, dependency vulns
+            - subagent_type: design-ux-researcher
+              focus: loading/error/empty states, mobile@375px, form validation, visual consistency vs style guide
+            - subagent_type: design-brand-guardian
+              focus: DNA drift check
+              notes: Phase 5 re-invite, does NOT issue verdict — feeds LRR Brand Guardian chapter
+        - id: "5.2"
+          name: Eval Harness -> Metric Loop
+          kind: loop
+          service: metric-loop
+          eval_case_count: 8-15
+          max_iterations: 4
+          fix_routing:
+            security: security-reviewer
+            a11y: engineering-frontend-developer
+            perf: testing-performance-benchmarker
+          post_loop: re-run-eval
+        - id: "5.3"
+          name: TEAM of 3 parallel
+          kind: dispatch-parallel
+          dispatch_mode: single-message
+          parallel_count: 3
+          dispatches:
+            - e2e-runner: Playwright, 3 iters mandatory
+            - dogfood-runner: agent-browser
+            - fake-data-detector
+        - id: "5.4"
+          name: Feedback Synthesizer
+          kind: dispatch-single
+          subagent_type: product-feedback-synthesizer
+          classifies_to: [phase-4-code, phase-3-visual, phase-2-structural]
+          max_fix_cycles: 2
+    ios_branch:
+      replaces: web-6+3
+      mode: three-slash-commands-in-sequence
+      sequence:
+        - /buildanything:verify
+        - /buildanything:ux-review
+        - /buildanything:fix
+      required_artifacts:
+        - docs/plans/ios-verify-report.md
+        - docs/plans/ios-ux-review-report.md
+        - "maestro/*.yaml (>=1)"
+        - "docs/plans/evidence/maestro-runs/*.png (>=1)"
+    writes:
+      - docs/plans/evidence/*.json
+      - evidence/fake-data-audit.md
+      - evidence/dogfood/classified-findings.json
+      - "learnings.jsonl (reality sweep PITFALL/PATTERN rows)"
+
+  - id: "6"
+    name: Launch Readiness Review
+    kind: evidence-sweep-then-5-parallel-chapters-then-aggregator
+    skip_conditions: []
+    reality_check:
+      id: "6.0"
+      hard_gate_preconditions:
+        all_projects: [".build-state.json exists + has recent VERIFY:PASS"]
+        web:
+          - eval-harness/baseline.json
+          - eval-harness/final.json
+          - e2e/iter-3-results.json
+          - dogfood/findings.md
+          - dogfood/classified-findings.json
+          - fake-data-audit.md
+          - manifest.json
+        ios:
+          - ios-verify-report.md
+          - ios-ux-review-report.md
+          - maestro/*.yaml (>=1)
+          - maestro-runs/*.png (>=1)
+          - manifest.json
+      dispatch:
+        subagent_type: testing-reality-checker
+        role: evidence-sweep-only
+        evidence_ref_mode: by-PATH-only-never-paste
+        tools: [Read, Glob, Grep]
+      writes:
+        - evidence/reality-check-manifest.json
+      manifest_fields: [file_path, sha256, byte_count, modified_time, verdict_contribution]
+      dissent_log_revisit:
+        reads: decisions.jsonl
+        filter: status==open AND revisit_criterion non-empty
+        action: semantically evaluate criterion vs current evidence
+        on_trigger:
+          - structural-finding
+          - "PITFALL row appended to learnings.jsonl with provenance.decision_id"
+          - flag-for-LRR
+      authority: Reality Checker does NOT issue combined_verdict — moved to LRR Aggregator.
+    chapters:
+      id: "6.1"
+      parallel_count: 5
+      dispatch_mode: single-message
+      panel:
+        - number: 1
+          name: Eng-Quality
+          merged_from: [Engineering, QA, PM]
+          subagent_types:
+            primary: code-reviewer
+            parallel_sub_dispatch: pr-test-analyzer
+          verdicts: [PASS, CONCERNS, BLOCK]
+          extra_fields: [requirements_coverage]
+          follow_up_allowed: false
+        - number: 2
+          name: Security
+          subagent_type: security-reviewer
+          verdicts: [PASS, CONCERNS, BLOCK]
+          follow_up_allowed: true
+          follow_up_caps: {mode: read-only, tool_calls_max: 15, only_if_verdict_would_be: BLOCK}
+        - number: 3
+          name: SRE
+          includes: [Performance]
+          subagent_type: engineering-sre
+          verdicts: [PASS, CONCERNS, BLOCK]
+          auto_block: bundle >25% over Scope budget
+          follow_up_allowed: true
+          follow_up_caps: {mode: read-only, tool_calls_max: 15, only_if_verdict_would_be: BLOCK}
+        - number: 4
+          name: A11y
+          subagent_type: a11y-architect
+          verdict_rules:
+            PASS: 0 Serious + 0 Critical
+            CONCERNS: 1-3 Serious + 0 Critical
+            BLOCK: any Critical OR >3 Serious
+          follow_up_allowed: false
+          status: NEW_SEAT
+        - number: 5
+          name: Brand Guardian
+          replaces: old-Design-mechanical-check
+          subagent_type: design-brand-guardian
+          verdicts: [PASS, CONCERNS, BLOCK]
+          axes: 6 DNA axes + 5 craft dims
+          follow_up_allowed: false
+      every_chapter_writes:
+        path: docs/plans/evidence/lrr/<chapter>.json
+        schema_source: protocols/launch-readiness.md
+        fields: [chapter, verdict, override_blocks_launch, evidence_files_read, findings, follow_up_spawned, follow_up_findings]
+        finding_fields: [severity, description, evidence_ref, related_decision_id]
+    pm_coverage_fold_in:
+      id: "6.1a"
+      location: sub-input of Eng-Quality chapter
+      field: requirements_coverage
+      notes: Chapter count stays 5.
+    aggregator:
+      id: "6.2"
+      kind: internal-inline-role-string
+      sequential: true
+      runs_after: all-5-chapter-files-exist
+      may_self_approve: false
+      must_cite: triggering-rule-number
+      step_1_file_completeness:
+        glob: evidence/lrr/*.json
+        on_missing_or_malformed: [log INCOMPLETE, write evidence/lrr-incomplete.json, STOP]
+      step_2_rules:
+        - id: 1
+          trigger: ANY override_blocks_launch == true
+          verdict: BLOCKED
+        - id: 2
+          trigger: ALL verdicts PASS AND 0 follow-ups
+          verdict: PRODUCTION READY
+        - id: 3
+          trigger: ANY verdict BLOCK (without override)
+          verdict: NEEDS WORK
+          action: route findings to fix loop
+        - id: 4
+          trigger: ANY CONCERNS
+          verdict: NEEDS WORK
+          action: concerns logged
+        - id: 5
+          trigger: follow_up_spawned AND follow_up.confirmed == true
+          action: treat parent chapter as BLOCK
+        - id: 6
+          trigger: contradictions between chapters on typed fields
+          verdict: BLOCKED
+          action: emit cross-chapter contradiction finding
+      step_3_star_rule:
+        symbol: ⭐⭐
+        name: backward routing on BLOCK
+        procedure:
+          - for each BLOCK finding, read related_decision_id
+          - look up row in decisions.jsonl
+          - read decided_by
+          - route BACKWARD to authoring phase
+        known_decided_by:
+          architect: phase-2
+          design-brand-guardian: phase-3
+          implementer: phase-4
+          human: gates-1-and-2
+      step_4_needs_work_classification:
+        code: phase-4
+        structural: phase-2
+        visual: phase-3
+      step_5_ready_writes:
+        path: evidence/lrr-aggregate.json
+        fields: [combined_verdict, chapter_verdicts, triggered_rule, findings, follow_ups_spawned, backward_routing, timestamp]
+        forward_to: phase-7
+    verdict_resolution:
+      PRODUCTION_READY:
+        action: advance-to-phase-7
+      NEEDS_WORK:
+        action: apply lrr-routing.json via re-entry template
+        max_cycles: 2
+        on_cycle_cap:
+          interactive: present-remaining-issues-ask-direction
+          autonomous: log-remaining-proceed-to-7-with-warning
+      BLOCKED:
+        action: apply backward routing
+        never_proceed_to: phase-7
+    hard_gates:
+      - LRR Aggregator is the ONLY agent that may emit combined_verdict.
+    re_entry_template: |
+      INPUT: {blocking_finding, prior_output, decision_row}
+      TASK:  Revise prior_output to address blocking_finding ONLY.
+             Do NOT redo unaffected work. Emit new decision_row.
+
+  - id: "7"
+    name: Ship
+    kind: sequential-ship-pipeline
+    skip_conditions: []
+    precondition:
+      gate: verify-protocol
+      checks: 7
+      max_fix_attempts: 2
+    steps:
+      - id: "7.1.1"
+        name: Technical Writer
+        kind: dispatch-single
+        subagent_type: engineering-technical-writer
+        writes: [README, API docs, deploy notes]
+        target_from: PRD
+      - id: "7.1.2"
+        name: Documentation Metric Loop
+        kind: loop
+        service: metric-loop
+        metric: new-dev-can-follow-readme-end-to-end
+        max_iterations: 3
+      - id: "7.1.3"
+        name: App Store Optimizer
+        kind: dispatch-single
+        platform: ios
+        conditional_on: ship
+        subagent_type: marketing-app-store-optimizer
+        skills_granted: [asc-metadata-generator, asc-screenshot-generator, asc-privacy-manifest]
+        also_dispatch: ios-app-review-guardian
+        notes: Review guardian sanity check before TestFlight.
+      - id: "7.1.4"
+        name: Deploy
+        kind: dispatch-single
+        subagent_type: engineering-devops-automator
+        actions: [pre-deploy-checks, execute-deploy, verify-200-at-deploy-URL]
+      - id: "7.1.5"
+        name: Completion Report
+        kind: dispatch-single-internal
+        reads: [lrr-aggregate.json, reality-check-manifest.json]
+        surfaces_before_write: Verification Gap if declared != passing OR stub-flagged > 0
+    ios_ship:
+      optional: true
+      notes: simulator-only is valid end-state; separate from web ship
+    writes:
+      - docs/plans/learnings.jsonl
+
+# ---------------------------------------------------------------------------
+# 4. Cross-cutting callable services
+# ---------------------------------------------------------------------------
+callable_services:
+  metric_loop:
+    source: protocols/metric-loop.md
+    callers:
+      - phase-2 (architecture)
+      - phase-3.step-3.6 (design critic web)
+      - phase-3.step-3.4-ios (visual QA)
+      - phase-4 (per-task)
+      - phase-4.step-4.0.d (iOS scaffold)
+      - phase-5.step-5.2 (hardening)
+      - phase-7 (documentation)
+    contract:
+      metric_defined_by: orchestrator
+      measure_and_fix_isolation: separate-dispatches-never-share-context
+      fix_input_scope: top-issue + file-paths + acceptance-criteria (NOT full findings)
+      fix_cadence: one fix per iteration; measure impact before next fix
+      findings_persistence: each measurement is fresh; do not accumulate
+      state_tracking: .build-state.json (survives compaction)
+      iter_1_short_circuit: first measurement >= target + 10 -> exit, log exit_reason=short_circuit_iter1
+      exit_conditions: [target-met, iter>=max, stall (2 consecutive delta<=0), short-circuit-iter1]
+      autonomous_stall:
+        accept_at: ">= 60% target (warning)"
+        halt_below: "< 60% OR any CRITICAL remaining"
+
+  verify_protocol:
+    source: protocols/verify.md
+    callers: [phase-2, phase-4-scaffold-gate, phase-4-per-task, phase-5-pre-audit, phase-7-pre-ship]
+    contract:
+      sequential_checks: [Build, Type-Check, Lint, Test, Security, Diff-Review, Artifacts]
+      stop_on: first-FAIL
+      dispatch_mode: INTERNAL-inline role string "Verify scaffolding"
+      phase_4_per_task_scope: static-only (behavioral already done in metric loop)
+
+  decision_log:
+    source: protocols/decision-log.md
+    schema: docs/migration/decisions.schema.json
+    validator: eval/validate_decisions.py
+    writers:
+      - {phase: "1", agent: brainstorm-synthesis, row_count: 3}
+      - {phase: "2.2", agent: architecture-synthesizer, row_count: 4}
+      - {phase: "3", agent: DEFERRED, row_count: 0}
+      - {phase: "4", agent: implementer, condition: deviation-only}
+    readers: [phase-0-resume, phase-5-reality-checker, phase-6-lrr-aggregator]
+    constraints:
+      file: docs/plans/decisions.jsonl
+      mode: append-only
+      writer_authority: orchestrator-scribe-ONLY
+      max_rejected_alternatives_per_row: 3
+      max_sentences_per_reason: 2
+      max_sentences_per_revisit_criterion: 1
+      max_rows_per_phase: 5
+      total_rows_per_build: 15-25
+    linkage:
+      finding_field: related_decision_id
+      location: on-finding-object-inside-chapter-verdict
+
+  learnings:
+    file: learnings.jsonl
+    writers: [phase-5-reality-sweep, phase-7-late-learnings]
+    readers: [phase-0-learnings-loader (step-0.1d), phase-5-reality-sweep]
+    row_schema:
+      - run_id
+      - timestamp
+      - project_type
+      - phase_where_learning_surfaced
+      - metric
+      - top_issue
+      - fix_applied
+      - score_delta
+      - pattern_type: [PITFALL, PATTERN, HEURISTIC]
+    cross_run_injection: phase-4 implementer reads .active-learnings.md (top-3 filtered at phase-0)
+
+  briefing_officer:
+    kind: INTERNAL
+    callable_per: phase-4-task
+    contract:
+      reads: [refs.json, task-row]
+      writes: CONTEXT MAP (~40 lines)
+      mode: refs-not-pastes
+      excluded: [CLAUDE.md (auto-loaded), phase1-scratch (SPENT)]
+    context_map_shape:
+      persona_jtbd: design-doc.md#persona
+      product_scope: design-doc.md#scope
+      visual_tokens: visual-design-spec.md#tokens
+      component_variants: component-manifest.md#[category]
+      auth_model: architecture.md#auth
+      data_schema: architecture.md#data-model
+      sibling_task_deps: "sprint-tasks.md#[dep-id-1], #[dep-id-2]"
+      prior_decisions: "decisions.jsonl rows [row-id-1], [row-id-2]"
+      quality_targets: quality-targets.json (full file)
+
+# ---------------------------------------------------------------------------
+# 5. Backward routing edges
+# ---------------------------------------------------------------------------
+backward_routing:
+  - from: GATE-1-NO
+    to: phase-1.step-1.0
+    note: Brainstorm Facilitator r1 with feedback
+  - from: GATE-2-NO
+    to: phase-2
+    note: with user feedback
+  - from: phase-3.step-3.2b-DNA-persona-mismatch
+    to: phase-3.step-3.0
+    note: re-lock DNA
+  - from: phase-5-audit-code-issue
+    to: phase-4.target-task
+  - from: phase-5-audit-design-issue
+    to: phase-3.target-step
+  - from: phase-5-audit-spec-issue
+    to: phase-2
+    note: re-architect
+  - from: phase-5-dogfood-classified
+    to: target_phase-per-classified-findings.json
+  - from: phase-6-LRR-BLOCK
+    via: star-star-rule
+    to: authoring-phase (per decisions.jsonl.decided_by)
+  - from: phase-6-LRR-NEEDS_WORK-code
+    to: phase-4.target-task
+    via: related_decision_id
+  - from: phase-6-LRR-NEEDS_WORK-structural
+    to: phase-2-or-phase-3
+    note: by-finding-classification
+
+re_entry_template: |
+  INPUT: {blocking_finding: {...}, prior_output: <path>, decision_row: <row>}
+  TASK:  Revise prior_output to address blocking_finding ONLY.
+         Do NOT redo unaffected work. Emit new decision_row.
+
+re_entry_rules:
+  phase-2: "Only the architect whose domain matches decision_row.author re-runs. Synthesizer re-runs once."
+  phase-3: "Only the step named by decision_row.author re-runs (DNA lock, component manifest, or visual spec)."
+  phase-4: "Target task only. Reads prior_output + changed files. Revises ONLY what blocking_finding requires. Does NOT re-run acceptance tests that passed. Does NOT touch files outside finding blast radius."
+
+needs_work_loop_cap:
+  max_cycles: 2
+  on_third_needs_work:
+    interactive: present-all-remaining-issues-ask-direction
+    autonomous: log-remaining-proceed-to-phase-7-with-warning
+
+# ---------------------------------------------------------------------------
+# 6. State schema (.build-state.json top-level)
+# ---------------------------------------------------------------------------
+state_schema:
+  file: docs/plans/.build-state.json
+  rendered_view: docs/plans/.build-state.md
+  rendered_policy: regenerated-from-json-on-every-update-never-edit-markdown-directly
+  compaction_trigger:
+    check_at: every-phase-boundary
+    field: dispatch_count
+    threshold: 8
+    action: save-all-state-reset-counter-regenerate-markdown-view
+    note: TodoWrite does NOT survive compaction; rebuild from JSON on resume.
+  fields:
+    project_type: {type: enum, values: [web, ios]}
+    archetype: {type: enum, values: [H1, H2, H3, H4]}
+    ios_features: {type: object, when: project_type==ios, flags_count: 16}
+    phase: {type: integer, range: [0, 7]}
+    step: {type: string, pattern: "X.Y"}
+    input: {type: string, value: $ARGUMENTS}
+    context_level: {type: enum, values: [full-design, decision-brief, partial, raw-idea]}
+    prerequisites: {type: object, populated_at: step-1.5}
+    dispatch_count: {type: integer, reset_after_save: true}
+    last_save_phase: {type: string}
+    autonomous: {type: boolean}
+    session_id: {type: string}
+    session_started: {type: string, format: ISO-8601}
+    completed_tasks: {type: array, items: task-id}
+    metric_loop_scores: {type: array, items: per-loop-per-iter}
+    decisions_next_id: {type: object, pattern: "{phase: next_seq}", example: {"1": 4, "2": 5, "4": 12}}
+    resume_point:
+      type: object
+      fields:
+        phase: {type: integer, range: [0, 7]}
+        step: {type: string}
+        completed_tasks: {type: array}
+        git_branch: {type: string}

@@ -1,0 +1,91 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://buildanything.claude/decisions.schema.json",
+  "title": "decisions.jsonl row",
+  "description": "Append-only decision log row. Source of truth: protocols/decision-log.md. Rows live in docs/plans/decisions.jsonl, one JSON object per line.",
+  "type": "object",
+  "required": [
+    "decision_id",
+    "phase",
+    "timestamp",
+    "decision",
+    "chosen_approach",
+    "rejected_alternatives",
+    "decided_by",
+    "ref",
+    "status"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "decision_id": {
+      "type": "string",
+      "pattern": "^D-[0-9]+(\\.[0-9]+)?-[0-9]{2,}$",
+      "description": "D-<phase>-<seq>. Phase is 1, 2, 2.2, etc. Seq is zero-padded >=2 digits."
+    },
+    "phase": {
+      "type": "string",
+      "pattern": "^[0-9]+(\\.[0-9]+)?$",
+      "description": "Phase number as string (e.g. '1', '2.2', '4')."
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 UTC timestamp."
+    },
+    "decision": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 240,
+      "description": "One-line summary of the call made."
+    },
+    "chosen_approach": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 480
+    },
+    "rejected_alternatives": {
+      "type": "array",
+      "maxItems": 3,
+      "description": "Max 3 rejected alternatives per decision_row (protocols/decision-log.md).",
+      "items": {
+        "type": "object",
+        "required": ["approach", "reason", "revisit_criterion"],
+        "additionalProperties": false,
+        "properties": {
+          "approach": { "type": "string", "minLength": 1, "maxLength": 240 },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 400,
+            "description": "Max 2 sentences; enforced semantically, not by regex."
+          },
+          "revisit_criterion": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 240,
+            "description": "One-sentence natural-language assertion Reality Checker can match against build evidence."
+          }
+        }
+      }
+    },
+    "decided_by": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Free-form agent role string (architect, implementer, design-critic, human, etc.). Not validated against a fixed enum — see protocols/decision-log.md §Schema."
+    },
+    "ref": {
+      "type": "string",
+      "pattern": "^[a-zA-Z0-9_\\-./]+\\.(md|json|jsonl|yaml|yml)(#[a-zA-Z0-9_\\-/.]+)?$",
+      "description": "Anchor into the artifact backing the decision (e.g., architecture.md#backend/persistence)."
+    },
+    "status": {
+      "type": "string",
+      "enum": ["open", "triggered", "resolved"]
+    },
+    "related_decision_id": {
+      "type": "string",
+      "pattern": "^D-[0-9]+(\\.[0-9]+)?-[0-9]{2,}$",
+      "description": "Used on finding objects, not decision rows. Listed here so validator accepts rows that reference it explicitly."
+    }
+  }
+}

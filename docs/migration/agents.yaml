@@ -1,0 +1,729 @@
+version: 1
+source_prose: agents/<name>.md frontmatter + Skill Access section
+phase_graph: docs/migration/phase-graph.yaml
+generator: eval/generate_agent_registry.py
+policy: Agent prompt files are source of truth for name/tools/model/description/skills. phase-graph.yaml is source of truth
+  for phase_usage/dispatch_modes/artifacts_written. Hand overrides for utility agents live in eval/calibration.json under
+  'agent_registry_overrides'. Regenerate via `python eval/generate_agent_registry.py`; lint with `--check`.
+agents:
+- name: a11y-architect
+  prompt_path: agents/a11y-architect.md
+  tools:
+  - Read
+  - Write
+  - Edit
+  - Bash
+  - Grep
+  - Glob
+  - Skill
+  description: You are a Senior Accessibility Architect. Your goal is to ensure that every digital product is Perceivable,
+    Operable, Understandable, and Robust (POUR) for all users, including those with visual, auditory, motor, or cognitive
+    disabilities.
+  phase_usage:
+  - '2'
+  - '3'
+  - '5'
+  - '6'
+  dispatch_modes:
+  - single
+  - team
+  team_roles:
+  - worker:accessibility-auditor
+  skills_granted:
+  - skills/ios/hig-inputs
+  - skills/ios/hig-platforms
+  - skills/ios/swift-accessibility
+  - skills/web/accessibility
+  - skills/web/chart-accessibility
+  skills_forbidden:
+  - skills/ios/swift-concurrency
+- name: business-model
+  prompt_path: agents/business-model.md
+  description: '# Business Model Analyst'
+  phase_usage:
+  - '1'
+  dispatch_modes:
+  - single
+- name: code-architect
+  prompt_path: agents/code-architect.md
+  tools:
+  - Read
+  - Grep
+  - Glob
+  - Bash
+  - Skill
+  model: sonnet
+  description: '# Code Architect Agent'
+  phase_usage:
+  - '2'
+  dispatch_modes:
+  - single
+- name: code-reviewer
+  prompt_path: agents/code-reviewer.md
+  tools:
+  - Read
+  - Grep
+  - Glob
+  - Bash
+  - Skill
+  model: sonnet
+  description: You are a senior code reviewer ensuring high standards of code quality and security.
+  phase_usage:
+  - '4'
+  - '6'
+  dispatch_modes:
+  - single
+  skills_granted:
+  - skills/ios/swift-protocol-di-testing
+  - skills/web/react-best-practices
+- name: code-simplifier
+  prompt_path: agents/code-simplifier.md
+  tools:
+  - Read
+  - Write
+  - Edit
+  - Bash
+  - Grep
+  - Glob
+  - Skill
+  model: sonnet
+  description: '# Code Simplifier Agent'
+  phase_usage:
+  - '4'
+  dispatch_modes:
+  - single
+  skills_granted:
+  - skills/ios/swiftui-view-refactor
+  skills_forbidden:
+  - skills/ios/swift-concurrency
+- name: design-brand-guardian
+  prompt_path: agents/design-brand-guardian.md
+  description: '# Brand Guardian Agent Personality'
+  phase_usage:
+  - '3'
+  - '5'
+  - '6'
+  dispatch_modes:
+  - single
+  skills_granted:
+  - skills/ios/hig-foundations
+  - skills/ios/swiftui-design-tokens
+  - skills/ios/swiftui-liquid-glass
+  - skills/web/web-design-guidelines
+  skills_forbidden:
+  - skills/ios/swift-concurrency
+  - skills/ios/swiftui-liquid-glass
+- name: design-critic
+  prompt_path: agents/design-critic.md
+  model: opus
+  description: '# Design Critic'
+  phase_usage:
+  - '3'
+  dispatch_modes:
+  - single
+  skills_granted:
+  - skills/ios/hig-foundations
+  - skills/ios/swiftui-design-principles
+  - skills/web/chart-accessibility
+  - skills/web/web-design-guidelines
+  skills_forbidden:
+  - skills/ios/swift-concurrency
+- name: design-inclusive-visuals-specialist
+  prompt_path: agents/design-inclusive-visuals-specialist.md
+  description: '# 📸 Inclusive Visuals Specialist'
+  phase_usage:
+  - '3'
+  dispatch_modes:
+  - single
+- name: design-ui-designer
+  prompt_path: agents/design-ui-designer.md
+  description: '# UI Designer Agent Personality'
+  phase_usage:
+  - '3'
+  dispatch_modes:
+  - single
+  skills_granted:
+  - skills/ios/hig-components-content
+  - skills/ios/hig-components-controls
+  - skills/ios/hig-components-status
+  - skills/ios/hig-foundations
+  - skills/ios/hig-project-context
+  - skills/ios/swiftui-design-principles
+  - skills/ios/swiftui-design-tokens
+  - skills/ios/swiftui-liquid-glass
+  - skills/ios/writing-for-interfaces
+  - skills/web/aceternity-ui
+  - skills/web/composition-patterns
+  - skills/web/web-design-guidelines
+  skills_forbidden:
+  - skills/ios/swift-concurrency
+  - skills/web/aceternity-ui
+- name: design-ux-architect
+  prompt_path: agents/design-ux-architect.md
+  description: '# ArchitectUX Agent Personality'
+  phase_usage:
+  - '3'
+  dispatch_modes:
+  - single
+  skills_granted:
+  - skills/ios/hig-components-dialogs
+  - skills/ios/hig-components-layout
+  - skills/ios/hig-components-menus
+  - skills/ios/hig-components-search
+  - skills/ios/hig-inputs
+  - skills/ios/hig-patterns
+  - skills/ios/hig-platforms
+  - skills/ios/hig-project-context
+  - skills/ios/writing-for-interfaces
+  skills_forbidden:
+  - skills/ios/swift-concurrency
+- name: design-ux-researcher
+  prompt_path: agents/design-ux-researcher.md
+  description: '# UX Researcher Agent Personality'
+  phase_usage:
+  - '1'
+  - '3'
+  - '5'
+  dispatch_modes:
+  - single
+  skills_granted:
+  - skills/ios/writing-for-interfaces
+- name: engineering-ai-engineer
+  prompt_path: agents/engineering-ai-engineer.md
+  description: '# AI Engineer Agent'
+  phase_usage:
+  - '4'
+  dispatch_modes:
+  - single
+  skills_granted:
+  - skills/ios/apple-on-device-ai
+  - skills/ios/hig-technologies
+  - skills/web/cost-aware-llm-pipeline
+  - skills/web/mcp-server-patterns
+  - skills/web/next-best-practices
+  skills_forbidden:
+  - skills/ios/apple-on-device-ai
+- name: engineering-backend-architect
+  prompt_path: agents/engineering-backend-architect.md
+  description: '# Backend Architect Agent Personality'
+  phase_usage:
+  - '2'
+  - '4'
+  dispatch_modes:
+  - single
+  - team
+  team_roles:
+  - worker:backend-architect
+  skills_granted:
+  - skills/ios/swift-actor-persistence
+  - skills/ios/swift-concurrency
+  - skills/ios/swift-concurrency-6-2
+  - skills/ios/swiftdata-pro
+  - skills/web/api-design
+  - skills/web/database-migrations
+  - skills/web/mcp-server-patterns
+  - skills/web/next-best-practices
+  - skills/web/next-cache-components
+  - skills/web/postgres-best-practices
+  skills_forbidden:
+  - skills/ios/swift-concurrency
+  - skills/web/mcp-server-patterns
+- name: engineering-data-engineer
+  prompt_path: agents/engineering-data-engineer.md
+  description: '# Data Engineer Agent'
+  phase_usage:
+  - '2'
+  dispatch_modes:
+  - single
+  - team
+  team_roles:
+  - worker:data-engineer
+  skills_granted:
+  - skills/web/postgres-best-practices
+- name: engineering-devops-automator
+  prompt_path: agents/engineering-devops-automator.md
+  description: '# DevOps Automator Agent Personality'
+  phase_usage:
+  - '7'
+  dispatch_modes:
+  - single
+  skills_granted:
+  - skills/web/deployment-patterns
+  - skills/web/docker-patterns
+  - skills/web/lighthouse-ci
+  skills_forbidden:
+  - skills/ios/swift-concurrency
+- name: engineering-frontend-developer
+  prompt_path: agents/engineering-frontend-developer.md
+  description: '# Frontend Developer Agent Personality'
+  phase_usage:
+  - '2'
+  - '3'
+  - '4'
+  - '5'
+  dispatch_modes:
+  - single
+  - team
+  team_roles:
+  - worker:frontend-architect
+  skills_granted:
+  - skills/ios/activitykit
+  - skills/ios/app-intents
+  - skills/ios/apple-on-device-ai
+  - skills/ios/hig-components-system
+  - skills/ios/swift-accessibility
+  - skills/ios/swift-concurrency-6-2
+  - skills/ios/swiftui-pro
+  - skills/ios/swiftui-ui-patterns
+  - skills/ios/widgetkit
+  - skills/web/aceternity-ui
+  - skills/web/chart-accessibility
+  - skills/web/composition-patterns
+  - skills/web/next-best-practices
+  - skills/web/next-cache-components
+  - skills/web/react-best-practices
+  skills_forbidden:
+  - skills/ios/swift-concurrency
+  - skills/web/aceternity-ui
+  - skills/web/chart-accessibility
+- name: engineering-mobile-app-builder
+  prompt_path: agents/engineering-mobile-app-builder.md
+  description: '# Mobile App Builder Agent'
+  phase_usage:
+  - '4'
+  dispatch_modes:
+  - single
+- name: engineering-rapid-prototyper
+  prompt_path: agents/engineering-rapid-prototyper.md
+  description: '# Rapid Prototyper'
+  phase_usage:
+  - '4'
+  dispatch_modes:
+  - single
+  skills_granted:
+  - skills/web/aceternity-ui
+  - skills/web/docker-patterns
+  - skills/web/next-best-practices
+  skills_forbidden:
+  - skills/web/aceternity-ui
+- name: engineering-security-engineer
+  prompt_path: agents/engineering-security-engineer.md
+  description: '# Security Engineer Agent'
+  phase_usage:
+  - '2'
+  - '5'
+  dispatch_modes:
+  - single
+  - team
+  team_roles:
+  - worker:security-engineer
+  skills_granted:
+  - skills/ios/asc-privacy-manifest
+  - skills/ios/ios-entitlements-generator
+  - skills/ios/ios-info-plist-hardening
+  - skills/ios/swift-security-expert
+  - skills/web/e2e-testing
+  - skills/web/zap-scan-config
+  skills_forbidden:
+  - skills/ios/swift-concurrency
+- name: engineering-senior-developer
+  prompt_path: agents/engineering-senior-developer.md
+  description: '# Developer Agent Personality'
+  phase_usage:
+  - '4'
+  dispatch_modes:
+  - single
+  skills_granted:
+  - skills/ios/ios-26-platform
+  - skills/ios/ios-bootstrap
+  - skills/ios/ios-debugger-agent
+  - skills/ios/ios-entitlements-generator
+  - skills/ios/ios-info-plist-hardening
+  - skills/ios/ios-maestro-flow-author
+  - skills/ios/swift-concurrency-6-2
+  - skills/ios/swift-protocol-di-testing
+  - skills/ios/swiftdata-pro
+  - skills/ios/swiftui-pro
+  - skills/web/database-migrations
+  - skills/web/next-best-practices
+  - skills/web/react-best-practices
+  skills_forbidden:
+  - skills/ios/swift-concurrency
+- name: engineering-sre
+  prompt_path: agents/engineering-sre.md
+  description: '# SRE (Site Reliability Engineer) Agent'
+  phase_usage:
+  - '6'
+  dispatch_modes:
+  - single
+- name: engineering-technical-writer
+  prompt_path: agents/engineering-technical-writer.md
+  description: '# Technical Writer Agent'
+  phase_usage:
+  - '7'
+  dispatch_modes:
+  - single
+  skills_granted:
+  - skills/ios/app-store-connect-metadata
+  - skills/web/deployment-patterns
+  - skills/web/seo
+  skills_forbidden:
+  - skills/ios/swift-concurrency
+  - skills/web/seo
+- name: feature-intel
+  prompt_path: agents/feature-intel.md
+  model: opus
+  description: '# Feature Intel'
+  phase_usage:
+  - '1'
+  dispatch_modes:
+  - single
+- name: ios-app-review-guardian
+  prompt_path: agents/ios-app-review-guardian.md
+  tools:
+  - Read
+  - Edit
+  - Write
+  - Glob
+  - Grep
+  - Skill
+  description: '# App Review Guardian'
+  phase_usage:
+  - '7'
+  dispatch_modes:
+  - single
+  skills_granted:
+  - skills/ios/asc-privacy-manifest
+  - skills/ios/ios-info-plist-hardening
+  skills_forbidden:
+  - skills/ios/swift-concurrency
+- name: ios-foundation-models-specialist
+  prompt_path: agents/ios-foundation-models-specialist.md
+  tools:
+  - Read
+  - Edit
+  - Write
+  - Glob
+  - Grep
+  - Skill
+  description: '# Foundation Models Specialist'
+  phase_usage:
+  - '1'
+  - '4'
+  dispatch_modes:
+  - single
+  skills_granted:
+  - skills/ios/apple-on-device-ai
+  - skills/ios/hig-technologies
+  skills_forbidden:
+  - skills/ios/swift-concurrency
+- name: ios-storekit-specialist
+  prompt_path: agents/ios-storekit-specialist.md
+  tools:
+  - Read
+  - Edit
+  - Write
+  - Glob
+  - Grep
+  - Skill
+  description: '# StoreKit Specialist'
+  phase_usage:
+  - '4'
+  dispatch_modes:
+  - single
+  skills_forbidden:
+  - skills/ios/swift-concurrency
+- name: ios-swift-architect
+  prompt_path: agents/ios-swift-architect.md
+  tools:
+  - Read
+  - Glob
+  - Grep
+  - Bash
+  - Skill
+  - TodoWrite
+  model: opus
+  description: '# iOS Swift Feature Architect'
+  phase_usage:
+  - '2'
+  dispatch_modes:
+  - single
+  skills_granted:
+  - skills/ios/activitykit
+  - skills/ios/app-intents
+  - skills/ios/apple-on-device-ai
+  - skills/ios/ios-26-platform
+  - skills/ios/swift-actor-persistence
+  - skills/ios/swift-concurrency-6-2
+  - skills/ios/swift-protocol-di-testing
+  - skills/ios/swiftdata-pro
+  - skills/ios/widgetkit
+  skills_forbidden:
+  - skills/ios/swift-concurrency
+- name: ios-swift-search
+  prompt_path: agents/ios-swift-search.md
+  tools:
+  - Grep
+  - Glob
+  - Read
+  - Bash
+  model: haiku
+  description: You are a specialized Swift code search agent. Your ONLY job is to find Swift code locations quickly and return
+    structured results.
+  phase_usage:
+  - '2'
+  - '3'
+  - '4'
+  - '5'
+  dispatch_modes:
+  - single
+  skills_forbidden:
+  - skills/ios/swift-concurrency
+  notes: Utility agent — callable from any iOS phase for Swift code exploration.
+- name: ios-swift-ui-design
+  prompt_path: agents/ios-swift-ui-design.md
+  tools:
+  - Read
+  - Glob
+  - Grep
+  - Skill
+  model: opus
+  description: '# iOS UI Design Analysis'
+  phase_usage:
+  - '3'
+  - '4'
+  dispatch_modes:
+  - single
+  skills_granted:
+  - skills/ios/hig-components-content
+  - skills/ios/hig-components-controls
+  - skills/ios/hig-components-status
+  - skills/ios/hig-foundations
+  - skills/ios/hig-project-context
+  - skills/ios/swift-accessibility
+  - skills/ios/swiftui-design-principles
+  - skills/ios/swiftui-design-tokens
+  - skills/ios/swiftui-liquid-glass
+  - skills/ios/swiftui-pro
+  - skills/ios/swiftui-ui-patterns
+  skills_forbidden:
+  - skills/ios/swift-concurrency
+  - skills/ios/swiftui-liquid-glass
+- name: marketing-app-store-optimizer
+  prompt_path: agents/marketing-app-store-optimizer.md
+  description: '# App Store Optimizer Agent Personality'
+  phase_usage:
+  - '7'
+  dispatch_modes:
+  - single
+  skills_granted:
+  - skills/ios/app-store-connect-metadata
+  skills_forbidden:
+  - skills/ios/swift-concurrency
+- name: planner
+  prompt_path: agents/planner.md
+  tools:
+  - Read
+  - Grep
+  - Glob
+  - Skill
+  model: opus
+  description: You are an expert planning specialist focused on creating comprehensive, actionable implementation plans.
+  phase_usage:
+  - '2'
+  dispatch_modes:
+  - single
+- name: pr-test-analyzer
+  prompt_path: agents/pr-test-analyzer.md
+  tools:
+  - Read
+  - Grep
+  - Glob
+  - Bash
+  - Skill
+  model: sonnet
+  description: '# PR Test Analyzer Agent'
+  phase_usage:
+  - '6'
+  dispatch_modes:
+  - single
+  skills_granted:
+  - skills/ios/swift-testing-expert
+  skills_forbidden:
+  - skills/ios/swift-concurrency
+  - skills/web/e2e-testing
+- name: product-feedback-synthesizer
+  prompt_path: agents/product-feedback-synthesizer.md
+  tools:
+  - WebFetch
+  - WebSearch
+  - Read
+  - Write
+  - Edit
+  - Skill
+  description: '# Product Feedback Synthesizer Agent'
+  phase_usage:
+  - '5'
+  dispatch_modes:
+  - single
+- name: refactor-cleaner
+  prompt_path: agents/refactor-cleaner.md
+  tools:
+  - Read
+  - Write
+  - Edit
+  - Bash
+  - Grep
+  - Glob
+  - Skill
+  model: sonnet
+  description: '# Refactor & Dead Code Cleaner'
+  phase_usage:
+  - '4'
+  dispatch_modes:
+  - single
+  skills_granted:
+  - skills/ios/swiftui-view-refactor
+  skills_forbidden:
+  - skills/ios/swift-concurrency
+- name: security-reviewer
+  prompt_path: agents/security-reviewer.md
+  tools:
+  - Read
+  - Write
+  - Edit
+  - Bash
+  - Grep
+  - Glob
+  - Skill
+  model: sonnet
+  description: '# Security Reviewer'
+  phase_usage:
+  - '4'
+  - '5'
+  - '6'
+  dispatch_modes:
+  - single
+  skills_granted:
+  - skills/ios/swift-security-expert
+  - skills/web/zap-scan-config
+  skills_forbidden:
+  - skills/ios/swift-concurrency
+- name: silent-failure-hunter
+  prompt_path: agents/silent-failure-hunter.md
+  tools:
+  - Read
+  - Grep
+  - Glob
+  - Bash
+  - Skill
+  model: sonnet
+  description: '# Silent Failure Hunter Agent'
+  phase_usage:
+  - '4'
+  dispatch_modes:
+  - single
+- name: swift-build-resolver
+  prompt_path: agents/swift-build-resolver.md
+  description: '# Swift Build Resolver'
+  phase_usage:
+  - '4'
+  dispatch_modes:
+  - single
+  skills_forbidden:
+  - skills/ios/swift-concurrency
+- name: swift-reviewer
+  prompt_path: agents/swift-reviewer.md
+  model: opus
+  description: '# Swift Reviewer'
+  phase_usage:
+  - '4'
+  dispatch_modes:
+  - single
+  skills_granted:
+  - skills/ios/apple-on-device-ai
+  - skills/ios/swift-actor-persistence
+  - skills/ios/swift-concurrency-6-2
+  - skills/ios/swift-protocol-di-testing
+  - skills/ios/swift-security-expert
+  - skills/ios/swift-testing-expert
+  skills_forbidden:
+  - skills/ios/swift-concurrency
+- name: tech-feasibility
+  prompt_path: agents/tech-feasibility.md
+  tools:
+  - WebSearch
+  - WebFetch
+  - TodoWrite
+  - Skill
+  description: You are a senior staff engineer doing a technical feasibility review. Think like a Stripe or Google infra engineer
+    — pragmatic, opinionated, evidence-based.
+  phase_usage:
+  - '1'
+  dispatch_modes:
+  - single
+  skills_granted:
+  - skills/ios/apple-on-device-ai
+  - skills/ios/hig-technologies
+  - skills/ios/ios-26-platform
+  skills_forbidden:
+  - skills/ios/apple-on-device-ai
+  - skills/ios/swift-concurrency
+- name: testing-api-tester
+  prompt_path: agents/testing-api-tester.md
+  description: '# API Tester Agent Personality'
+  phase_usage:
+  - '5'
+  dispatch_modes:
+  - single
+  skills_granted:
+  - skills/web/api-design
+- name: testing-evidence-collector
+  prompt_path: agents/testing-evidence-collector.md
+  description: '# Evidence Collector'
+  phase_usage:
+  - '4'
+  - '5'
+  dispatch_modes:
+  - single
+  skills_granted:
+  - skills/ios/ios-debugger-agent
+  - skills/ios/ios-maestro-flow-author
+  - skills/ios/swift-accessibility
+  - skills/ios/swift-testing-expert
+  - skills/web/e2e-testing
+  skills_forbidden:
+  - skills/ios/swift-concurrency
+  notes: P4 build-time evidence + P5 audit evidence collection; referenced via skill-integration-plan.md rather than phase-graph
+    dispatches.
+- name: testing-performance-benchmarker
+  prompt_path: agents/testing-performance-benchmarker.md
+  description: '# Performance Benchmarker'
+  phase_usage:
+  - '2'
+  - '5'
+  dispatch_modes:
+  - single
+  - team
+  team_roles:
+  - worker:performance-benchmarker
+  skills_granted:
+  - skills/ios/swiftui-performance-audit
+  - skills/web/lighthouse-ci
+  skills_forbidden:
+  - skills/ios/swift-concurrency
+- name: testing-reality-checker
+  prompt_path: agents/testing-reality-checker.md
+  model: opus
+  description: '# Reality Checker'
+  phase_usage:
+  - '6'
+  dispatch_modes:
+  - single
+- name: visual-research
+  prompt_path: agents/visual-research.md
+  description: '# Visual Research'
+  phase_usage:
+  - '3'
+  dispatch_modes:
+  - single
