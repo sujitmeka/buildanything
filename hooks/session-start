@@ -2,6 +2,20 @@
 # buildanything: SessionStart hook
 # Re-injects orchestrator identity after context compaction, resume, or clear.
 
+# Cache the SessionStart hook stdin payload once — stdin is a pipe and reads
+# are destructive. Extract session_id and export as CLAUDE_SESSION_ID so the
+# mode-transition recorder (task 4.7.1) can tag rows. Tolerate empty/missing
+# stdin (e.g., when the shim is invoked outside the hook harness).
+if [ ! -t 0 ]; then
+  HOOK_STDIN=$(cat)
+  CLAUDE_SESSION_ID=$(printf '%s' "$HOOK_STDIN" | python3 -c 'import json,sys
+try:
+    print(json.loads(sys.stdin.read() or "{}").get("session_id","") or "")
+except Exception:
+    print("")' 2>/dev/null)
+  export CLAUDE_SESSION_ID
+fi
+
 # SDK install-and-probe: write on/off state to sdkStateFile for the runtime to read.
 SDK_WARN=""
 SDK_STATE_FILE=$(python3 -c "import json,sys; print(json.load(open(sys.argv[1])).get('config',{}).get('sdkStateFile',''))" .claude-plugin/plugin.json 2>/dev/null)
@@ -156,7 +170,7 @@ fi
 # handler crashes, log to stderr and continue. No-op when .build-state.json
 # is absent (fresh project, pre-Phase-0).
 if [ -f "docs/plans/.build-state.json" ]; then
-  if ! npx --no-install tsx "$PLUGIN_ROOT/hooks/record-mode-transitions.ts" 2>/dev/null; then
+  if ! npx --no-install tsx "$PLUGIN_ROOT/hooks/record-mode-transitions.ts"; then
     echo "buildanything: mode-transition recorder failed; flag-flip not recorded this session" >&2
   fi
 fi
