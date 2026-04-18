@@ -1,0 +1,385 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$comment": "Schema version migration table: schema_version 1 = Stages 1-3; schema_version 2 = Stage 4 (adds backward_routing_count, backward_routing_count_by_target_phase, in_flight_backward_edge, mode_transitions); schema_version 3 = Stage 5 (adds lrr_cycle_state); schema_version 4 = Stage 6 (adds current_sprint_context_hash). --- Runtime validation rules (not encodable in JSON Schema, require code): Rule 5 — step prefix must match current phase number; Rule 6 — mode/autonomous consistency (mode==='autonomous' iff autonomous===true); Rule 7 — iOS fields gating (app_name, bundle_id, xcodeproj_path, ios_features, phase_progress.phase_minus_1 exist iff project_type==='ios'); Rule 10 — pending/in-progress disjoint (in_progress_task.task_id not in pending_tasks or completed_tasks); Rule 11 — resume_point.phase/step must not be ahead of top-level phase/step; Rule 12 — timestamps monotonic (session_last_saved >= session_started).",
+  "title": ".build-state.json",
+  "description": "Typed source of truth for BuildAnything build state. Validated by the PreToolUse schema lint hook (W2-2). additionalProperties: false enforces fail-closed per A8 SSOT rule.",
+  "type": "object",
+  "additionalProperties": false,
+
+  "$defs": {
+    "completed_task": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["task_id", "task_name", "status", "evidence_files", "completed_at"],
+      "properties": {
+        "task_id":        { "type": "string" },
+        "task_name":      { "type": "string" },
+        "status":         { "type": "string", "enum": ["done", "skipped", "deferred"] },
+        "evidence_files": { "type": "array", "items": { "type": "string" } },
+        "completed_at":   { "type": "string", "format": "date-time" }
+      }
+    },
+
+    "in_progress_task": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["task_id", "task_name", "started_at"],
+      "properties": {
+        "task_id":    { "type": "string" },
+        "task_name":  { "type": "string" },
+        "started_at": { "type": "string", "format": "date-time" }
+      }
+    },
+
+    "metric_loop_entry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["phase", "iteration", "score", "target", "top_issue", "timestamp"],
+      "properties": {
+        "phase":     { "type": "integer" },
+        "iteration": { "type": "integer" },
+        "score":     { "type": "number" },
+        "target":    { "type": "number" },
+        "top_issue": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "scoring_criteria_checklist": { "type": "string" },
+        "extraction_method": {
+          "type": "string",
+          "enum": ["mechanical", "one-shot-dispatch", "mixed"]
+        }
+      }
+    },
+
+    "active_metric_loop": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["phase", "artifact", "metric", "target", "max_iterations", "current_iteration"],
+      "properties": {
+        "phase":             { "type": "integer" },
+        "artifact":          { "type": "string" },
+        "metric":            { "type": "string" },
+        "target":            { "type": "number" },
+        "max_iterations":    { "type": "integer" },
+        "current_iteration": { "type": "integer" },
+        "scoring_criteria_checklist": { "type": "string" },
+        "extraction_method": {
+          "type": "string",
+          "enum": ["mechanical", "one-shot-dispatch", "mixed"]
+        }
+      }
+    },
+
+    "blocker": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "description", "surfaced_at", "type"],
+      "properties": {
+        "id":          { "type": "string" },
+        "description": { "type": "string" },
+        "surfaced_at": { "type": "string", "format": "date-time" },
+        "type":        { "type": "string", "enum": ["build", "design", "dep", "external"] }
+      }
+    },
+
+    "dispatch_counter": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["dispatches_since_save", "last_save_phase"],
+      "properties": {
+        "dispatches_since_save": { "type": "integer", "minimum": 0 },
+        "last_save_phase":       { "type": "string" }
+      }
+    },
+
+    "resume_point": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["phase", "step", "autonomous", "completed_summary", "git_branch"],
+      "properties": {
+        "phase":             { "type": "integer", "enum": [-1, 0, 1, 2, 3, 4, 5, 6, 7] },
+        "step":              { "type": "string" },
+        "autonomous":        { "type": "boolean" },
+        "completed_summary": { "type": "string" },
+        "git_branch":        { "type": "string" }
+      }
+    },
+
+    "verification": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["last_verify_result", "last_verify_timestamp"],
+      "properties": {
+        "last_verify_result": {
+          "oneOf": [
+            { "type": "string", "enum": ["PRODUCTION_READY", "NEEDS_WORK", "BLOCKED"] },
+            { "type": "null" }
+          ]
+        },
+        "last_verify_timestamp": {
+          "oneOf": [
+            { "type": "string", "format": "date-time" },
+            { "type": "null" }
+          ]
+        }
+      }
+    },
+
+    "ios_features": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "widgets", "liveActivities", "appIntents", "foundationModels",
+        "storekit", "healthkit", "push", "cloudkit",
+        "siri", "location", "background", "cameraPhoto",
+        "microphone", "contacts", "calendar", "appleWatch"
+      ],
+      "properties": {
+        "widgets":          { "type": "boolean" },
+        "liveActivities":   { "type": "boolean" },
+        "appIntents":       { "type": "boolean" },
+        "foundationModels": { "type": "boolean" },
+        "storekit":         { "type": "boolean" },
+        "healthkit":        { "type": "boolean" },
+        "push":             { "type": "boolean" },
+        "cloudkit":         { "type": "boolean" },
+        "siri":             { "type": "boolean" },
+        "location":         { "type": "boolean" },
+        "background":       { "type": "boolean" },
+        "cameraPhoto":      { "type": "boolean" },
+        "microphone":       { "type": "boolean" },
+        "contacts":         { "type": "boolean" },
+        "calendar":         { "type": "boolean" },
+        "appleWatch":       { "type": "boolean" }
+      }
+    },
+
+    "phase_progress": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "phase_0", "phase_1", "phase_2", "phase_3",
+        "phase_4", "phase_5", "phase_6", "phase_7"
+      ],
+      "properties": {
+        "phase_minus_1": { "type": "boolean" },
+        "phase_0":       { "type": "boolean" },
+        "phase_1":       { "type": "boolean" },
+        "phase_2":       { "type": "boolean" },
+        "phase_3":       { "type": "boolean" },
+        "phase_4":       { "type": "boolean" },
+        "phase_5":       { "type": "boolean" },
+        "phase_6":       { "type": "boolean" },
+        "phase_7":       { "type": "boolean" }
+      }
+    },
+
+    "in_flight_backward_edge": {
+      "$comment": "Stage 4+ (schema_version >= 2). Written atomically with counter increment on backward-route dispatch. Cleared by target phase on re-entry. Stale edges (>60s) trigger counter decrement on --resume.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["decision_id", "target_phase", "counter_value", "started_at"],
+      "properties": {
+        "decision_id":   { "type": "string" },
+        "target_phase":  { "type": "string" },
+        "counter_value": { "type": "integer", "minimum": 0 },
+        "started_at":    { "type": "string", "format": "date-time" }
+      }
+    },
+
+    "mode_transition": {
+      "$comment": "Stage 4+ (schema_version >= 2). Records SDK/markdown flag-flip events.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["from", "to", "timestamp"],
+      "properties": {
+        "from":      { "type": "string" },
+        "to":        { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" }
+      }
+    }
+  },
+
+  "required": [
+    "schema_version",
+    "project_type",
+    "phase",
+    "step",
+    "session_id",
+    "session_started",
+    "session_last_saved",
+    "autonomous",
+    "mode",
+    "build_request",
+    "context_level",
+    "git_branch",
+    "completed_tasks",
+    "pending_tasks",
+    "phase_artifacts",
+    "metric_loop_history",
+    "dispatch_counter",
+    "phase_progress",
+    "resume_point",
+    "verification"
+  ],
+
+  "properties": {
+    "schema_version": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 4,
+      "description": "Currently 1 (Stages 1-3). Bumped to 2 at Stage 4, 3 at Stage 5, 4 at Stage 6."
+    },
+    "project_type": {
+      "type": "string",
+      "enum": ["ios", "web"],
+      "description": "Drives mode-branch routing."
+    },
+    "phase": {
+      "type": "integer",
+      "enum": [-1, 0, 1, 2, 3, 4, 5, 6, 7],
+      "description": "Current phase. -1 is iOS bootstrap only."
+    },
+    "step": {
+      "type": "string",
+      "description": "Dotted step identifier within the phase (e.g. '5.3b', '6.4', '-1.1')."
+    },
+    "session_id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "UUID generated at session start; stable across compactions within a session."
+    },
+    "session_started": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp when the current session began."
+    },
+    "session_last_saved": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp of the most recent state write. Must be >= session_started."
+    },
+    "autonomous": {
+      "type": "boolean",
+      "description": "Whether --autonomous was passed. Must agree with mode field."
+    },
+    "mode": {
+      "type": "string",
+      "enum": ["interactive", "autonomous"],
+      "description": "interactive iff autonomous === false."
+    },
+    "build_request": {
+      "type": "string",
+      "description": "Original user prompt that initiated the build."
+    },
+    "context_level": {
+      "type": "string",
+      "enum": ["raw_idea", "decision_brief", "partial_context", "full_design"],
+      "description": "Richness of the initial context provided."
+    },
+    "git_branch": {
+      "type": "string",
+      "description": "Current branch; 'main' if uninitialized."
+    },
+    "completed_tasks": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/completed_task" },
+      "description": "Tasks finished. May be empty []."
+    },
+    "pending_tasks": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "task_ids still to be dispatched. May be empty []."
+    },
+    "phase_artifacts": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Paths to persisted phase outputs. All properties optional; empty {} is valid."
+    },
+    "metric_loop_history": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/metric_loop_entry" },
+      "description": "Scored iterations across all phases. May be empty []."
+    },
+    "dispatch_counter": {
+      "$ref": "#/$defs/dispatch_counter",
+      "description": "Used by the 'save every N dispatches' heuristic."
+    },
+    "phase_progress": {
+      "$ref": "#/$defs/phase_progress",
+      "description": "Boolean per phase. phase_minus_1 is optional (iOS only)."
+    },
+    "resume_point": {
+      "$ref": "#/$defs/resume_point",
+      "description": "Snapshot used by Phase-0 resume logic."
+    },
+    "verification": {
+      "$ref": "#/$defs/verification",
+      "description": "Last verify result and timestamp."
+    },
+
+    "app_name": {
+      "type": "string",
+      "description": "iOS only. App display name."
+    },
+    "bundle_id": {
+      "type": "string",
+      "description": "iOS only. Bundle identifier."
+    },
+    "xcodeproj_path": {
+      "type": "string",
+      "description": "iOS only. Absolute path to .xcodeproj."
+    },
+    "ios_features": {
+      "$ref": "#/$defs/ios_features",
+      "description": "iOS only. Exactly 16 boolean feature flags."
+    },
+    "in_progress_task": {
+      "$ref": "#/$defs/in_progress_task",
+      "description": "Task currently executing. Present only while a task is in flight."
+    },
+    "active_metric_loop": {
+      "$ref": "#/$defs/active_metric_loop",
+      "description": "Present only while a metric loop is running. Removed when loop completes."
+    },
+    "blockers": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/blocker" },
+      "description": "Open blockers. Omitted when empty."
+    },
+    "decisions_next_id": {
+      "type": "object",
+      "additionalProperties": { "type": "integer", "minimum": 0 },
+      "description": "Keyed by phase number string. Integer values = next sequence. Deprecated under Stage 2 (scribe owns ID allocation); scheduled for removal at Stage 4 A7."
+    },
+
+    "backward_routing_count": {
+      "type": "object",
+      "additionalProperties": { "type": "integer", "minimum": 0 },
+      "description": "Stage 4+ (schema_version >= 2). Per-decision backward routing counter: decision_id -> count."
+    },
+    "backward_routing_count_by_target_phase": {
+      "type": "object",
+      "additionalProperties": { "type": "integer", "minimum": 0 },
+      "description": "Stage 4+ (schema_version >= 2). Per-target-phase backward routing counter: phase -> count."
+    },
+    "in_flight_backward_edge": {
+      "$ref": "#/$defs/in_flight_backward_edge",
+      "description": "Stage 4+ (schema_version >= 2). Present only while a backward-routing edge is in flight."
+    },
+    "mode_transitions": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/mode_transition" },
+      "description": "Stage 4+ (schema_version >= 2). Records SDK/markdown flag-flip events."
+    },
+
+    "lrr_cycle_state": {
+      "type": "object",
+      "description": "Stage 5+ (schema_version >= 3). LRR cycle state and aggregator output fields."
+    },
+
+    "current_sprint_context_hash": {
+      "type": "string",
+      "description": "Stage 6+ (schema_version >= 4). Hash of sprint-scoped shared context; triggers re-render only on sprint boundary."
+    }
+  }
+}

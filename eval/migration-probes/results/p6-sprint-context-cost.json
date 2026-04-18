@@ -1,0 +1,58 @@
+{
+  "probe": "P6",
+  "name": "sprint-context-cost",
+  "pass_condition": "FINAL \u00a711.3 \u2014 per-build cumulative reduction thresholds",
+  "builds": {
+    "habita": {
+      "baseline_stage5": {
+        "build": "habita",
+        "stage": "stage5",
+        "runs": 3,
+        "cost_usd_median": 11.7024,
+        "cost_usd_min": 10.5749,
+        "cost_usd_max": 12.0329,
+        "input_tokens_median": 4058345
+      },
+      "variant_stage6": {
+        "build": "habita",
+        "stage": "stage6",
+        "runs": 3,
+        "cost_usd_median": 10.9732,
+        "cost_usd_min": 9.8754,
+        "cost_usd_max": 11.2124,
+        "input_tokens_median": 3776623
+      },
+      "delta_usd": -0.7292,
+      "delta_pct": -6.23
+    },
+    "pacely": {
+      "baseline_stage5": {
+        "build": "pacely",
+        "stage": "stage5",
+        "runs": 3,
+        "cost_usd_median": 16.7311,
+        "cost_usd_min": 16.371,
+        "cost_usd_max": 17.3231,
+        "input_tokens_median": 5755022
+      },
+      "variant_stage6": {
+        "build": "pacely",
+        "stage": "stage6",
+        "runs": 3,
+        "cost_usd_median": 15.6602,
+        "cost_usd_min": 15.329,
+        "cost_usd_max": 16.2301,
+        "input_tokens_median": 5354632
+      },
+      "delta_usd": -1.0709,
+      "delta_pct": -6.4
+    }
+  },
+  "habita_cumulative_pct": -6.23,
+  "pacely_cumulative_pct": -6.4,
+  "classification": {
+    "outcome": "dual_fail",
+    "action": "Stage 6 does NOT ship. On-record: migration delivered ~-10%.",
+    "ships": false
+  }
+}
