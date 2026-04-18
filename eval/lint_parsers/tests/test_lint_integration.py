@@ -22,6 +22,9 @@ def _seed_clean_repo(repo: Path) -> None:
 
     (repo / "commands" / "build.md").write_text(
         "# build\n\n"
+        "Live downstream docs (read across Phase 3+):\n"
+        "  - `CLAUDE.md`              — P1 writer\n\n"
+        "subagent_type: `alpha`\n\n"
         "### Backward Edges — Routing Fix\n\n"
         "```\n"
         "PROBLEM FOUND AT                    ROUTES BACK TO\n"
@@ -33,9 +36,16 @@ def _seed_clean_repo(repo: Path) -> None:
 
     (repo / "docs" / "migration" / "phase-graph.yaml").write_text(
         "version: 1\n"
+        "artifacts:\n"
+        "  - path: CLAUDE.md\n"
+        "    writer: phase-1\n"
+        "    readers: [all]\n"
         'phases:\n'
         '  - id: "-1"\n'
         '  - id: "1"\n'
+        "    steps:\n"
+        "      - id: '1.1'\n"
+        "        subagent_type: alpha\n"
         "backward_routing:\n"
         "  - from: GATE-1-NO\n"
         "    to: phase-1.step-1.0\n"

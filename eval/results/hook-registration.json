@@ -1,0 +1,132 @@
+{
+  "passed": 25,
+  "total": 25,
+  "ok": true,
+  "checks": [
+    {
+      "name": "SessionStart_present",
+      "pass": true,
+      "detail": "found 1 entry(ies)"
+    },
+    {
+      "name": "SessionStart_matcher",
+      "pass": true,
+      "detail": "expected 'startup|resume|clear|compact', got 'startup|resume|clear|compact'"
+    },
+    {
+      "name": "PreToolUse_present",
+      "pass": true,
+      "detail": "found 1 entry(ies)"
+    },
+    {
+      "name": "PreToolUse_matcher",
+      "pass": true,
+      "detail": "expected 'Write|Edit', got 'Write|Edit'"
+    },
+    {
+      "name": "SubagentStart_present",
+      "pass": true,
+      "detail": "found 1 entry(ies)"
+    },
+    {
+      "name": "SubagentStart_matcher",
+      "pass": true,
+      "detail": "expected '.*', got '.*'"
+    },
+    {
+      "name": "SubagentStop_present",
+      "pass": true,
+      "detail": "found 1 entry(ies)"
+    },
+    {
+      "name": "SubagentStop_matcher",
+      "pass": true,
+      "detail": "expected '.*', got '.*'"
+    },
+    {
+      "name": "PreCompact_present",
+      "pass": true,
+      "detail": "found 1 entry(ies)"
+    },
+    {
+      "name": "PreCompact_matcher",
+      "pass": true,
+      "detail": "expected '.*', got '.*'"
+    },
+    {
+      "name": "shell_session-start_exists",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "shell_pre-tool-use_exists",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "shell_subagent-start_exists",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "shell_subagent-stop_exists",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "ts_compile-writer-owner-cache_exists",
+      "pass": true,
+      "detail": "hooks/compile-writer-owner-cache.ts"
+    },
+    {
+      "name": "ts_record-mode-transitions_exists",
+      "pass": true,
+      "detail": "hooks/record-mode-transitions.ts"
+    },
+    {
+      "name": "ts_pre-tool-use_exists",
+      "pass": true,
+      "detail": "hooks/pre-tool-use.ts"
+    },
+    {
+      "name": "ts_subagent-start_exists",
+      "pass": true,
+      "detail": "hooks/subagent-start.ts"
+    },
+    {
+      "name": "ts_subagent-stop_exists",
+      "pass": true,
+      "detail": "hooks/subagent-stop.ts"
+    },
+    {
+      "name": "SessionStart_type",
+      "pass": true,
+      "detail": "expected 'command', got 'command'"
+    },
+    {
+      "name": "PreToolUse_type",
+      "pass": true,
+      "detail": "expected 'command', got 'command'"
+    },
+    {
+      "name": "SubagentStart_type",
+      "pass": true,
+      "detail": "expected 'command', got 'command'"
+    },
+    {
+      "name": "SubagentStop_type",
+      "pass": true,
+      "detail": "expected 'command', got 'command'"
+    },
+    {
+      "name": "PreCompact_type",
+      "pass": true,
+      "detail": "expected 'prompt', got 'prompt'"
+    },
+    {
+      "name": "no_duplicate_registrations",
+      "pass": true,
+      "detail": ""
+    }
+  ]
+}

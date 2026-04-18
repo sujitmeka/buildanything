@@ -10,6 +10,8 @@
     "haiku_input": 0.80,
     "haiku_output": 4.0
   },
+  "sonnet_cache_write_per_mtok": 3.75,
+  "sonnet_cache_read_per_mtok": 0.30,
   "system_prompt_tokens": 3500,
   "claude_md_tokens": 2000,
   "tool_result_tokens": {
@@ -21,10 +23,18 @@
     "Edit": 50,
     "Agent": 2500,
     "WebFetch": 3000,
-    "WebSearch": 1500
+    "WebSearch": 1500,
+    "scribe_decision": 200,
+    "state_save": 150,
+    "acquire_write_lease": 100,
+    "cycle_counter_check": 80,
+    "TodoWrite": 50
   },
   "avg_output_tokens_per_turn": 400,
   "context_carry_forward_ratio": 0.7,
+  "sdk_phase_executor_overhead_tokens": 500,
+  "sdk_subprocess_startup_tokens": 1200,
+  "mcp_tool_registration_overhead_tokens": 300,
   "agent_registry_overrides": {
     "ios-swift-search": {
       "phase_usage": ["2", "3", "4", "5"],

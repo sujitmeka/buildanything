@@ -32,6 +32,8 @@ from typing import Sequence
 from lint_parsers.agents_registry import validate_agents_registry
 from lint_parsers.backward_routing import parse_backward_routing
 from lint_parsers.base import ParseIssue, ParserRegistration
+from lint_parsers.subagent_mappings import validate_subagent_mappings
+from lint_parsers.yaml_artifacts import validate_yaml_artifacts
 
 # Script lives at <repo>/eval/lint_phase_graph.py; parents[1] == repo root.
 REPO_DEFAULT = Path(__file__).resolve().parents[1]
@@ -52,10 +54,17 @@ def _build_registry() -> list[ParserRegistration]:
             fn=parse_backward_routing,
             description="Compare backward-routing edges between build.md and phase-graph.yaml.",
         ),
-        # KIRO slots in here:
-        # ParserRegistration("writer_owner", validate_writer_owner, "..."),
-        # ParserRegistration("yaml_artifacts", validate_yaml_artifacts, "..."),
-        # ParserRegistration("subagent_mappings", validate_subagent_mappings, "..."),
+        # KIRO parsers:
+        ParserRegistration(
+            name="yaml_artifacts",
+            fn=validate_yaml_artifacts,
+            description="Compare artifact writer-owner table between build.md and phase-graph.yaml.",
+        ),
+        ParserRegistration(
+            name="subagent_mappings",
+            fn=validate_subagent_mappings,
+            description="Compare subagent dispatch mappings between build.md and phase-graph.yaml.",
+        ),
     ]
 
 

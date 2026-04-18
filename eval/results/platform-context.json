@@ -1,0 +1,132 @@
+{
+  "passed": 25,
+  "total": 25,
+  "ok": true,
+  "checks": [
+    {
+      "name": "ios_protocol_ios-phase-branches",
+      "pass": true,
+      "detail": "protocols/ios-phase-branches.md"
+    },
+    {
+      "name": "ios_protocol_ios-context",
+      "pass": true,
+      "detail": "protocols/ios-context.md"
+    },
+    {
+      "name": "ios_protocol_ios-frameworks-map",
+      "pass": true,
+      "detail": "protocols/ios-frameworks-map.md"
+    },
+    {
+      "name": "ios_protocol_ios-preflight",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "web_protocol_web-phase-branches",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "ios_agent_skills_ios-app-review-guardian",
+      "pass": true,
+      "detail": "skills: ['skills/ios/asc-privacy-manifest', 'skills/ios/ios-info-plist-hardening']..."
+    },
+    {
+      "name": "ios_agent_skills_ios-foundation-models-specialist",
+      "pass": true,
+      "detail": "skills: ['skills/ios/apple-on-device-ai', 'skills/ios/hig-technologies']..."
+    },
+    {
+      "name": "ios_agent_skills_ios-storekit-specialist",
+      "pass": true,
+      "detail": "no skills_granted"
+    },
+    {
+      "name": "ios_agent_skills_ios-swift-architect",
+      "pass": true,
+      "detail": "skills: ['skills/ios/activitykit', 'skills/ios/app-intents', 'skills/ios/apple-on-device-ai']..."
+    },
+    {
+      "name": "ios_agent_skills_ios-swift-search",
+      "pass": true,
+      "detail": "no skills_granted"
+    },
+    {
+      "name": "ios_agent_skills_ios-swift-ui-design",
+      "pass": true,
+      "detail": "skills: ['skills/ios/hig-components-content', 'skills/ios/hig-components-controls', 'skills/ios/hig-components-status']..."
+    },
+    {
+      "name": "swift_architect_concurrency",
+      "pass": true,
+      "detail": "has ['skills/ios/swift-concurrency-6-2']"
+    },
+    {
+      "name": "storekit_specialist_exists",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "phase_neg1_in_protocol",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "ios_bootstrap_skill_dir",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "phase_1_ios_branch",
+      "pass": true,
+      "detail": "found: ['0', '1', '2', '3', '4', '5', '6', '7']"
+    },
+    {
+      "name": "phase_2_ios_branch",
+      "pass": true,
+      "detail": "found: ['0', '1', '2', '3', '4', '5', '6', '7']"
+    },
+    {
+      "name": "phase_3_ios_branch",
+      "pass": true,
+      "detail": "found: ['0', '1', '2', '3', '4', '5', '6', '7']"
+    },
+    {
+      "name": "phase_4_ios_branch",
+      "pass": true,
+      "detail": "found: ['0', '1', '2', '3', '4', '5', '6', '7']"
+    },
+    {
+      "name": "ios_features_16_flags",
+      "pass": true,
+      "detail": "got 16 flags"
+    },
+    {
+      "name": "visual_design_spec_web",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "ios_design_board_ios",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "component_manifest_web",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "ios_skill_dirs_gte_10",
+      "pass": true,
+      "detail": "found 42"
+    },
+    {
+      "name": "web_skill_dirs_gte_5",
+      "pass": true,
+      "detail": "found 19"
+    }
+  ]
+}
