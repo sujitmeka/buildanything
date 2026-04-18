@@ -3,7 +3,8 @@
   "version": "1.8.0",
   "description": "One command to build an entire product. 44 specialist agents orchestrated into a full engineering pipeline for Claude Code.",
   "bin": {
-    "buildanything": "./bin/setup.js"
+    "buildanything": "./bin/setup.js",
+    "buildanything-runtime": "./bin/buildanything-runtime.ts"
   },
   "scripts": {
     "version": "node bin/sync-version.js && git add .claude-plugin/plugin.json .claude-plugin/marketplace.json"
