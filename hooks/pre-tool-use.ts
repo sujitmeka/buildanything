@@ -1,6 +1,6 @@
 #!/usr/bin/env tsx
 /*
- * buildanything: PreToolUse writer-owner hook handler (tasks 2.1.1–2.1.3, 2.2.2, 2.4.1, 2.4.2, 5.2.1).
+ * buildanything: PreToolUse writer-owner hook handler (tasks 2.1.1–2.1.3, 2.2.2, 2.4.1, 2.4.2, 3.3.1, 5.2.1).
  *
  * Reads a Claude Code tool-call JSON from stdin, consults the writer-owner
  * table in docs/migration/phase-graph.yaml, and denies Write|Edit|MultiEdit
@@ -30,6 +30,15 @@
  * is null and the lease check short-circuits to allow (same as 2.4.1's
  * "no task_id known" branch).
  *
+ * Task 3.3.1 adds a HARD-DENY branch for raw Write|Edit|MultiEdit targeting
+ * docs/plans/.build-state.json. All mutations to that file must route through
+ * the `state_save` MCP tool (src/orchestrator/mcp/state-save.ts) which owns
+ * atomic write semantics + SHA-256 integrity. The lease mechanism from 2.4.1
+ * does NOT override this deny — the rule is "only state_save writes the state
+ * file, period". MCP tool calls are not Write/Edit and therefore never enter
+ * this hook. Emergency rollback via BUILDANYTHING_ALLOW_RAW_STATE_WRITES=on
+ * downgrades to warn (off by default).
+ *
  * Task 5.2.1 extends writer-owner enforcement to agent-role owners. When the
  * matched artifact's writers list contains tokens that are neither phases
  * (`phase-N`) nor the known non-agent pseudos (orchestrator,
@@ -55,6 +64,10 @@
  *     other artifact still blocks on mismatch. Use this flag to regress to
  *     dual-write mode if the scribe MCP pipeline misbehaves in production
  *     without disabling the rest of the writer-owner table.
+ *   BUILDANYTHING_ALLOW_RAW_STATE_WRITES=on → 3.3.1 hard-deny on raw
+ *     Write|Edit targeting docs/plans/.build-state.json downgrades to warn.
+ *     Default OFF. Emergency debugging only — normal operation MUST route
+ *     state mutations through the state_save MCP.
  *   BUILDANYTHING_STRICT_TASK_ID=off → restore 2.4.1 env fallback: when
  *     stdin lacks `parent_tool_use_id`, consult env BUILDANYTHING_TASK_ID
  *     before giving up. Default is on (strict, SDK-only). The `tool_use_id`
@@ -75,6 +88,10 @@ const ENFORCE_ENV = "BUILDANYTHING_ENFORCE_WRITER_OWNER";
 const ENFORCE_LEASE_ENV = "BUILDANYTHING_ENFORCE_WRITE_LEASE";
 const SCRIBE_SINGLE_WRITER_ENV = "BUILDANYTHING_SCRIBE_SINGLE_WRITER";
 const DECISIONS_JSONL_PATH = "docs/plans/decisions.jsonl";
+// Task 3.3.1: raw Write|Edit on .build-state.json is unconditionally denied;
+// this flag downgrades the deny to warn. Default OFF — emergency use only.
+const ALLOW_RAW_STATE_WRITES_ENV = "BUILDANYTHING_ALLOW_RAW_STATE_WRITES";
+const BUILD_STATE_PATH = "docs/plans/.build-state.json";
 const TASK_ID_ENV = "BUILDANYTHING_TASK_ID";
 // Task 2.4.2: default ON (strict, parent_tool_use_id only). Set to "off" to
 // restore 2.4.1's env-var fallback. The per-invocation `tool_use_id` fallback
@@ -626,6 +643,29 @@ function main(): number {
         relCandidates.add(relative(p, f));
       }
     }
+  }
+
+  // Task 3.3.1: raw Write|Edit|MultiEdit on docs/plans/.build-state.json is
+  // unconditionally denied — all state mutations must route through the
+  // `state_save` MCP tool. This runs BEFORE the writer-owner table lookup
+  // and lease check because the rule is absolute: no lease and no phase
+  // ownership overrides it. The state_save MCP call itself is not a Write
+  // tool call, so PreToolUse never fires on it — no false positive on the
+  // legitimate writer. We match on `relCandidates` (covers raw + absolute-
+  // resolved-to-project forms) plus a fresh cwd-relative normalization of
+  // filePath to catch the `./docs/plans/.build-state.json` form that
+  // `relCandidates` does not otherwise normalize for relative inputs.
+  const buildStateMatched =
+    relCandidates.has(BUILD_STATE_PATH) ||
+    relative(project, resolve(project, filePath)) === BUILD_STATE_PATH;
+  if (buildStateMatched) {
+    const msg = `buildanything: raw ${toolName} on ${BUILD_STATE_PATH} denied. Use the state_save MCP tool instead. Set ${ALLOW_RAW_STATE_WRITES_ENV}=on to downgrade to warn.`;
+    if (process.env[ALLOW_RAW_STATE_WRITES_ENV] === "on") {
+      process.stdout.write(`WARNING: ${msg}\n`);
+      return 0;
+    }
+    process.stderr.write(`${msg}\n`);
+    return 2;
   }
 
   let hit: ArtifactEntry | null = null;
