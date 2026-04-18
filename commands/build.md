@@ -941,6 +941,8 @@ Evaluate DRIFT: did the built product stay true to the DNA card locked at Phase 
 
 Write verdict to `docs/plans/evidence/lrr/brand-guardian.json` per schema. Fields per protocol. Brand Guardian CANNOT spawn follow-ups."
 
+**Security/SRE BLOCK-only follow-up dispatch — SDK-gated (Stage 5 / task 5.3.1).** The read-only follow-up investigations spawned by the Security and SRE chapters (BLOCK-only trigger per `protocols/launch-readiness.md`) are dispatched via a TS switch: when the SDK flag is active (default), the orchestrator dispatches the follow-up through `claude-agent-sdk` with `maxTurns: 15` — a hard safety rail that prevents runaway remediation loops. When the SDK is disabled (`BUILDANYTHING_SDK=off`), fall back to the standard Agent tool dispatch with the same 15 tool-call cap self-reported via `tool_calls_used` (the markdown-mode cap documented in `protocols/launch-readiness.md`). If a follow-up exceeds 15 turns under SDK mode, the orchestrator flags to the user (interactive) or logs a warning and treats the parent chapter as BLOCK confirmed (autonomous) — do NOT let the subagent churn indefinitely.
+
 ### Step 6.1a — PM coverage fold-in
 
 PM coverage is a sub-input of the Eng-Quality chapter — evaluated inline within the Eng-Quality dispatch at Step 6.1 above against `design-doc.md` MVP scope and emitted as a `requirements_coverage[]` field on `eng-quality.json`. The LRR Aggregator runs exactly once. Chapter count stays 5.
