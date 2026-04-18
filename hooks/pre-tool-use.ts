@@ -1,6 +1,6 @@
 #!/usr/bin/env tsx
 /*
- * buildanything: PreToolUse writer-owner hook handler (tasks 2.1.1–2.1.3, 2.4.1).
+ * buildanything: PreToolUse writer-owner hook handler (tasks 2.1.1–2.1.3, 2.4.1, 2.4.2).
  *
  * Reads a Claude Code tool-call JSON from stdin, consults the writer-owner
  * table in docs/migration/phase-graph.yaml, and denies Write|Edit|MultiEdit
@@ -18,11 +18,17 @@
  * decision. After the phase-level check returns ALLOW (either via a matching
  * writer-owner entry or by falling outside PROTECTED_PREFIXES), the handler
  * consults docs/plans/.build-state.json.active_write_leases[] and denies when
- * the calling task_id lacks a lease covering file_path. task_id is derived
- * (best-effort for 2.4.1 — strict SDK-spec derivation lands in 2.4.2) from:
- *   1. stdin payload parent_tool_use_id / tool_use_id
- *   2. env BUILDANYTHING_TASK_ID
- *   3. none — lease check skipped (backward compat for Phase 0/1/2)
+ * the calling task_id lacks a lease covering file_path.
+ *
+ * Task 2.4.2 tightens task_id derivation to STRICT mode: task_id comes ONLY
+ * from stdin `parent_tool_use_id`, which per SDK subagent propagation
+ * identifies the parent Agent dispatch. The transitional 2.4.1 fallbacks
+ * (`tool_use_id`, env `BUILDANYTHING_TASK_ID`) are removed because
+ * `tool_use_id` is per-tool-invocation (too granular — the writer-owner
+ * table encodes per-AGENT permissions) and env vars are forgeable / leaky.
+ * When `parent_tool_use_id` is absent (main orchestrator context), task_id
+ * is null and the lease check short-circuits to allow (same as 2.4.1's
+ * "no task_id known" branch).
  *
  * Exit codes per Claude Code PreToolUse protocol:
  *   0 — allow
@@ -33,6 +39,10 @@
  *     lease) downgrade to stdout warnings and exit 0.
  *   BUILDANYTHING_ENFORCE_WRITE_LEASE=false → only the lease check downgrades
  *     to stdout warning; writer-owner denies still block.
+ *   BUILDANYTHING_STRICT_TASK_ID=off → restore 2.4.1 env fallback: when
+ *     stdin lacks `parent_tool_use_id`, consult env BUILDANYTHING_TASK_ID
+ *     before giving up. Default is on (strict, SDK-only). The `tool_use_id`
+ *     fallback is NOT restored by this flag — it was always wrong.
  *
  * Task 2.1.2: boot-compiled cache at .buildanything/writer-owner.json is the
  * fast path. Cache misses (missing / corrupt / stale-mtime) fall back to live
@@ -48,6 +58,10 @@ const WATCHED_TOOLS = new Set(["Write", "Edit", "MultiEdit"]);
 const ENFORCE_ENV = "BUILDANYTHING_ENFORCE_WRITER_OWNER";
 const ENFORCE_LEASE_ENV = "BUILDANYTHING_ENFORCE_WRITE_LEASE";
 const TASK_ID_ENV = "BUILDANYTHING_TASK_ID";
+// Task 2.4.2: default ON (strict, parent_tool_use_id only). Set to "off" to
+// restore 2.4.1's env-var fallback. The per-invocation `tool_use_id` fallback
+// is unconditionally removed — no flag re-enables it.
+const STRICT_TASK_ID_ENV = "BUILDANYTHING_STRICT_TASK_ID";
 
 // Claude Code PreToolUse stdin shape (only the fields we consume).
 interface ToolInput {
@@ -56,11 +70,10 @@ interface ToolInput {
 interface ToolCall {
   tool_name?: string;
   tool_input?: ToolInput;
-  // Claude Code propagates the calling tool_use_id when a hook fires for a
-  // tool invocation spawned by a Task dispatch. 2.4.2 will nail down the
-  // exact field per SDK spec; for 2.4.1 we accept either shape.
+  // Per SDK subagent propagation, `parent_tool_use_id` identifies the parent
+  // Agent dispatch that owns this tool call. 2.4.2 relies on this field
+  // exclusively (see `deriveTaskId`). Absent in main-orchestrator context.
   parent_tool_use_id?: string;
-  tool_use_id?: string;
 }
 
 // Persisted lease shape per MIGRATION-PLAN-FINAL §4 A5:
@@ -388,10 +401,22 @@ function leaseEnforceMode(): "deny" | "warn" {
 }
 
 function deriveTaskId(call: ToolCall): string | null {
-  const fromCall = call.parent_tool_use_id ?? call.tool_use_id;
+  // Task 2.4.2: STRICT by default. The writer-owner/lease table encodes
+  // per-AGENT permissions, and `parent_tool_use_id` is the SDK-propagated
+  // identifier of the parent Agent dispatch. `tool_use_id` (per-invocation)
+  // is too granular and env vars are forgeable; both were transitional
+  // 2.4.1 fallbacks. Absence of `parent_tool_use_id` is the legitimate
+  // main-orchestrator case and returns null (callers short-circuit).
+  const fromCall = call.parent_tool_use_id;
   if (typeof fromCall === "string" && fromCall.trim()) return fromCall.trim();
-  const fromEnv = process.env[TASK_ID_ENV];
-  if (typeof fromEnv === "string" && fromEnv.trim()) return fromEnv.trim();
+
+  // Rollback path only: restores the 2.4.1 env-var fallback. Unset or any
+  // value other than "off" keeps strict mode. The `tool_use_id` fallback
+  // is NOT restored by this flag.
+  if (process.env[STRICT_TASK_ID_ENV] === "off") {
+    const fromEnv = process.env[TASK_ID_ENV];
+    if (typeof fromEnv === "string" && fromEnv.trim()) return fromEnv.trim();
+  }
   return null;
 }
 
@@ -422,18 +447,20 @@ function evaluateLease(
   displayPath: string,
   candidates: Iterable<string>,
 ): LeaseDecision {
-  // No task_id known → preserves backward compat for Phase 0/1/2 and any
-  // non-SDK invocation path. 2.4.2 tightens this.
+  // No task_id known → main-orchestrator context (no parent_tool_use_id on
+  // stdin) or 2.4.1-rollback env-unset. Lease layer intentionally no-ops;
+  // the writer-owner layer still ran above. This preserves Phase 0/1/2
+  // behavior and the main orchestrator case.
   if (!taskId) return { kind: "allow" };
 
   if (leases.length === 0) {
-    // TODO(task-2.4.2-tightening): once Phase 4 orchestrator reliably
-    // acquires leases before dispatching implementers, flip this to a
-    // hard deny. For now, warn + allow so the system doesn't break
-    // during cutover from Stage 1 to Stage 2.
+    // TODO(phase-4-cutover): once Phase 4 orchestrator reliably acquires
+    // leases before dispatching implementers, flip this to a hard deny.
+    // For now, warn + allow so the system doesn't break during cutover
+    // from Stage 1 to Stage 2.
     return {
       kind: "warn",
-      message: `buildanything: write-lease WARNING on ${toolName} ${displayPath} — task_id '${taskId}' has no active leases in .build-state.json; lease acquisition will be required once Phase 4 implementer dispatches are fully cut over (see task 2.4.2)`,
+      message: `buildanything: write-lease WARNING on ${toolName} ${displayPath} — task_id '${taskId}' has no active leases in .build-state.json; lease acquisition will be required once Phase 4 implementer dispatches are fully cut over`,
     };
   }
 
