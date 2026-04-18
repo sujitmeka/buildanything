@@ -1,6 +1,6 @@
 #!/usr/bin/env tsx
 /*
- * buildanything: PreToolUse writer-owner hook handler (tasks 2.1.1–2.1.3, 2.2.2, 2.4.1, 2.4.2).
+ * buildanything: PreToolUse writer-owner hook handler (tasks 2.1.1–2.1.3, 2.2.2, 2.4.1, 2.4.2, 5.2.1).
  *
  * Reads a Claude Code tool-call JSON from stdin, consults the writer-owner
  * table in docs/migration/phase-graph.yaml, and denies Write|Edit|MultiEdit
@@ -29,6 +29,17 @@
  * When `parent_tool_use_id` is absent (main orchestrator context), task_id
  * is null and the lease check short-circuits to allow (same as 2.4.1's
  * "no task_id known" branch).
+ *
+ * Task 5.2.1 extends writer-owner enforcement to agent-role owners. When the
+ * matched artifact's writers list contains tokens that are neither phases
+ * (`phase-N`) nor the known non-agent pseudos (orchestrator,
+ * orchestrator-scribe, every-phase, auto-rendered-view, all-subagents-auto),
+ * those tokens are treated as `subagent_type` names. The hook reads the
+ * subagent_type that subagent-start staged to
+ * `.buildanything/subagent-start-cache/<parent_tool_use_id>.json` and denies
+ * when the staged subagent_type is not in the writers list. This restricts
+ * `lrr/*.json` to the 5 LRR chapter subagents (the "chapter-judge" role) —
+ * aggregator + orchestrator are NOT writers of chapter files.
  *
  * Exit codes per Claude Code PreToolUse protocol:
  *   0 — allow
@@ -156,6 +167,18 @@ const PROTECTED_FILES = new Set(["CLAUDE.md"]);
 
 const CACHE_VERSION = 1;
 const CACHE_REL_PATH = ".buildanything/writer-owner.json";
+const SUBAGENT_START_CACHE_DIR_REL = ".buildanything/subagent-start-cache";
+
+// Tokens in `writers:` / `writer:` that are NOT agent-role names. Anything
+// outside this set AND not matching /^phase--?\d+$/ is treated as a
+// subagent_type (task 5.2.1).
+const NON_AGENT_OWNER_PSEUDOS = new Set([
+  "orchestrator",
+  "orchestrator-scribe",
+  "every-phase",
+  "auto-rendered-view",
+  "all-subagents-auto",
+]);
 
 interface BuildState {
   current_phase?: string | number;
@@ -241,8 +264,12 @@ function normalizePhase(raw: unknown): string | null {
   if (raw === undefined || raw === null) return null;
   const s = String(raw).trim();
   if (!s) return null;
-  // Accept "phase-2", "2", "P2". Normalize to "phase-N".
-  const m = s.match(/(?:phase-?|P)?(-?\d+)/i);
+  // Accept "phase-2", "2", "P2". Normalize to "phase-N". Must match the
+  // whole string; otherwise agent names containing digits (e.g. "a11y-architect")
+  // or compound pseudos like "phase-6-aggregator" get mis-classified as phases
+  // (task 5.2.1: the latter was a latent bug surfaced by agent-role writers
+  // landing in the phase-graph).
+  const m = s.match(/^(?:phase-?|P)?(-?\d+)$/i);
   if (!m) return null;
   return `phase-${m[1]}`;
 }
@@ -415,6 +442,39 @@ function leaseEnforceMode(): "deny" | "warn" {
   if (process.env[ENFORCE_ENV] === "false") return "warn";
   if (process.env[ENFORCE_LEASE_ENV] === "false") return "warn";
   return "deny";
+}
+
+interface StagedSubagent {
+  subagent_type?: string | null;
+}
+
+function readStagedSubagentType(projectDir: string, taskId: string): string | null {
+  // The SubagentStart hook (hooks/subagent-start.ts) writes a staging file
+  // keyed by parent_tool_use_id. We read only the subagent_type field. Any
+  // filesystem / parse error yields null (caller falls through — agent-role
+  // enforcement is best-effort; missing staging data never blocks a write).
+  const path = resolve(projectDir, SUBAGENT_START_CACHE_DIR_REL, `${taskId}.json`);
+  let text: string;
+  try {
+    text = readFileSync(path, "utf8");
+  } catch {
+    return null;
+  }
+  try {
+    const parsed = JSON.parse(text) as StagedSubagent;
+    const t = parsed?.subagent_type;
+    return typeof t === "string" && t.length > 0 ? t : null;
+  } catch {
+    return null;
+  }
+}
+
+function agentRoleOwners(owners: string[]): string[] {
+  // Owners that are neither phases nor known non-agent pseudos. The caller
+  // has already normalized phase-like strings to `phase-N`.
+  return owners.filter(
+    (o) => !/^phase--?\d+$/.test(o) && !NON_AGENT_OWNER_PSEUDOS.has(o),
+  );
 }
 
 function deriveTaskId(call: ToolCall): string | null {
@@ -621,6 +681,28 @@ function main(): number {
     return applyLeaseDecision(
       evaluateLease(taskId, leases, toolName, hitPath, relCandidates),
     );
+  }
+
+  // Task 5.2.1: agent-role enforcement. When the artifact's writers list
+  // contains subagent_type names (e.g. chapter-judge subagents for
+  // lrr/*.json), deny when the calling subagent's staged subagent_type is
+  // not in that list. Best-effort: if no task_id or no staged cache file
+  // exists, fall through (matches lease semantics — main orchestrator has
+  // no parent_tool_use_id; writer-owner still enforces phases).
+  const agentOwners = agentRoleOwners(owners);
+  if (agentOwners.length > 0 && taskId) {
+    const stagedType = readStagedSubagentType(project, taskId);
+    if (stagedType && !agentOwners.includes(stagedType)) {
+      const ownerStr = agentOwners.join(" | ");
+      const msg = `buildanything: writer-owner hook denied ${toolName} on ${hitPath} — subagent '${stagedType}' is not an owner; writer(s): ${ownerStr}`;
+      if (enforceMode() === "warn" || decisionsJsonlDowngrade(relCandidates)) {
+        process.stdout.write(`WARNING: ${msg}\n`);
+        return 0;
+      }
+      process.stderr.write(`${msg}\n`);
+      return 2;
+    }
+    // stagedType match OR staging file missing → fall through to phase / lease.
   }
 
   // Non-phase owners (e.g. "orchestrator", "orchestrator-scribe",
