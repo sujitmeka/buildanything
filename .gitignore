@@ -7,5 +7,9 @@ eval/.venv/
 # Local-only plugin R&D (debate artifacts, internal design docs, session state)
 # These live on the maintainer's machine but don't ship to plugin users.
 docs/plans/
+docs/migration/sdk-hybrid/
 .claude/
 .buildanything/
+
+# Evaluation harness outputs (local probe runs, not published)
+eval/migration-probes/
