@@ -34,7 +34,7 @@ Every synthesized `architecture.md` MUST provide at least these subsection ancho
 
 ### Under `# Frontend`
 
-- `frontend/layout` — page hierarchy, routing, navigation structure.
+- `frontend/layout` — page hierarchy, routing, navigation structure. MUST state whether the product exposes a public, unauthenticated, content-indexable surface (yes / no / partial) — downstream SEO skill loading keys off this answer.
 - `frontend/components` — core component list and responsibilities.
 - `frontend/state` — state management approach (stores, context, local state boundaries).
 - `frontend/styling` — design tokens, CSS/styling approach.

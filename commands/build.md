@@ -63,13 +63,12 @@ CONTEXT:
   phase: <current phase number>
   dna: <resolved from docs/plans/visual-dna.md — INCLUDE only if project_type=web AND phase >= 4>
   ios_features: <resolved from .build-state.json — INCLUDE only if project_type=ios>
-  archetype: <resolved from .build-state.json>
 
 TASK:
 ```
 
 **Rendering procedure** (run once per phase boundary):
-1. Read `docs/plans/.build-state.json`. Extract `project_type`, `ios_features`, `archetype`.
+1. Read `docs/plans/.build-state.json`. Extract `project_type`, `ios_features`.
 2. If `project_type=web` AND phase >= 4: read `docs/plans/visual-dna.md` and extract the DNA summary (first 5 lines or the `## Summary` section). Otherwise omit the `dna` field.
 3. If `project_type=ios`: include `ios_features`. Otherwise omit.
 4. Substitute all values into the template above. Store the result as `rendered_context_header`.
@@ -243,23 +242,6 @@ Scan the build request AND any context from Step 0.1 for iOS signals. Keywords: 
 Record the classification in `docs/plans/.build-state.json` as the top-level `project_type` field. Regenerate `.build-state.md` after the write. This field survives compaction and gates every branching block below.
 
 **Mode-specific additions to Phase 0:** See `protocols/ios-phase-branches.md` §Phase 0 additions (iOS only).
-
-### Step 0.1c — Project Archetype Classification (H1/H2/H3/H4)
-
-Classify the product **archetype**. This is orthogonal to `project_type` (which is the platform) and gates a different set of skills (e.g. `seo`, `cost-aware-llm-pipeline`, `mcp-server-patterns`). The CONTEXT header injected into every dispatch block downstream includes `archetype: {...}` and will not resolve unless this step writes a value.
-
-Read the build request AND, if it exists, `docs/plans/phase1-scratch/idea-draft.md` (may not exist yet on first pass — that's fine; re-run this step after Step 1.0 if the initial classification was ambiguous). Apply these heuristics in order; first match wins:
-
-| Archetype | Signals | Skill gating summary |
-|---|---|---|
-| **H4 — AI-Powered SaaS** | LLM in the critical path; chat/agent interface, RAG, tool-use, AI-powered automation is the core value prop (not just a sprinkled feature) | `cost-aware-llm-pipeline` required; `mcp-server-patterns` optional; `seo` optional per H1/H2 overlap |
-| **H3 — Infra / Dev tool / CLI / Backend** | Dev tools, internal APIs, CLIs, libraries, infra; no end-user UI surface | `seo` excluded; `mcp-server-patterns` optional |
-| **H1 — Marketing site / Landing page** | Static content, sales pages, landing pages with lead forms; content-first, SEO-critical; no user accounts/dashboards | `seo` required; `mcp-server-patterns` excluded |
-| **H2 — Product / SaaS app** | User accounts, dashboards, CRUD data, per-user state, auth, billing — standard SaaS. Default when no stronger signal matches. | `seo` optional; `mcp-server-patterns` excluded |
-
-**Ambiguity rule:** if two archetypes look plausible (e.g. H2 SaaS with an AI assistant bolted on — is it H2 or H4?), ask the user one short question: "Is the AI/LLM layer the core value prop (H4) or a supporting feature inside a standard SaaS (H2)?" and use their answer. In autonomous mode, default to the *less* AI-heavy choice (H2 over H4, H2 over H1) and log the inference to `docs/plans/build-log.md`.
-
-Write the result to `docs/plans/.build-state.json` as the top-level `archetype` field with value `"H1" | "H2" | "H3" | "H4"`. Regenerate `.build-state.md` after the write. This field survives compaction and is consumed by every dispatch block's CONTEXT header.
 
 ### Step 0.1d — Learnings Loader (PITFALL replay)
 

@@ -10,7 +10,6 @@
 {
   "schema_version": 1,
   "project_type": "ios",
-  "archetype": "H4",
   "phase": 6,
   "step": "6.4",
   "session_id": "6f3a9c82-7d4e-4b51-9f2a-1e8c6d3f4a0b",
@@ -41,7 +40,6 @@
 |---|---|---|---|
 | `schema_version` | integer | yes | Currently `1`. Bump on breaking changes. |
 | `project_type` | enum | yes | `"ios"` or `"web"`. Drives mode-branch routing. |
-| `archetype` | enum | yes | `"H1"`, `"H2"`, `"H3"`, `"H4"`. Set by `commands/build.md` Step 0.1c. Gates skill-loading in dispatch blocks. Orthogonal to `project_type`. |
 | `phase` | integer | yes | Current phase, one of `-1, 0, 1, 2, 3, 4, 5, 6, 7`. |
 | `step` | string | yes | Dotted step identifier within the phase (e.g., `"5.3b"`, `"6.4"`). |
 | `session_id` | string | yes | UUID generated at session start; stable across compactions within a session. |
@@ -75,7 +73,7 @@
 The rendered markdown MUST contain these sections in this order:
 
 1. **Header** — one line: `# Build State`
-2. **Current Phase** — `**project_type:** {project_type}`, `**archetype:** {archetype}`, `**Phase:** {phase} — {phase_name}`, `**Step:** {step}`, `**Mode:** {mode}`, `**Autonomous:** {autonomous}`. iOS builds also render `**app_name:**`, `**bundle_id:**`, `**xcodeproj:**`.
+2. **Current Phase** — `**project_type:** {project_type}`, `**Phase:** {phase} — {phase_name}`, `**Step:** {step}`, `**Mode:** {mode}`, `**Autonomous:** {autonomous}`. iOS builds also render `**app_name:**`, `**bundle_id:**`, `**xcodeproj:**`.
 3. **Input** — `**Build request:** {build_request}` and `**Context Level:** {context_level}`.
 4. **Dispatch Counter** — two lines: `- dispatches_since_save: {n}`, `- last_save: Phase {k}`.
 5. **Metric Loop Scores** — table rendered from `metric_loop_history`. Columns: Phase, Iteration, Score, Target, Top Issue. Rows sorted by phase then iteration.
@@ -110,7 +108,6 @@ A well-formed `.build-state.json` must satisfy:
 2. **No duplicate keys** — JSON parse succeeds with strict mode. (Addresses the duplicate-`Autonomous:` drift.)
 3. **Type correctness** — every field matches the declared type. Integers are integers, booleans are booleans, ISO timestamps parse.
 4. **Phase bounds** — `phase ∈ {-1, 0, 1, 2, 3, 4, 5, 6, 7}`. `phase === -1` only if `project_type === "ios"`.
-4a. **Archetype bounds** — `archetype ∈ {"H1", "H2", "H3", "H4"}`.
 5. **Step matches phase** — `step` starts with the current phase number (e.g., phase 5 → `"5.x"`). Exception: iOS bootstrap step `"-1.x"`.
 6. **Mode/autonomous consistency** — `mode === "autonomous" iff autonomous === true`.
 7. **iOS fields gating** — `app_name`, `bundle_id`, `xcodeproj_path`, `ios_features`, `phase_progress.phase_minus_1` exist iff `project_type === "ios"`. On web builds these must be absent.

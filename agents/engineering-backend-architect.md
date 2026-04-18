@@ -35,7 +35,7 @@ The orchestrator passes these variables into your dispatch prompt: `project_type
 **Forbidden defaults:**
 - Do NOT load `skills/ios/swift-concurrency` (older) — superseded by `swift-concurrency-6-2`.
 
-**Archetype-gated (web AI-powered SaaS — H4):**
+**LLM/MCP workload gated (web):**
 - `project_type=web AND description mentions AI/LLM/agent/MCP server` → `skills/web/mcp-server-patterns` — MCP server building with Node/TS SDK
 - Otherwise → DO NOT load `skills/web/mcp-server-patterns`
 

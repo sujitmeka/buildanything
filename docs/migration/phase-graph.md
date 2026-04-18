@@ -6,7 +6,7 @@
 
 **Scope of this document:**
 1. Artifact writer-owner table (who writes what, when)
-2. Project-type and archetype classification matrix
+2. Project-type classification matrix
 3. Phase graph (phases 0 through 7, with steps, dispatches, gates, reads, writes)
 4. Cross-cutting callable services
 5. Backward-routing edges
@@ -64,18 +64,7 @@ Branch-file load is conditional:
 - `project_type=ios` → load `protocols/ios-phase-branches.md` + `protocols/ios-context.md`
 - `project_type=web` → load `protocols/web-phase-branches.md`
 
-### 2.2 `archetype` — product class (orthogonal to platform)
-
-First-match-wins heuristics:
-
-| Archetype | Signals | Gated skills |
-|---|---|---|
-| `H4` — AI-Powered SaaS | LLM in critical path; chat/agent/RAG/tool-use as core value | `cost-aware-llm-pipeline` required |
-| `H3` — Infra / Dev tool / CLI / Backend | No end-user UI | `seo` excluded |
-| `H1` — Marketing site / Landing page | Static content, SEO-critical, no user accounts | `seo` required |
-| `H2` — Product / SaaS app | User accounts, dashboards, CRUD, auth | default |
-
-### 2.3 `ios_features` — 16-flag block (iOS only, resolved end of Phase 2)
+### 2.2 `ios_features` — 16-flag block (iOS only, resolved end of Phase 2)
 
 `widgets, liveActivities, appIntents, foundationModels, storekit, healthkit, push, cloudkit, siri, location, background, cameraPhoto, microphone, contacts, calendar, appleWatch`
 
@@ -96,7 +85,6 @@ Structured representation. Every phase has: `id`, `name`, `kind`, `skip_conditio
 | resume-check | Resume handler | internal | rehydrates `.build-state.json`, reads top 5 decisions.jsonl rows, rebuilds TodoWrite | fires on `--resume` or post-compaction SessionStart hook |
 | 0.1 | Read the Room | classify | `context_level` ∈ {full-design, decision-brief, partial, raw-idea} | scans input + `docs/plans/` + `docs/briefs/` |
 | 0.1b | Project Type Classification | classify | `project_type` ∈ {web, ios} | iOS keyword scan, `.xcodeproj` detection |
-| 0.1c | Archetype Classification | classify | `archetype` ∈ {H1, H2, H3, H4} | ambiguity → ask user one question |
 | 0.1d | Learnings Loader | read | `docs/plans/.active-learnings.md` (top 3 relevant PITFALLs) | reads `learnings.jsonl` local, fallback to `~/.claude/buildanything/learnings.jsonl` |
 | 0.2 | Initialize | write | `docs/plans/.build-state.json`, TodoWrite checklist | no prereq collection yet (stack not decided) |
 
@@ -504,7 +492,6 @@ Phase 4 re-entry: target task only. Reads `prior_output` under `.task-outputs/[t
 ```jsonc
 {
   "project_type": "web" | "ios",
-  "archetype": "H1" | "H2" | "H3" | "H4",
   "ios_features": { /* 16 flags when project_type=ios */ },
   "phase": 0-7,
   "step": "X.Y",

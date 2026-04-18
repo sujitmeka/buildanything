@@ -11,14 +11,12 @@ CONTEXT:
   project_type: web
   phase: <resolved: current phase number>
   dna: <resolved: 6-axis DNA values extracted from docs/plans/visual-dna.md — NOT the full file content, just the axis values. Include only if phase >= 3 AND visual-dna.md exists>
-  archetype: <resolved: H1|H2|H3|H4 from .build-state.json>
 
 TASK:
 ```
 
 **Resolution rules:**
 - `dna` = the 6 axis values only (Scope, Density, Character, Material, Motion, Type) — NOT the full `visual-dna.md` content. ~100 tokens, not ~5K.
-- `archetype` = single enum value from `.build-state.json`.
 - Phase 3 Step 3.0 (Visual DNA Selection) is the ONE exception — it runs BEFORE `visual-dna.md` exists, so its CONTEXT omits `dna`.
 - The rendered header is a stable prefix — it does not change between dispatches within a phase.
 

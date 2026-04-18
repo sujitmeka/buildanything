@@ -116,27 +116,6 @@ classifications:
       ios: [protocols/ios-phase-branches.md, protocols/ios-context.md]
       web: [protocols/web-phase-branches.md]
 
-  archetype:
-    values: [H1, H2, H3, H4]
-    match: first-wins
-    rules:
-      - value: H4
-        label: AI-Powered SaaS
-        signals: [LLM in critical path, chat, agent, RAG, tool-use as core value]
-        gated_skills_required: [cost-aware-llm-pipeline]
-      - value: H3
-        label: Infra / Dev tool / CLI / Backend
-        signals: [no end-user UI]
-        gated_skills_excluded: [seo]
-      - value: H1
-        label: Marketing site / Landing page
-        signals: [static content, SEO-critical, no user accounts]
-        gated_skills_required: [seo]
-      - value: H2
-        label: Product / SaaS app
-        signals: [user accounts, dashboards, CRUD, auth]
-        default: true
-
   ios_features:
     platform: ios
     resolved_at: end-of-phase-2
@@ -185,12 +164,6 @@ phases:
         kind: classify
         writes_state: project_type
         value_domain: [web, ios]
-      - id: "0.1c"
-        name: Archetype Classification
-        kind: classify
-        writes_state: archetype
-        value_domain: [H1, H2, H3, H4]
-        ambiguity_resolution: ask_user_one_question
       - id: "0.1d"
         name: Learnings Loader
         kind: read
@@ -1082,7 +1055,6 @@ state_schema:
     note: TodoWrite does NOT survive compaction; rebuild from JSON on resume.
   fields:
     project_type: {type: enum, values: [web, ios]}
-    archetype: {type: enum, values: [H1, H2, H3, H4]}
     ios_features: {type: object, when: project_type==ios, flags_count: 16}
     phase: {type: integer, range: [0, 7]}
     step: {type: string, pattern: "X.Y"}

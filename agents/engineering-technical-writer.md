@@ -25,9 +25,9 @@ The orchestrator passes these variables into your dispatch prompt: `project_type
 **Project-type gated (iOS):**
 - `project_type=ios AND phase=7` → `skills/ios/app-store-connect-metadata` — authoring & sync of App Store description, keywords, `whatsNew`, localizations via `asc` CLI
 
-**Archetype-gated (web — Marketing/Product scope):**
-- `project_type=web AND archetype ∈ {H1, H2} (Marketing/Product-scoped web apps)` → `skills/web/seo` — technical SEO for search visibility at ship time
-- Otherwise → DO NOT load `skills/web/seo`
+**Public-surface gated (web — search-indexable content):**
+- Read `docs/plans/architecture.md` (the `frontend/layout` section) and the PRD/design-doc scope. If the product exposes a public, unauthenticated, content-indexable surface (landing pages, blog, public product/marketing pages) → load `skills/web/seo` — technical SEO for search visibility at ship time.
+- If the product is entirely behind auth or has no content-indexable surface → DO NOT load `skills/web/seo`.
 
 **Forbidden defaults:**
 - Do NOT load `skills/ios/swift-concurrency` (older) — not docs-relevant.

@@ -15,14 +15,12 @@ CONTEXT:
   project_type: ios
   phase: <resolved: current phase number>
   ios_features: <resolved: 16-flag block from .build-state.json — the literal YAML values, NOT a pointer>
-  archetype: <resolved: H1|H2|H3|H4 from .build-state.json>
 
 TASK:
 ```
 
 **Resolution rules:**
 - `ios_features` = the 16 boolean flags resolved to their values. ~200 tokens.
-- `archetype` = single enum value from `.build-state.json`.
 - The rendered header is a stable prefix — it does not change between dispatches within a phase.
 
 Individual dispatches below reference `[CONTEXT header above]` and rely on this rendered template.

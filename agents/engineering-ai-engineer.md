@@ -29,7 +29,7 @@ The orchestrator passes these variables into your dispatch prompt: `project_type
 - `ios_features.foundationModels == true` → `skills/ios/apple-on-device-ai` — Apple FoundationModels @Generable, on-device inference
 - Otherwise → DO NOT load `skills/ios/apple-on-device-ai`
 
-**Archetype-gated (web AI-powered SaaS — H4):**
+**LLM/MCP workload gated (web):**
 - `project_type=web AND description mentions AI/LLM/agent` → `skills/web/cost-aware-llm-pipeline` — LLM cost optimization, model routing by complexity, budget tracking
 - `project_type=web AND description mentions AI/LLM/agent/MCP server` → `skills/web/mcp-server-patterns` — MCP server building with Node/TS SDK
 - Otherwise → DO NOT load `cost-aware-llm-pipeline` or `mcp-server-patterns`
