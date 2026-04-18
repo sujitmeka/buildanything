@@ -129,7 +129,48 @@ async function main(): Promise<void> {
 
   if (resumeRequested) {
     console.log("[buildanything-runtime] resume requested");
-    // [Task 4.3.4] --resume staleness decrement
+    // [Task 4.3.4] --resume staleness decrement — clears a crashed
+    // backward edge (>60s old) by decrementing counters, so the retry
+    // isn't double-counted toward the escalate-to-user cap.
+    try {
+      const cycleCounter = await import("../src/orchestrator/mcp/cycle-counter.js");
+      const stateSaveModule = await import("../src/orchestrator/mcp/state-save.js");
+      let parsed: Record<string, unknown> | null = null;
+      try {
+        const raw = await readFile(buildStatePath, "utf8");
+        parsed = JSON.parse(raw) as Record<string, unknown>;
+      } catch (err) {
+        const code = (err as NodeJS.ErrnoException).code;
+        if (code === "ENOENT") {
+          process.stderr.write("buildanything: no active backward edge; --resume is a no-op.\n");
+        } else {
+          console.warn(
+            `[buildanything-runtime] warning: could not read ${buildStatePath} for --resume stale-edge check (${(err as Error).message}); continuing`,
+          );
+        }
+      }
+      if (parsed) {
+        if (!parsed.in_flight_backward_edge) {
+          process.stderr.write("buildanything: no active backward edge; --resume is a no-op.\n");
+        } else {
+          const cleared = cycleCounter.handleStaleEdge(parsed as unknown as import("../src/orchestrator/mcp/cycle-counter.js").CounterState);
+          if (cleared) {
+            stateSaveModule.stateSave(buildStatePath, parsed);
+            process.stderr.write(
+              "buildanything: cleared stale in_flight_backward_edge (>60s old); counters decremented. Resuming from last known good phase.\n",
+            );
+          } else {
+            process.stderr.write(
+              "buildanything: --resume requested but no stale edge detected; proceeding normally.\n",
+            );
+          }
+        }
+      }
+    } catch (err) {
+      console.warn(
+        `[buildanything-runtime] warning: --resume stale-edge check failed (${(err as Error).message}); continuing`,
+      );
+    }
   }
 
   const hostVersion = process.env.CLAUDE_CODE_VERSION;
