@@ -49,6 +49,8 @@ Phase-internal scaffolding (lives in `docs/plans/phase1-scratch/` after Gate 1, 
 Phase 4 implementers never reference Phase 1 raw research files. They are SPENT after Phase 2 dispatch.
 </HARD-GATE>
 
+> **Default-deny (Stage 2+):** Once Stage 2 of the SDK migration activates, any `Write|Edit` tool call targeting a path absent from this table will be denied by the `PreToolUse` hook with message `"path not in writer-owner table — please add to phase-graph.yaml or route through scribe MCP"`. This is a pre-announcement; actual hook wiring ships in Task 2.1.3.
+
 <HARD-GATE>
 CONTEXT HEADER — RENDER ONCE, HOIST AS STABLE PREFIX.
 
@@ -76,6 +78,10 @@ TASK:
 
 This keeps the prefix stable across parallel batches (enabling KV-cache reuse) and eliminates redundant state-file reads (~300K–1M tokens saved per build).
 </HARD-GATE>
+
+## SSOT Rule (machine-readable form is authoritative)
+
+For every HARD-GATE promoted to code in Stages 2–5, the machine-readable form (`phase-graph.yaml`, `decisions.schema.json`, `state-schema.md`) is AUTHORITATIVE at runtime. Prose in `commands/build.md` and `protocols/*.md` is a narrative view of the machine-readable form. Prose edits without corresponding machine-readable edits are build-breaking PRs enforced by `eval/lint_phase_graph.py` in CI.
 
 ### Orchestrator Discipline
 
