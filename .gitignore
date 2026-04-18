@@ -1,6 +1,8 @@
 node_modules/
 .DS_Store
 research/
+dist/
+eval/.venv/
 
 # Local-only plugin R&D (debate artifacts, internal design docs, session state)
 # These live on the maintainer's machine but don't ship to plugin users.

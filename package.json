@@ -41,6 +41,9 @@
     "hooks/",
     "protocols/",
     "skills/",
+    "src/",
+    "docs/migration/phase-graph.yaml",
+    "docs/migration/agents.yaml",
     "README.md",
     "CHANGELOG.md"
   ],
