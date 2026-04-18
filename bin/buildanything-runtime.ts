@@ -164,9 +164,10 @@ async function main(): Promise<void> {
 
   // [Task 1.2.4] scribe MCP registration
   // [Task 2.3.4] write-lease MCP registration
+  // [Task 3.2.4] state-save MCP registration
   const mcpServers: Record<string, unknown> = {};
   if (!sdkActive) {
-    console.log("[buildanything-runtime] sdk inactive — scribe + write-lease MCP registration skipped (markdown mode)");
+    console.log("[buildanything-runtime] sdk inactive — scribe + write-lease + state-save MCP registration skipped (markdown mode)");
   } else {
     try {
       const sdk = await import("@anthropic-ai/claude-agent-sdk");
@@ -203,6 +204,29 @@ async function main(): Promise<void> {
     } catch (err) {
       console.warn(
         `[buildanything-runtime] warning: write-lease MCP registration failed (${(err as Error).message}); continuing without lease enforcement`,
+      );
+    }
+
+    try {
+      const sdk = await import("@anthropic-ai/claude-agent-sdk");
+      const {
+        buildStateSaveTool,
+        buildStateReadTool,
+        buildVerifyIntegrityTool,
+      } = await import("./adapters/state-save-tool.js");
+      const saveTool = buildStateSaveTool(sdk.tool);
+      const readTool = buildStateReadTool(sdk.tool);
+      const verifyTool = buildVerifyIntegrityTool(sdk.tool);
+      mcpServers.state_save = sdk.createSdkMcpServer({
+        name: "state_save",
+        tools: [saveTool, readTool, verifyTool],
+      });
+      console.log(
+        "[buildanything-runtime] state-save MCP server registered (tools: state_save, state_read, verify_integrity)",
+      );
+    } catch (err) {
+      console.warn(
+        `[buildanything-runtime] warning: state-save MCP registration failed (${(err as Error).message}); continuing in markdown mode`,
       );
     }
   }
