@@ -6,10 +6,12 @@ Two entry points:
   shape used by the other source parsers in this package.
 * ``validate_agents_registry(repo)`` — validator conforming to the Parser
   protocol in ``base.py``. Returns ``list[ParseIssue]`` the aggregator
-  consumes. Drift rules: prompt_path exists on disk, phase_usage ∈ the
-  top-level phase ids declared in ``docs/migration/phase-graph.yaml``
-  (SSOT — derived, not hard-coded), tool names non-empty, no duplicate
-  agent names.
+  consumes. Drift rules: prompt_path exists on disk AND resolves inside
+  the repo, phase_usage ∈ the top-level phase ids declared in
+  ``docs/migration/phase-graph.yaml`` (SSOT — derived, not hard-coded;
+  missing/unreadable phase-graph emits ``phase_graph_unreadable`` and
+  skips the phase check rather than falling back silently), tool names
+  non-empty, no duplicate agent names.
 """
 
 from __future__ import annotations
@@ -26,27 +28,34 @@ PARSER_NAME = "agents_registry"
 REGISTRY_REL_PATH = "docs/migration/agents.yaml"
 PHASE_GRAPH_REL_PATH = "docs/migration/phase-graph.yaml"
 
-# Used only when phase-graph.yaml is absent or unreadable (SSOT itself is
-# broken). Kept aligned with the known top-level phases as of the A8 migration.
-_FALLBACK_VALID_PHASES: frozenset[str] = frozenset(
-    {"-1", "0", "1", "2", "3", "4", "5", "6", "7"}
-)
+
+@dataclass(frozen=True)
+class _PhaseLoadResult:
+    """Result of reading the phase-graph SSOT for phase validation."""
+
+    phases: frozenset[str] | None
+    error: str | None
 
 
-def _load_valid_phases(repo: Path) -> frozenset[str]:
-    """Return the set of top-level phase ids declared in phase-graph.yaml."""
+def _load_valid_phases(repo: Path) -> _PhaseLoadResult:
+    """Return the set of top-level phase ids declared in phase-graph.yaml.
+
+    Returns ``phases=None`` with an error string when the SSOT is missing
+    or malformed; the caller emits ``phase_graph_unreadable`` and skips
+    phase validation rather than falling back to a stale constant.
+    """
     graph_path = repo / PHASE_GRAPH_REL_PATH
     if not graph_path.exists():
-        return _FALLBACK_VALID_PHASES
+        return _PhaseLoadResult(None, f"{PHASE_GRAPH_REL_PATH} not found")
     try:
         data = yaml.safe_load(graph_path.read_text())
-    except yaml.YAMLError:
-        return _FALLBACK_VALID_PHASES
+    except yaml.YAMLError as exc:
+        return _PhaseLoadResult(None, f"yaml parse error: {exc}")
     if not isinstance(data, dict):
-        return _FALLBACK_VALID_PHASES
+        return _PhaseLoadResult(None, "top-level is not a mapping")
     phases = data.get("phases")
     if not isinstance(phases, list):
-        return _FALLBACK_VALID_PHASES
+        return _PhaseLoadResult(None, "'phases:' list missing or not a list")
     ids: set[str] = set()
     for phase in phases:
         if not isinstance(phase, dict):
@@ -58,18 +67,9 @@ def _load_valid_phases(repo: Path) -> frozenset[str]:
         if "." in pid_str:
             continue
         ids.add(pid_str)
-    return frozenset(ids) if ids else _FALLBACK_VALID_PHASES
-
-
-@dataclass(frozen=True)
-class AgentSpec:
-    """Typed view of one entry in agents.yaml for downstream consumers."""
-
-    name: str
-    prompt_path: str
-    tools: tuple[str, ...]
-    phase_usage: tuple[str, ...]
-    dispatch_modes: tuple[str, ...]
+    if not ids:
+        return _PhaseLoadResult(None, "no top-level phase ids found")
+    return _PhaseLoadResult(frozenset(ids), None)
 
 
 def parse_agents_registry(yaml_path: str | Path) -> dict[str, dict[str, Any]]:
@@ -95,25 +95,35 @@ def get_agents_for_phase(registry: dict[str, dict[str, Any]], phase: str) -> lis
     return [name for name, spec in registry.items() if phase in spec.get("phase_usage", [])]
 
 
-def load_agent_specs(repo: Path) -> dict[str, AgentSpec]:
-    """Return ``AgentSpec`` records keyed by name. Raises on unreadable registry."""
-    registry_path = repo / REGISTRY_REL_PATH
-    data = yaml.safe_load(registry_path.read_text())
-    specs: dict[str, AgentSpec] = {}
-    for entry in (data or {}).get("agents", []) or []:
-        if not isinstance(entry, dict):
-            continue
-        name = entry.get("name")
-        if not isinstance(name, str):
-            continue
-        specs[name] = AgentSpec(
-            name=name,
-            prompt_path=str(entry.get("prompt_path", "")),
-            tools=tuple(str(t) for t in (entry.get("tools") or [])),
-            phase_usage=tuple(str(p) for p in (entry.get("phase_usage") or [])),
-            dispatch_modes=tuple(str(d) for d in (entry.get("dispatch_modes") or [])),
+def _prompt_path_issue(
+    repo_root: Path, repo_rel: Path, name: str, prompt_path: str, entry_src: str
+) -> ParseIssue | None:
+    """Validate one ``prompt_path`` — return a ParseIssue or None on success."""
+    candidate = (repo_root / prompt_path).resolve()
+    try:
+        candidate.relative_to(repo_rel)
+    except ValueError:
+        return ParseIssue(
+            parser=PARSER_NAME,
+            kind="prompt_path_outside_repo",
+            message=(
+                f"agent {name!r} prompt_path escapes repo root: {prompt_path}"
+            ),
+            source=entry_src,
+            details={"agent": name, "prompt_path": prompt_path},
         )
-    return specs
+    if not candidate.is_file():
+        return ParseIssue(
+            parser=PARSER_NAME,
+            kind="prompt_path_missing",
+            message=(
+                f"agent {name!r} prompt_path does not exist on disk: "
+                f"{prompt_path}"
+            ),
+            source=entry_src,
+            details={"agent": name, "prompt_path": prompt_path},
+        )
+    return None
 
 
 def validate_agents_registry(repo: Path) -> list[ParseIssue]:
@@ -162,8 +172,22 @@ def validate_agents_registry(repo: Path) -> list[ParseIssue]:
             )
         ]
 
-    valid_phases = _load_valid_phases(repo)
     issues: list[ParseIssue] = []
+    phase_result = _load_valid_phases(repo)
+    if phase_result.phases is None:
+        issues.append(
+            ParseIssue(
+                parser=PARSER_NAME,
+                kind="phase_graph_unreadable",
+                message=(
+                    f"cannot derive valid phases from {PHASE_GRAPH_REL_PATH} "
+                    f"({phase_result.error}); skipping phase validation"
+                ),
+                source=PHASE_GRAPH_REL_PATH,
+            )
+        )
+
+    repo_rel = repo.resolve()
     seen_names: set[str] = set()
 
     for idx, entry in enumerate(agents):
@@ -212,19 +236,10 @@ def validate_agents_registry(repo: Path) -> list[ParseIssue]:
                     source=entry_src,
                 )
             )
-        elif not (repo / prompt_path).resolve().is_file():
-            issues.append(
-                ParseIssue(
-                    parser=PARSER_NAME,
-                    kind="prompt_path_missing",
-                    message=(
-                        f"agent {name!r} prompt_path does not exist on disk: "
-                        f"{prompt_path}"
-                    ),
-                    source=entry_src,
-                    details={"agent": name, "prompt_path": prompt_path},
-                )
-            )
+        else:
+            issue = _prompt_path_issue(repo, repo_rel, name, prompt_path, entry_src)
+            if issue is not None:
+                issues.append(issue)
 
         for tool in entry.get("tools") or []:
             if not str(tool).strip():
@@ -238,20 +253,21 @@ def validate_agents_registry(repo: Path) -> list[ParseIssue]:
                     )
                 )
 
-        for phase in entry.get("phase_usage") or []:
-            phase_str = str(phase)
-            if phase_str not in valid_phases:
-                issues.append(
-                    ParseIssue(
-                        parser=PARSER_NAME,
-                        kind="invalid_phase",
-                        message=(
-                            f"agent {name!r} has invalid phase {phase_str!r}; "
-                            f"valid: {sorted(valid_phases)}"
-                        ),
-                        source=entry_src,
-                        details={"agent": name, "phase": phase_str},
+        if phase_result.phases is not None:
+            for phase in entry.get("phase_usage") or []:
+                phase_str = str(phase)
+                if phase_str not in phase_result.phases:
+                    issues.append(
+                        ParseIssue(
+                            parser=PARSER_NAME,
+                            kind="invalid_phase",
+                            message=(
+                                f"agent {name!r} has invalid phase {phase_str!r}; "
+                                f"valid: {sorted(phase_result.phases)}"
+                            ),
+                            source=entry_src,
+                            details={"agent": name, "phase": phase_str},
+                        )
                     )
-                )
 
     return issues

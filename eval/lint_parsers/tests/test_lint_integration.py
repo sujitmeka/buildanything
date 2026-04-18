@@ -33,6 +33,9 @@ def _seed_clean_repo(repo: Path) -> None:
 
     (repo / "docs" / "migration" / "phase-graph.yaml").write_text(
         "version: 1\n"
+        'phases:\n'
+        '  - id: "-1"\n'
+        '  - id: "1"\n'
         "backward_routing:\n"
         "  - from: GATE-1-NO\n"
         "    to: phase-1.step-1.0\n"

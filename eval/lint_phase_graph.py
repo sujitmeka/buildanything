@@ -27,12 +27,13 @@ import logging
 import sys
 from dataclasses import asdict
 from pathlib import Path
-from typing import Callable, Sequence
+from typing import Sequence
 
 from lint_parsers.agents_registry import validate_agents_registry
 from lint_parsers.backward_routing import parse_backward_routing
 from lint_parsers.base import ParseIssue, ParserRegistration
 
+# Script lives at <repo>/eval/lint_phase_graph.py; parents[1] == repo root.
 REPO_DEFAULT = Path(__file__).resolve().parents[1]
 
 logger = logging.getLogger(__name__)

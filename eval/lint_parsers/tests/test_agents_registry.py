@@ -97,8 +97,20 @@ def _write_prompt(repo: Path, rel_path: str) -> None:
     prompt.write_text("# prompt\n")
 
 
+def _write_phase_graph(repo: Path, phase_ids: list[str] | None = None) -> None:
+    """Write a minimal phase-graph.yaml so SSOT-strict phase loading passes."""
+    ids = phase_ids if phase_ids is not None else ["-1", "0", "1", "2", "3", "4", "5", "6", "7"]
+    body = "version: 1\nphases:\n" + "".join(
+        f'  - id: "{pid}"\n' for pid in ids
+    )
+    migration = repo / "docs" / "migration"
+    migration.mkdir(parents=True, exist_ok=True)
+    (migration / "phase-graph.yaml").write_text(body)
+
+
 @pytest.mark.unit
 def test_validate_clean_registry_has_no_issues(tmp_path: Path) -> None:
+    _write_phase_graph(tmp_path)
     _write_prompt(tmp_path, "agents/alpha.md")
     _write_prompt(tmp_path, "agents/beta.md")
     _write_repo_registry(tmp_path, SAMPLE)
@@ -108,6 +120,7 @@ def test_validate_clean_registry_has_no_issues(tmp_path: Path) -> None:
 
 @pytest.mark.unit
 def test_validate_missing_prompt_file_is_reported(tmp_path: Path) -> None:
+    _write_phase_graph(tmp_path)
     _write_repo_registry(
         tmp_path,
         """
@@ -128,6 +141,7 @@ def test_validate_missing_prompt_file_is_reported(tmp_path: Path) -> None:
 
 @pytest.mark.unit
 def test_validate_invalid_phase_is_reported(tmp_path: Path) -> None:
+    _write_phase_graph(tmp_path)
     _write_prompt(tmp_path, "agents/alpha.md")
     _write_repo_registry(
         tmp_path,
@@ -149,6 +163,7 @@ def test_validate_invalid_phase_is_reported(tmp_path: Path) -> None:
 
 @pytest.mark.unit
 def test_validate_empty_tool_name_is_reported(tmp_path: Path) -> None:
+    _write_phase_graph(tmp_path)
     _write_prompt(tmp_path, "agents/alpha.md")
     _write_repo_registry(
         tmp_path,
@@ -177,6 +192,7 @@ def test_validate_missing_registry_file_is_reported(tmp_path: Path) -> None:
 
 @pytest.mark.unit
 def test_validate_phase_negative_one_is_valid(tmp_path: Path) -> None:
+    _write_phase_graph(tmp_path)
     _write_prompt(tmp_path, "agents/setup.md")
     _write_repo_registry(
         tmp_path,
@@ -192,3 +208,52 @@ def test_validate_phase_negative_one_is_valid(tmp_path: Path) -> None:
     )
 
     assert validate_agents_registry(tmp_path) == []
+
+
+@pytest.mark.unit
+def test_validate_prompt_path_outside_repo_is_reported(tmp_path: Path) -> None:
+    """Path traversal: prompt_path must resolve inside repo root."""
+    _write_phase_graph(tmp_path)
+    _write_repo_registry(
+        tmp_path,
+        """
+        version: 1
+        agents:
+          - name: escaper
+            prompt_path: ../../escape.md
+            tools: [Read]
+            phase_usage: ['1']
+            dispatch_modes: [single]
+        """,
+    )
+
+    issues = validate_agents_registry(tmp_path)
+
+    assert "prompt_path_outside_repo" in {i.kind for i in issues}
+
+
+@pytest.mark.unit
+def test_validate_reports_phase_graph_unreadable_and_skips_phase_check(
+    tmp_path: Path,
+) -> None:
+    """Without phase-graph.yaml the SSOT is broken; emit phase_graph_unreadable
+    and do NOT silently validate phases against a fallback set."""
+    _write_prompt(tmp_path, "agents/alpha.md")
+    _write_repo_registry(
+        tmp_path,
+        """
+        version: 1
+        agents:
+          - name: alpha
+            prompt_path: agents/alpha.md
+            tools: [Read]
+            phase_usage: ['99']
+            dispatch_modes: [single]
+        """,
+    )
+
+    issues = validate_agents_registry(tmp_path)
+    kinds = {i.kind for i in issues}
+
+    assert "phase_graph_unreadable" in kinds
+    assert "invalid_phase" not in kinds

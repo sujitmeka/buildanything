@@ -122,3 +122,21 @@ def test_missing_yaml_section_is_reported(tmp_path: Path) -> None:
 
     kinds = [i.kind for i in issues]
     assert "yaml_section_missing" in kinds
+
+
+@pytest.mark.unit
+def test_prose_section_present_but_no_edges_is_reported(tmp_path: Path) -> None:
+    """Section header present but body has no matching rows — regex regression sentinel."""
+    prose_header_only = (
+        "# build\n\n"
+        "### Backward Edges — Routing Fix\n\n"
+        "The table has been temporarily removed pending reformat.\n"
+        "No arrows in this body.\n\n"
+        "---\n"
+    )
+    _write_sources(tmp_path, prose_header_only, CLEAN_YAML)
+
+    issues = parse_backward_routing(tmp_path)
+
+    kinds = [i.kind for i in issues]
+    assert "prose_edges_empty" in kinds
