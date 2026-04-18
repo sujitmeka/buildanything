@@ -2,7 +2,7 @@
 
 **One command to build an entire product.**
 
-buildanything is a Claude Code plugin that orchestrates 61 specialist AI agents into a full engineering pipeline — from idea to shipped, tested, reviewed code. You describe what you want to build. buildanything handles research, design, architecture, implementation, behavioral testing, and hardening.
+buildanything is a Claude Code plugin that orchestrates 44 specialist AI agents into a full engineering pipeline — from idea to shipped, tested, reviewed code. You describe what you want to build. buildanything handles research, design, architecture, implementation, behavioral testing, and hardening.
 
 No agent expertise required. No manual coordination. Just `/build`.
 

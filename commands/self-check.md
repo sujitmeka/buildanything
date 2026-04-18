@@ -49,9 +49,9 @@ Use Bash + Grep for the walk. Report PASS with file counts (e.g., `PASS — 15 p
 1. Run `ls /Users/sujit/projects/oneshot-claude-plugin/agents/ | wc -l` to get the actual count.
 2. Read `/Users/sujit/projects/oneshot-claude-plugin/.claude-plugin/plugin.json` and extract any integer from the `description` field (e.g., "73 specialist agents"). If `plugin.json` has a dedicated `agent_count` field, prefer that.
 3. If the two numbers disagree, FAIL with both values.
-4. If no agent count is claimed anywhere in `plugin.json`, report PASS with a warning: `PASS — 61 agents on disk, no claim in manifest to check against`.
+4. If no agent count is claimed anywhere in `plugin.json`, report PASS with a warning: `PASS — 44 agents on disk, no claim in manifest to check against`.
 
-Report format: `PASS — 61 agents on disk, manifest claims 61` or `FAIL — 61 agents on disk, manifest claims 73`.
+Report format: `PASS — 44 agents on disk, manifest claims 44` or `FAIL — 44 agents on disk, manifest claims 73`.
 
 ---
 
@@ -101,7 +101,7 @@ For each check, emit one line with the check name, verdict, and one-sentence rea
 
 ```
 Check 1 — Schema Sanity:        PASS — 15 protocols, 10 commands, 47 cross-refs, all resolve
-Check 2 — Manifest Sync:        PASS — 61 agents on disk, no claim in manifest to check against
+Check 2 — Manifest Sync:        PASS — 44 agents on disk, no claim in manifest to check against
 Check 3 — V.H.P. Regression:    PASS — detector correctly flagged capdotai/capTests.swift as STUB (358 bytes, 2 markers, 0 assertions)
 Check 4 — Silent-Skip:          PASS — no silent-skip phrases found in protocols/
 ```
