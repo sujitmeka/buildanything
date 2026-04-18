@@ -1,17 +1,18 @@
 """P6 — Sprint-context cost probe.
 
-Question: what is the cost delta of Stage 6 (sprint-context hoisting) on top
-of Shape B Stages 1-5?
+Question: what is the cumulative cost reduction of Shape B (Stages 1-6) vs
+the markdown-mode baseline?
 
 Method:
-  1. Baseline = Shape B with Stages 1-5 modifiers (from P1).
-  2. Variant  = Shape B + Stage 6 sprint-context hoisting.
+  1. Baseline = markdown-mode (no modifiers, same as P1 SHAPE_MODS["markdown"]).
+  2. Variant  = Shape B with all Stages 1-6 applied.
      Stage 6 effect on Phase 4:
        - static_mod  0.74 → 0.55  (sprint context cached, not re-sent per task)
        - dynamic_mod 0.90 → 0.78  (per-task refs block removed, replaced with pointer)
-     Other phases unchanged from Shape B.
+     Stages 1-5 apply the standard Shape B modifiers from P1.
   3. 3-run median with ±10% jitter (same as P1).
   4. Reports per-build (Habita + Pacely) separately.
+  5. Stage 5 intermediate result also reported for reference (shows Stages 1-5 sub-total).
 
 Pass condition (FINAL §11.3):
   - strong_pass:  both builds >= 15% cumulative reduction  → ships, C3 lifts to 9
@@ -48,6 +49,11 @@ CARRY_RATIO = CALIB["context_carry_forward_ratio"]
 
 BUILDS: dict[str, tuple[PhaseSpec, ...]] = {
     "habita": HABITA_PHASES, "pacely": PACELY_PHASES,
+}
+
+# -- Markdown baseline (no modifiers — same as P1 SHAPE_MODS["markdown"]) -
+MARKDOWN_BASELINE: dict[str, tuple[float, float, bool]] = {
+    "default": (1.00, 1.00, True),
 }
 
 # -- Shape B Stage 5 modifiers (from P1 SHAPE_MODS["B"]) ------------------
@@ -152,14 +158,16 @@ def classify_outcome(habita_pct: float, pacely_pct: float) -> dict:
 def run() -> dict:
     results: dict[str, dict] = {}
     for build in BUILDS:
-        base = _median(build, SHAPE_B_STAGE5, "stage5")
+        base = _median(build, MARKDOWN_BASELINE, "markdown")
+        stage5 = _median(build, SHAPE_B_STAGE5, "stage5")
         var = _median(build, SHAPE_B_STAGE6, "stage6")
         d_usd = round(var["cost_usd_median"] - base["cost_usd_median"], 4)
         d_pct = round(d_usd / base["cost_usd_median"] * 100, 2) if base["cost_usd_median"] else 0.0
-        results[build] = {"baseline_stage5": base, "variant_stage6": var,
-                          "delta_usd": d_usd, "delta_pct": d_pct}
-    h_pct = results["habita"]["delta_pct"]
-    p_pct = results["pacely"]["delta_pct"]
+        results[build] = {"baseline_markdown": base, "stage5_subtotal": stage5,
+                          "variant_stage6": var, "delta_usd": d_usd,
+                          "cumulative_pct": d_pct}
+    h_pct = results["habita"]["cumulative_pct"]
+    p_pct = results["pacely"]["cumulative_pct"]
     return {"probe": "P6", "name": "sprint-context-cost",
             "pass_condition": "FINAL §11.3 — per-build cumulative reduction thresholds",
             "builds": results,
@@ -179,10 +187,11 @@ def main() -> int:
     print(f"\n{'BUILD':<9} {'STAGE':<9} {'COST':>8} {'Δ USD':>9} {'Δ %':>8}")
     print("-" * 46)
     for build, data in result["builds"].items():
-        b, v = data["baseline_stage5"], data["variant_stage6"]
-        print(f"{build:<9} {'stage5':<9} {b['cost_usd_median']:>8.3f}")
+        b, s5, v = data["baseline_markdown"], data["stage5_subtotal"], data["variant_stage6"]
+        print(f"{build:<9} {'markdown':<9} {b['cost_usd_median']:>8.3f}")
+        print(f"{'':<9} {'stage5':<9} {s5['cost_usd_median']:>8.3f}")
         print(f"{'':<9} {'stage6':<9} {v['cost_usd_median']:>8.3f} "
-              f"{data['delta_usd']:>+9.3f} {data['delta_pct']:>+7.1f}%")
+              f"{data['delta_usd']:>+9.3f} {data['cumulative_pct']:>+7.1f}%")
     print(f"\nOutcome : {cls['outcome']}")
     print(f"Action  : {cls['action']}")
     print(f"Ships   : {cls['ships']}")

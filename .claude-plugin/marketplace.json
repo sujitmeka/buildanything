@@ -12,7 +12,7 @@
       "name": "buildanything",
       "source": "./",
       "description": "Full product build pipeline with 44 specialist agents orchestrated across architecture, implementation, testing, and hardening phases. Includes /build (full factory) and /idea-sweep (parallel research).",
-      "version": "1.8.0"
+      "version": "2.0.0"
     }
   ]
 }
