@@ -19,13 +19,13 @@
   "properties": {
     "decision_id": {
       "type": "string",
-      "pattern": "^D-[0-9]+(\\.[0-9]+)?-[0-9]{2,}$",
-      "description": "D-<phase>-<seq>. Phase is 1, 2, 2.2, etc. Seq is zero-padded >=2 digits."
+      "pattern": "^D-N?[0-9]+(\\.[0-9]+)?-[0-9]{2,}$",
+      "description": "D-<encodedPhase>-<seq>. Phase is 1, 2, 2.2, etc.; negative phases (e.g. -1 for iOS bootstrap) encode the leading minus as 'N' so '-1' becomes 'N1' in this slot. Seq is zero-padded >=2 digits."
     },
     "phase": {
       "type": "string",
-      "pattern": "^[0-9]+(\\.[0-9]+)?$",
-      "description": "Phase number as string (e.g. '1', '2.2', '4')."
+      "pattern": "^-?[0-9]+(\\.[0-9]+)?$",
+      "description": "Phase number as string (e.g. '1', '2.2', '4', '-1' for iOS bootstrap)."
     },
     "timestamp": {
       "type": "string",
@@ -84,7 +84,7 @@
     },
     "related_decision_id": {
       "type": "string",
-      "pattern": "^D-[0-9]+(\\.[0-9]+)?-[0-9]{2,}$",
+      "pattern": "^D-N?[0-9]+(\\.[0-9]+)?-[0-9]{2,}$",
       "description": "Used on finding objects, not decision rows. Listed here so validator accepts rows that reference it explicitly."
     }
   }

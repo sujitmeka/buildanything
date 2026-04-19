@@ -101,9 +101,12 @@ artifacts:
       acting as Phase 3 step owner; LRR A11y chapter reads this plus the
       Phase 5 runtime audit per protocols/launch-readiness.md.
   - path: docs/plans/refs.json
-    writer: phase-2
-    extended_by: phase-3
+    writers: [phase-2, phase-3]
     readers: [phase-4-briefing-officer]
+    notes: |
+      Phase 2 Refs Indexer writes the initial anchor index after architecture.md
+      lands. Phase 3 extends it after visual-design-spec.md lands (see
+      commands/build.md:167). Both phases are legitimate writers.
   - path: docs/plans/decisions.jsonl
     writer: orchestrator-scribe
     write_mode: append-only
@@ -150,13 +153,17 @@ artifacts:
       Smoke-test evidence per protocols/smoke-test.md (HAR captures,
       DOM snapshots, uncaught-exception logs).
   - path: docs/plans/evidence/lrr/*.json
-    writers: [code-reviewer, security-reviewer, engineering-sre, a11y-architect, design-brand-guardian]
+    writers: [code-reviewer, security-reviewer, engineering-sre, a11y-architect, design-brand-guardian, pr-test-analyzer]
     readers: [phase-6-aggregator, orchestrator]
     notes: |
-      One file per LRR chapter. Writer set = the 5 chapter subagents (aka
-      "chapter-judge" role per MIGRATION-PLAN-FINAL §Stage 5). Aggregator and
-      orchestrator are READ-ONLY on chapter files. Enforced agent-role match
-      in hooks/pre-tool-use.ts against subagent_type staged by subagent-start.
+      5 chapter verdict files (one per chapter subagent, aka "chapter-judge"
+      role per MIGRATION-PLAN-FINAL §Stage 5) plus 1 sub-verdict file:
+      pr-test-analyzer writes eng-quality-coverage.json as a parallel
+      sub-dispatch from the Eng-Quality chapter (commands/build.md Step 6.1);
+      code-reviewer reads that file and folds its findings into eng-quality.json.
+      Aggregator and orchestrator are READ-ONLY on every file in this dir.
+      Enforced agent-role match in hooks/pre-tool-use.ts against subagent_type
+      staged by subagent-start.
   - path: docs/plans/evidence/lrr-aggregate.json
     writer: phase-6-aggregator
     readers: [phase-7]

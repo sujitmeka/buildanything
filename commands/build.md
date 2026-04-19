@@ -19,15 +19,15 @@ Exception: Brainstorming in Phase 1 Step 1.0 and Step 1.3 uses an INTERNAL Brain
 <HARD-GATE>
 SUBAGENT_TYPE REQUIRED.
 
-Every Agent tool call MUST include a `subagent_type` field unless the dispatch is explicitly marked INTERNAL (inline role-string). INTERNAL dispatches are listed in `docs/plans/agent-dispatch-audit.md` — they are orchestrator helpers (Brainstorm Facilitator, Research Synthesizer, Design Doc Writer, Prereq Collector, Task DAG Validator, Refs Indexer, Briefing Officer, Dogfood runner, Fake-Data Detector, PM chapter, LRR Aggregator, Completion Report, Verify scaffolding dispatcher).
+Every Agent tool call MUST include a `subagent_type` field unless the dispatch is explicitly marked INTERNAL (inline role-string). INTERNAL dispatches are orchestrator helpers: Brainstorm Facilitator, Research Synthesizer, Design Doc Writer, Prereq Collector, Task DAG Validator, Refs Indexer, Briefing Officer, Dogfood runner, Fake-Data Detector, PM chapter, LRR Aggregator, Completion Report, Verify scaffolding dispatcher.
 
-Missing `subagent_type` on a non-INTERNAL dispatch is a HARD-GATE violation. The orchestrator rejects dispatches that don't name a specific agent. If you catch yourself typing `description: "..."` without a `subagent_type:` line alongside it, STOP and look up the right agent from the dispatch audit.
+Missing `subagent_type` on a non-INTERNAL dispatch is a HARD-GATE violation. The orchestrator rejects dispatches that don't name a specific agent. If you catch yourself typing `description: "..."` without a `subagent_type:` line alongside it, STOP and look up the right agent from the per-phase dispatch tables further down in this file.
 </HARD-GATE>
 
 <HARD-GATE>
 ARTIFACT WRITER-OWNER RULE.
 
-Every shared artifact has ONE concurrent writer at any instant. The writer-owner table in `docs/plans/orchestration-proposed-state.md` §6 defines which phase writes which file. Before any file write, the orchestrator verifies the current phase is the rightful writer. Non-owning phase writes are a HARD-GATE violation. For parallel-batch phases (e.g., Phase 4), intra-phase dispatches MUST NOT race on the same file — writes either target disjoint per-dispatch filenames OR route through an orchestrator-scribe handler (see `decisions.jsonl` handling below).
+Every shared artifact has ONE concurrent writer at any instant. The writer-owner table below defines which phase writes which file. Before any file write, the orchestrator verifies the current phase is the rightful writer. Non-owning phase writes are a HARD-GATE violation. For parallel-batch phases (e.g., Phase 4), intra-phase dispatches MUST NOT race on the same file — writes either target disjoint per-dispatch filenames OR route through an orchestrator-scribe handler (see `decisions.jsonl` handling below).
 
 Live downstream docs (read across Phase 3+):
   - `CLAUDE.md`              — P1 writer (then auto-loaded into every subagent)
@@ -295,7 +295,7 @@ Phase 4 implementer dispatch reads `.active-learnings.md` and injects its conten
 
 **If `project_type=ios` AND no `.xcodeproj` exists:** follow `protocols/ios-phase-branches.md` §Phase -1 — iOS Bootstrap. Otherwise skip entirely.
 
-iOS structural changes are out of scope for this orchestrator migration (per proposed-state §7).
+iOS structural changes are out of scope for this orchestrator migration.
 
 **Compaction checkpoint.** Update `.build-state.json` per the format above.
 
@@ -534,7 +534,7 @@ Per-architect dispatches:
 
 5. Description: "A11y constraints" — subagent_type: `a11y-architect` — team_name: `phase-2-architects` — name: `accessibility-auditor` — Prompt: "[CONTEXT header above] Accessibility-driven architecture constraints. Read these files via your Read tool before starting — do NOT expect pasted content:\n  - PRD: `docs/plans/design-doc.md`\n  - DIGEST: `docs/plans/phase1-scratch/findings-digest.md`\n  - YOUR DOMAIN RAW: `docs/plans/phase1-scratch/ux-research.md`\nIdentify WCAG 2.2 AA requirements that affect component choice, navigation structure, form patterns, focus management, landmark regions.\n\n[paste shared team brief above]"
 
-6. Description: "Performance constraints" — subagent_type: `testing-performance-benchmarker` — team_name: `phase-2-architects` — name: `performance-benchmarker` — Prompt: "[CONTEXT header above] Define quality targets for this build. Read these files via your Read tool before starting — do NOT expect pasted content:\n  - PRD: `docs/plans/design-doc.md`\n  - DIGEST: `docs/plans/phase1-scratch/findings-digest.md`\n  - YOUR DOMAIN RAW: `docs/plans/phase1-scratch/tech-feasibility.md`\nWrite `docs/plans/quality-targets.json` covering bundle budget, LCP, TTI, API p95, Lighthouse scores. Use per-Scope budgets from `orchestration-proposed-state.md` §11: Marketing 500KB / Product 300KB / Dashboard 400KB / Internal 200KB gzipped.\n\n[paste shared team brief above]"
+6. Description: "Performance constraints" — subagent_type: `testing-performance-benchmarker` — team_name: `phase-2-architects` — name: `performance-benchmarker` — Prompt: "[CONTEXT header above] Define quality targets for this build. Read these files via your Read tool before starting — do NOT expect pasted content:\n  - PRD: `docs/plans/design-doc.md`\n  - DIGEST: `docs/plans/phase1-scratch/findings-digest.md`\n  - YOUR DOMAIN RAW: `docs/plans/phase1-scratch/tech-feasibility.md`\nWrite `docs/plans/quality-targets.json` covering bundle budget, LCP, TTI, API p95, Lighthouse scores. Use per-Scope budgets: Marketing 500KB / Product 300KB / Dashboard 400KB / Internal 200KB gzipped.\n\n[paste shared team brief above]"
 
 **Step 2.2c — Wait for all 6 teammates to idle**, then proceed to synthesis. The `docs/plans/phase-2-contracts/*.md` files now contain post-debate positions (initial draft plus any SendMessage-driven revisions). The orchestrator does NOT read these files — the synthesizer below does.
 
@@ -613,7 +613,7 @@ Phase 4 WILL NOT START without `docs/plans/visual-design-spec.md` (web) or `docs
 
 **Mode-specific branch files drive Phase 3 in detail:**
 - `project_type=ios`: follow `protocols/ios-phase-branches.md` §Phase 3 (HIG + App Store + screenlane harvest → iOS Design Board, SwiftUI Preview QA loop).
-- `project_type=web`: follow `protocols/web-phase-branches.md` §Phase 3 — this file contains the NEW structure with steps 3.0-3.7 covering Visual DNA Selection (Brand Guardian as DNA owner at 3.0), Visual Research, Component Library Mapping, UX Architecture, Visual Design Spec, Inclusive Visuals Check, Style Guide Implementation (wrapped in Design Critic metric loop), and A11y Design Review. See `orchestration-proposed-state.md` §11 for the component library strategy.
+- `project_type=web`: follow `protocols/web-phase-branches.md` §Phase 3 — this file contains the NEW structure with steps 3.0-3.7 covering Visual DNA Selection (Brand Guardian as DNA owner at 3.0), Visual Research, Component Library Mapping, UX Architecture, Visual Design Spec, Inclusive Visuals Check, Style Guide Implementation (wrapped in Design Critic metric loop), and A11y Design Review. See the Component Library Mapping step in that protocol for the component library strategy.
 
 **Phase 3 write discipline:** Phase 3 is the writer for `docs/plans/visual-design-spec.md` (web) and extends `docs/plans/refs.json` to cover the visual spec anchors once it lands. Phase 3 does NOT write to `architecture.md` or `sprint-tasks.md` — those are Phase 2's.
 
@@ -759,7 +759,7 @@ DECISIONS.JSONL — ORCHESTRATOR-SCRIBE ONLY via `scribe_decision` MCP. Only the
 Runs after every Phase 4 parallel batch returns (and anywhere else a subagent returns a `deviation_row`, including Phase 1 synthesis and Phase 2 architecture synthesis). The scribe MCP is the single writer for `docs/plans/decisions.jsonl`; the orchestrator is the single caller of the MCP.
 
 1. Walk `batch_results`. Collect every non-null `deviation_row` from each subagent return.
-2. For each row, invoke the `scribe_decision` MCP tool with the row's fields (`phase`, `category`/`type`, `summary`, `decided_by`/`author`, `impact_level`, `rationale`, `related_files`) per the MCP's documented schema. One MCP call per row.
+2. For each row, invoke the `scribe_decision` MCP tool with the row's fields (`phase`, `summary`, `decided_by`/`author`, `impact_level`, `chosen_approach`, `rejected_alternatives`, `ref`) per the MCP's documented schema. One MCP call per row.
 3. The MCP allocates the `decision_id` (`D-{N}-<seq>`), stamps `timestamp` (ISO-8601) and `status: "open"`, validates against `decisions.schema.json`, and atomically appends the line. The orchestrator MUST NOT Write or Edit `docs/plans/decisions.jsonl` directly, MUST NOT pre-compute decision IDs, and MUST NOT read or allocate `.build-state.json.decisions_next_id.P{N}` — ID allocation is the MCP's responsibility.
 4. Regenerate `.build-state.md` after the batch completes so the rendered view reflects the newly appended rows.
 

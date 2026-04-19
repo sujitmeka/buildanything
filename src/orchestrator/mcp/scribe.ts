@@ -37,13 +37,12 @@ export interface DecisionRow {
 
 export interface ScribeInput {
   phase: string;
-  category: string;
   summary: string;
   decided_by: string;
   impact_level: 'low' | 'medium' | 'high' | 'critical';
   chosen_approach: string;
   rejected_alternatives?: RejectedAlternative[];
-  ref?: string;
+  ref: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -63,8 +62,15 @@ const MAX_REVISIT_LEN = 240;
 /** Ref field pattern from decisions.schema.json */
 const REF_PATTERN = /^[a-zA-Z0-9_\-./]+\.(md|json|jsonl|yaml|yml)(#[a-zA-Z0-9_\-/.]+)?$/;
 
-/** Phase string pattern from decisions.schema.json */
-const PHASE_PATTERN = /^[0-9]+(\.[0-9]+)?$/;
+/** Phase string pattern from decisions.schema.json. Leading minus allowed for Phase -1 (iOS bootstrap). */
+const PHASE_PATTERN = /^-?[0-9]+(\.[0-9]+)?$/;
+
+/** Encode a phase token for embedding in a decision_id. Negative phases get an "N" prefix
+ * instead of "-" to avoid colliding with the "-" delimiter in the ID format. So phase "-1"
+ * becomes "N1" in the ID slot, yielding "D-N1-01". Round-trippable via decodePhaseFromId. */
+function encodePhaseForId(phase: string): string {
+  return phase.startsWith('-') ? `N${phase.slice(1)}` : phase;
+}
 
 // ---------------------------------------------------------------------------
 // Per-phase sequence counters (task 1.2.3 — ID allocation)
@@ -96,10 +102,11 @@ export function loadCounters(filePath: string): void {
   }
 }
 
-/** Allocate the next decision ID for a phase. Format: D-{phase}-{seq} */
+/** Allocate the next decision ID for a phase. Format: D-{encodedPhase}-{seq} */
 function allocateId(phase: string): string {
-  counters[phase] = (counters[phase] ?? 0) + 1;
-  return `D-${phase}-${String(counters[phase]).padStart(2, '0')}`;
+  const encoded = encodePhaseForId(phase);
+  counters[encoded] = (counters[encoded] ?? 0) + 1;
+  return `D-${encoded}-${String(counters[encoded]).padStart(2, '0')}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -179,14 +186,11 @@ export function validate(input: ScribeInput): void {
   if (!input.decided_by || input.decided_by.length === 0) {
     throw new Error('decided_by is required');
   }
-  if (!input.category) {
-    throw new Error('category is required');
-  }
   if (!VALID_IMPACTS.includes(input.impact_level as typeof VALID_IMPACTS[number])) {
     throw new Error(`Invalid impact_level: ${input.impact_level}. Must be one of: ${VALID_IMPACTS.join(', ')}`);
   }
-  if (input.ref !== undefined && input.ref !== '' && !REF_PATTERN.test(input.ref)) {
-    throw new Error(`Invalid ref: "${input.ref}". Must match pattern ${REF_PATTERN.source}`);
+  if (!input.ref || input.ref.length === 0 || !REF_PATTERN.test(input.ref)) {
+    throw new Error(`Invalid ref: "${input.ref ?? ''}". Must match pattern ${REF_PATTERN.source}`);
   }
 
   const alts = input.rejected_alternatives ?? [];
@@ -238,7 +242,7 @@ export function scribeDecision(input: ScribeInput, filePath: string): DecisionRo
       chosen_approach: input.chosen_approach,
       rejected_alternatives: input.rejected_alternatives ?? [],
       decided_by: input.decided_by,
-      ref: input.ref ?? '',
+      ref: input.ref,
       status: 'open',
     };
 

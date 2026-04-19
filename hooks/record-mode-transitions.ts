@@ -35,10 +35,13 @@ import process from "node:process";
 
 const TRACKED_FLAGS = [
   "BUILDANYTHING_SDK",
-  "BUILDANYTHING_ENFORCE_WRITER_OWNER",
-  "BUILDANYTHING_ENFORCE_WRITE_LEASE",
   "BUILDANYTHING_SDK_SPRINT_CONTEXT",
   "BUILDANYTHING_SDK_SPRINT_CONTEXT_IOS",
+  "BUILDANYTHING_ENFORCE_WRITER_OWNER",
+  "BUILDANYTHING_ENFORCE_WRITE_LEASE",
+  "BUILDANYTHING_SCRIBE_SINGLE_WRITER",
+  "BUILDANYTHING_ALLOW_RAW_STATE_WRITES",
+  "BUILDANYTHING_STRICT_TASK_ID",
 ] as const;
 
 type FlagName = (typeof TRACKED_FLAGS)[number];
@@ -60,7 +63,11 @@ interface BuildState {
 
 function defaultFor(flag: FlagName): string {
   // BUILDANYTHING_SDK defaults to "on" when unset (v2 opt-out contract).
-  // All other flags default to "false" when unset.
+  // All other tracked flags use "false" as the unset sentinel — that includes
+  // the ENFORCE_* / SCRIBE_SINGLE_WRITER / STRICT_TASK_ID flags whose runtime
+  // default is "enforced" (the hook only checks for the literal opt-out value
+  // "off"/"false"). Any non-default override the operator sets will diff
+  // against this sentinel and produce a mode_transition row.
   return flag === "BUILDANYTHING_SDK" ? "on" : "false";
 }
 

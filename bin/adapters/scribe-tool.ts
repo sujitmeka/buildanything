@@ -26,13 +26,15 @@ const rejectedAlternativeSchema = z.object({
 
 const scribeInputShape = {
   phase: z.string().min(1),
-  category: z.string().min(1),
   summary: z.string().min(1),
   decided_by: z.string().min(1),
   impact_level: z.enum(["low", "medium", "high", "critical"]),
   chosen_approach: z.string().min(1),
   rejected_alternatives: z.array(rejectedAlternativeSchema).max(3).optional(),
-  ref: z.string().optional(),
+  ref: z
+    .string()
+    .min(1)
+    .regex(/^[a-zA-Z0-9_\-./]+\.(md|json|jsonl|yaml|yml)(#[a-zA-Z0-9_\-/.]+)?$/),
 };
 
 export function buildScribeTool(tool: ToolConstructor, cwd: string) {
