@@ -18,9 +18,9 @@ Everything else is out of scope. If your conclusion requires more than 500 words
 
 ## Inputs
 
-- Product idea description (from `idea-draft.md` or direct prompt)
-- Target user persona (from `findings-digest.md` if available)
-- Optional path to `feature-intel.md` if Phase 1.1 Feature Intel has already run
+- Product idea description (from `docs/plans/phase1-scratch/idea-draft.md` or direct prompt)
+- Target user persona (from `docs/plans/phase1-scratch/findings-digest.md` if available)
+- Optional path to `docs/plans/phase1-scratch/feature-intel.md` if Phase 1.1 Feature Intel has already run
 
 ## Core Responsibilities
 
@@ -40,7 +40,7 @@ Everything else is out of scope. If your conclusion requires more than 500 words
 
 ## Workflow
 
-1. Read the product idea description and (if present) `findings-digest.md` for the persona and `feature-intel.md` for the competitive context.
+1. Read the product idea description and (if present) `docs/plans/phase1-scratch/findings-digest.md` for the persona and `docs/plans/phase1-scratch/feature-intel.md` for the competitive context.
 2. **Revenue model** — list 2-3 viable monetization strategies for the product. For each, note the expected price range (with source) and the willingness-to-pay signal from comparable products. Recommend one primary model with one-sentence justification.
 3. **Acquisition channels** — list 2-3 plausible first-1000-users channels. Be specific — "viral via shared whiteboards" is a channel, "social media" is not. For each, note the approximate cost signal from benchmarks (with source URLs).
 4. **Unit economics sketch** — high-level CAC and LTV ranges for the primary model + channel combination. Flag the LTV:CAC ratio target. One paragraph max — if you're reaching for a spreadsheet, stop.
@@ -48,7 +48,7 @@ Everything else is out of scope. If your conclusion requires more than 500 words
    - Which features does the chosen revenue model require us to ship in the MVP? (e.g., "freemium with team plans → we need workspaces, invites, and a per-seat billing surface")
    - Which channels gate specific product decisions? (e.g., "viral loop via shared canvases → we need public-share-by-default with a unique URL per canvas")
    - What is the cheapest validation path? (e.g., "waitlist + single-tier paid beta — skip the freemium tier until retention is proven")
-6. Write `business-model.md` using the Write tool. Return the file path and a one-line summary.
+6. Write `docs/plans/phase1-scratch/business-model.md` using the Write tool. Return the file path and a one-line summary.
 
 ## Output Format
 
@@ -88,5 +88,5 @@ CAC: $30-80 for content/SEO-led growth in SaaS collaboration (source URL). LTV: 
 ## Tools
 
 - WebSearch / WebFetch for pricing benchmarks, CAC signals, growth case studies
-- Read for `idea-draft.md`, `findings-digest.md`, and `feature-intel.md` when present
-- Write for the final `business-model.md`
+- Read for `docs/plans/phase1-scratch/idea-draft.md`, `docs/plans/phase1-scratch/findings-digest.md`, and `docs/plans/phase1-scratch/feature-intel.md` when present
+- Write for the final `docs/plans/phase1-scratch/business-model.md`

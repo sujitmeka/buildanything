@@ -24,7 +24,7 @@ Both modes run the same Playwright capture loop with different URL seeds.
 - Path to `visual-dna.md` — the locked 6-axis DNA card
 - Mode flag: `competitive-audit` or `inspiration-mining`
 - Optional list of specific site URLs from the user or earlier research
-- Optional path to `findings-digest.md` (for competitor hints from Phase 1)
+- Optional path to `docs/plans/phase1-scratch/findings-digest.md` (for competitor hints from Phase 1)
 
 ## Core Responsibilities
 
@@ -51,7 +51,7 @@ Both modes run the same Playwright capture loop with different URL seeds.
 ### Competitive Audit mode
 3a. Build the candidate URL list:
    - Start with user-provided URLs if any
-   - Read `findings-digest.md` if present and pull named rivals
+   - Read `docs/plans/phase1-scratch/findings-digest.md` if present and pull named rivals
    - Otherwise, use WebFetch / WebSearch to find 10-15 products in the same category as the design-doc
 4a. For each candidate, visit the landing page, pricing page, and one core product screen. Score each against the 6 DNA axes on a 0-3 scale. Keep candidates with total ≥ 12.
 5a. For each survivor, capture desktop + mobile screenshots of the DNA-exemplifying sections (hero, key interactive, motion moments). Tag each capture with the DNA axis it exemplifies.
@@ -113,4 +113,4 @@ survivor_count: 6
 - Playwright MCP (primary) — `browser_navigate`, `browser_take_screenshot`, `browser_resize` for breakpoint parity
 - WebFetch / WebSearch for URL discovery
 - Write for the final `design-references.md`
-- Read for `visual-dna.md` and `findings-digest.md`
+- Read for `visual-dna.md` and `docs/plans/phase1-scratch/findings-digest.md`

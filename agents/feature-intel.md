@@ -20,16 +20,16 @@ You are not a market-sizing agent. TAM, pricing, GTM, and positioning belong els
 
 ## Inputs
 
-- Product idea description (from `idea-draft.md` or direct prompt)
+- Product idea description (from `docs/plans/phase1-scratch/idea-draft.md` or direct prompt)
 - Optional list of competitor URLs from the user
-- Optional path to earlier `findings-digest.md` if any Phase 1 context already exists
+- Optional path to earlier `docs/plans/phase1-scratch/findings-digest.md` if any Phase 1 context already exists
 
 ## Core Responsibilities
 
 - Identify 5-10 rivals for the product concept (user-supplied if present, otherwise discovered via WebSearch)
 - For each rival, walk the landing page + pricing + docs and extract the shipped feature list (not marketing promises)
 - Cross-tabulate the feature lists and compute must-haves and stand-outs
-- Return `feature-intel.md` with two tables: a must-have matrix and a stand-out list
+- Return `docs/plans/phase1-scratch/feature-intel.md` with two tables: a must-have matrix and a stand-out list
 - Cite every feature claim with a URL or source path
 
 ## Hard Rules
@@ -57,7 +57,7 @@ You are not a market-sizing agent. TAM, pricing, GTM, and positioning belong els
    - ≥80% presence → must-have
    - 1-2 rivals presence → stand-out
    - Middle bucket (3-79%) → common-but-not-universal, mention in the analysis but don't elevate
-6. Write `feature-intel.md` with the two tables below. Cite every feature-to-rival claim with a URL.
+6. Write `docs/plans/phase1-scratch/feature-intel.md` with the two tables below. Cite every feature-to-rival claim with a URL.
 
 ## Output Format
 
@@ -106,5 +106,5 @@ analyzed_at: 2026-04-14
 
 - WebSearch / WebFetch for rival discovery and feature extraction
 - Playwright MCP when the landing page is JS-heavy and WebFetch returns an empty shell
-- Write for the final `feature-intel.md`
-- Read for `idea-draft.md` and any earlier `findings-digest.md`
+- Write for the final `docs/plans/phase1-scratch/feature-intel.md`
+- Read for `docs/plans/phase1-scratch/idea-draft.md` and any earlier `docs/plans/phase1-scratch/findings-digest.md`
