@@ -127,7 +127,7 @@ interface NormalizedLease {
   file_paths: string[];
 }
 
-interface ArtifactEntry {
+export interface ArtifactEntry {
   path: string;
   writer?: string;
   writers?: string[];
@@ -257,10 +257,16 @@ function globToRegex(pattern: string): RegExp {
   return new RegExp(`^${out}$`);
 }
 
-function findArtifact(filePath: string, artifacts: ArtifactEntry[]): ArtifactEntry | null {
-  // Exact match first, then glob match. Exact wins if both are present.
+export function findArtifact(filePath: string, artifacts: ArtifactEntry[]): ArtifactEntry | null {
+  // Exact match first, then most-specific glob match. A glob's specificity is
+  // the length of its literal prefix before the first wildcard (`*` or `[`).
+  // Longer prefix = more specific. This prevents broad catch-all globs from
+  // shadowing narrow ones regardless of declaration order in phase-graph.yaml —
+  // e.g. `evidence/lrr/*.json` wins over `evidence/**/*.json` for LRR paths.
   const exact = artifacts.find((a) => a.path === filePath);
   if (exact) return exact;
+  let best: ArtifactEntry | null = null;
+  let bestSpecificity = -1;
   for (const a of artifacts) {
     const isGlob = a.is_glob ?? (a.path.includes("*") || a.path.includes("["));
     if (!isGlob) continue;
@@ -272,9 +278,15 @@ function findArtifact(filePath: string, artifacts: ArtifactEntry[]): ArtifactEnt
       const normalized = a.path.replace(/\[[^\]]+\]/g, "*");
       re = globToRegex(normalized);
     }
-    if (re.test(filePath)) return a;
+    if (!re.test(filePath)) continue;
+    const firstWildcard = a.path.search(/[*[]/);
+    const specificity = firstWildcard === -1 ? a.path.length : firstWildcard;
+    if (specificity > bestSpecificity) {
+      best = a;
+      bestSpecificity = specificity;
+    }
   }
-  return null;
+  return best;
 }
 
 function normalizePhase(raw: unknown): string | null {
@@ -773,4 +785,12 @@ function main(): number {
   return 2;
 }
 
-process.exit(main());
+// Guard CLI-only execution so the module is safe to import in tests.
+function isCliEntry(): boolean {
+  const entry = process.argv[1] ?? "";
+  return entry.endsWith("pre-tool-use.ts") || entry.endsWith("pre-tool-use");
+}
+
+if (isCliEntry()) {
+  process.exit(main());
+}
