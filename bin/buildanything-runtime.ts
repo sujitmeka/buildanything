@@ -2,6 +2,17 @@
 /*
  * buildanything runtime — entrypoint loaded by Claude Code plugin
  * when SDK mode is enabled.
+ *
+ * Responsibilities:
+ *   - schema_version forward-compat check on docs/plans/.build-state.json
+ *   - --resume stale-edge recovery (Task 4.3.4)
+ *   - SDK/host compat probe (sdkActive = state file + CLAUDE_CODE_VERSION ok)
+ *   - logging
+ *
+ * Orchestrator MCP tools (state_save, write_lease, cycle_counter, scribe) are
+ * served over stdio by bin/mcp-servers/orchestrator-mcp.ts — registered via
+ * .claude-plugin/plugin.json's mcpServers block and auto-started by Claude
+ * Code. This runtime no longer registers them in-process.
  */
 
 import process from "node:process";
@@ -203,113 +214,15 @@ async function main(): Promise<void> {
   const sdkActive = stateFileActive && hostCompat;
   console.log(`[buildanything-runtime] sdkActive=${sdkActive} (stateFile=${stateFileActive}, hostCompat=${hostCompat})`);
 
-  // [Task 1.2.4] scribe MCP registration
-  // [Task 2.3.4] write-lease MCP registration
-  // [Task 3.2.4] state-save MCP registration
-  // [Task 4.2.4] cycle-counter MCP registration
-  const mcpServers: Record<string, unknown> = {};
-  if (!sdkActive) {
-    console.log("[buildanything-runtime] sdk inactive — scribe + write-lease + state-save + cycle-counter MCP registration skipped (markdown mode)");
-  } else {
-    try {
-      const sdk = await import("@anthropic-ai/claude-agent-sdk");
-      const { buildScribeTool } = await import("./adapters/scribe-tool.js");
-      const scribeTool = buildScribeTool(sdk.tool, process.cwd());
-      mcpServers.scribe = sdk.createSdkMcpServer({
-        name: "scribe",
-        tools: [scribeTool],
-      });
-      console.log("[buildanything-runtime] scribe MCP server registered (tool: scribe_decision)");
-    } catch (err) {
-      console.warn(
-        `[buildanything-runtime] warning: scribe MCP registration failed (${(err as Error).message}); continuing in markdown mode`,
-      );
-    }
-
-    // Hydrate in-memory lease store from disk so it matches persisted state
-    // across runtime restarts. init() no-ops on missing file and swallows
-    // parse errors internally; we still guard so a surprise throw doesn't
-    // block MCP registration.
-    try {
-      const writeLeaseModule = await import("../src/orchestrator/mcp/write-lease.js");
-      writeLeaseModule.init(buildStatePath);
-    } catch (err) {
-      console.warn(
-        `[buildanything-runtime] warning: write-lease init failed (${(err as Error).message}); continuing with empty in-memory leases`,
-      );
-    }
-
-    try {
-      const sdk = await import("@anthropic-ai/claude-agent-sdk");
-      const {
-        buildAcquireWriteLeaseTool,
-        buildReleaseWriteLeaseTool,
-        buildListWriteLeasesTool,
-      } = await import("./adapters/write-lease-tool.js");
-      const acquireTool = buildAcquireWriteLeaseTool(sdk.tool);
-      const releaseTool = buildReleaseWriteLeaseTool(sdk.tool);
-      const listTool = buildListWriteLeasesTool(sdk.tool);
-      mcpServers.write_lease = sdk.createSdkMcpServer({
-        name: "write_lease",
-        tools: [acquireTool, releaseTool, listTool],
-      });
-      console.log(
-        "[buildanything-runtime] write-lease MCP server registered (tools: acquire_write_lease, release_write_lease, list_write_leases)",
-      );
-    } catch (err) {
-      console.warn(
-        `[buildanything-runtime] warning: write-lease MCP registration failed (${(err as Error).message}); continuing without lease enforcement`,
-      );
-    }
-
-    try {
-      const sdk = await import("@anthropic-ai/claude-agent-sdk");
-      const {
-        buildStateSaveTool,
-        buildStateReadTool,
-        buildVerifyIntegrityTool,
-      } = await import("./adapters/state-save-tool.js");
-      const saveTool = buildStateSaveTool(sdk.tool);
-      const readTool = buildStateReadTool(sdk.tool);
-      const verifyTool = buildVerifyIntegrityTool(sdk.tool);
-      mcpServers.state_save = sdk.createSdkMcpServer({
-        name: "state_save",
-        tools: [saveTool, readTool, verifyTool],
-      });
-      console.log(
-        "[buildanything-runtime] state-save MCP server registered (tools: state_save, state_read, verify_integrity)",
-      );
-    } catch (err) {
-      console.warn(
-        `[buildanything-runtime] warning: state-save MCP registration failed (${(err as Error).message}); continuing in markdown mode`,
-      );
-    }
-
-    try {
-      const sdk = await import("@anthropic-ai/claude-agent-sdk");
-      const {
-        buildCycleCounterCheckTool,
-        buildClearInFlightEdgeTool,
-        buildHandleStaleEdgeTool,
-      } = await import("./adapters/cycle-counter-tool.js");
-      const checkTool = buildCycleCounterCheckTool(sdk.tool);
-      const clearTool = buildClearInFlightEdgeTool(sdk.tool);
-      const staleTool = buildHandleStaleEdgeTool(sdk.tool);
-      mcpServers.cycle_counter = sdk.createSdkMcpServer({
-        name: "cycle_counter",
-        tools: [checkTool, clearTool, staleTool],
-      });
-      console.log(
-        "[buildanything-runtime] cycle-counter MCP server registered (tools: cycle_counter_check, clear_in_flight_edge, handle_stale_edge)",
-      );
-    } catch (err) {
-      console.warn(
-        `[buildanything-runtime] warning: cycle-counter MCP registration failed (${(err as Error).message}); continuing without cycle enforcement`,
-      );
-    }
-  }
-
-  void mcpServers;
+  // Orchestrator MCP tools (scribe_decision [Task 1.2.4], acquire/release/list
+  // write-lease [Task 2.3.4], state_save/state_read/verify_integrity [Task
+  // 3.2.4], cycle_counter_check/clear_in_flight_edge/handle_stale_edge [Task
+  // 4.2.4]) are served over stdio by bin/mcp-servers/orchestrator-mcp.ts,
+  // registered through .claude-plugin/plugin.json's mcpServers block. The
+  // Agent SDK path no longer owns these tools — stdio is the single source.
+  // The adapters in bin/adapters/*.ts remain for any future in-process SDK
+  // path that wants to share the zod shapes.
+  void sdkActive;
 }
 
 function isCliEntry(): boolean {
