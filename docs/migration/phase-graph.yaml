@@ -28,6 +28,21 @@ artifacts:
   - path: docs/plans/quality-targets.json
     writer: phase-2
     readers: [phase-4, phase-5, phase-6]
+  - path: docs/plans/phase-2-contracts/*.md
+    writer: phase-2
+    readers: [phase-2, phase-3]
+    notes: |
+      Per-architect post-debate contract files written by the 6 Phase-2.2b
+      teammates (backend, frontend, data, security, a11y, perf). Each file
+      captures the architect's initial decisions plus any peer-driven
+      revisions. Read by the Phase 2.3.1 Implementation Blueprint synthesizer.
+  - path: docs/plans/visual-dna-preview.md
+    writer: phase-2
+    readers: [phase-2, phase-3]
+    notes: |
+      Lightweight directional DNA preview surfaced at Gate 2. Web writer is
+      design-brand-guardian; iOS writer is ios-swift-ui-design. Discarded
+      after Gate 2 — Phase 3.0 re-invokes to produce the locked card.
   - path: docs/plans/visual-design-spec.md
     platform: web
     writer: phase-3
@@ -45,6 +60,46 @@ artifacts:
     platform: web
     writer: phase-3
     readers: [phase-3, phase-4, phase-5, phase-6]
+  - path: docs/plans/design-references.md
+    platform: web
+    writer: visual-research
+    readers: [phase-3, phase-4, phase-6-brand-guardian]
+    notes: |
+      Reference paths grouped by DNA axis. Written by the 2 parallel
+      visual-research subagents at Step 3.1 (competitive-audit + inspiration-
+      mining modes — both append).
+  - path: docs/plans/design-references/**
+    platform: web
+    writer: visual-research
+    readers: [phase-3, phase-4, phase-6-brand-guardian]
+    notes: |
+      Screenshots harvested by visual-research subagents — competitors/,
+      inspiration/, plus mode-keyed subdirs. Binary assets referenced from
+      design-references.md; gate must cover non-markdown file types.
+  - path: docs/plans/dna-persona-check.md
+    platform: web
+    writer: design-ux-researcher
+    readers: [phase-3, phase-3-brand-guardian]
+    notes: |
+      Step 3.2b persona/DNA cross-check. Mismatches may backward-edge to
+      Step 3.0 (DNA re-lock). Agent-role writer pinned to
+      design-ux-researcher per protocols/web-phase-branches.md.
+  - path: docs/plans/ux-architecture.md
+    platform: web
+    writer: phase-3
+    readers: [phase-3, phase-4, phase-5]
+  - path: docs/plans/inclusive-visuals-audit.md
+    platform: web
+    writer: phase-3
+    readers: [phase-3, phase-5, phase-6]
+  - path: docs/plans/a11y-design-review.md
+    platform: web
+    writer: phase-3
+    readers: [phase-5, phase-6-a11y-chapter]
+    notes: |
+      Phase 3.7 WCAG 2.2 AA design-time review. Written by a11y-architect
+      acting as Phase 3 step owner; LRR A11y chapter reads this plus the
+      Phase 5 runtime audit per protocols/launch-readiness.md.
   - path: docs/plans/refs.json
     writer: phase-2
     extended_by: phase-3
@@ -61,6 +116,39 @@ artifacts:
     writer: phase-5
     contributors: [phase-4]
     readers: [phase-6, phase-7]
+  - path: docs/plans/evidence/*.md
+    writers: [phase-5]
+    readers: [phase-5, phase-6, phase-7]
+    notes: |
+      Top-level evidence markdown (fake-data-audit.md, brand-drift findings
+      outside a nested dir, etc.). Matched explicitly because the **/*.md
+      glob requires an intermediate directory segment.
+  - path: docs/plans/evidence/**/*.json
+    writers: [phase-4, phase-5, phase-6]
+    readers: [phase-6, phase-7]
+    notes: |
+      Nested per-task / per-run evidence JSON (smoke-test HAR analysis,
+      eval-harness baseline/final, e2e iter-3 results, dogfood classified
+      findings, maestro run summaries). Top-level evidence/*.json kept
+      separate above for the phase-5 writer narrowing.
+  - path: docs/plans/evidence/**/*.md
+    writers: [phase-4, phase-5]
+    readers: [phase-5, phase-6, phase-7]
+    notes: |
+      Nested per-task / per-run evidence markdown (brand-drift.md,
+      fake-data-audit.md, dogfood/findings.md, per-task smoke-test notes).
+  - path: docs/plans/evidence/**/*.png
+    writers: [phase-3, phase-4, phase-5]
+    readers: [phase-5, phase-6, phase-7]
+    notes: |
+      Playwright screenshots, SwiftUI Preview captures, Maestro run captures,
+      design-reference screenshots. Written across multiple phases.
+  - path: docs/plans/evidence/**/*.{txt,har}
+    writers: [phase-4, phase-5]
+    readers: [phase-5, phase-6]
+    notes: |
+      Smoke-test evidence per protocols/smoke-test.md (HAR captures,
+      DOM snapshots, uncaught-exception logs).
   - path: docs/plans/evidence/lrr/*.json
     writers: [code-reviewer, security-reviewer, engineering-sre, a11y-architect, design-brand-guardian]
     readers: [phase-6-aggregator, orchestrator]
@@ -72,6 +160,20 @@ artifacts:
   - path: docs/plans/evidence/lrr-aggregate.json
     writer: phase-6-aggregator
     readers: [phase-7]
+  - path: docs/plans/evidence/lrr-incomplete.json
+    writer: phase-6-aggregator
+    readers: [orchestrator, user]
+    notes: File-completeness checkpoint output per protocols/launch-readiness.md Step 1.
+  - path: docs/plans/evidence/lrr-routing.json
+    writer: phase-6-aggregator
+    readers: [orchestrator]
+    notes: BLOCK routing via decided_by per commands/build.md Phase 6.2 STEP 4.
+  - path: docs/plans/evidence/reality-check-manifest.json
+    writer: testing-reality-checker
+    readers: [phase-6-aggregator, phase-7]
+    notes: |
+      Evidence-sweep manifest per commands/build.md Phase 6.0. Reality
+      Checker no longer issues combined_verdict (moved to LRR Aggregator).
   - path: docs/plans/.build-state.json
     writer: orchestrator
     write_frequency: every-phase-boundary
@@ -87,6 +189,26 @@ artifacts:
     writer: every-phase
     write_mode: append-on-transition
     readers: [user, resume]
+  - path: docs/plans/.active-learnings.md
+    writer: phase-0
+    readers: [phase-4-implementer]
+    notes: |
+      Top-3 cross-run learnings filtered at Step 0.1d and injected into
+      Phase 4 implementer briefings per protocols/decision-log.md.
+  - path: docs/plans/ios-verify-report.md
+    platform: ios
+    writer: phase-5
+    readers: [phase-6]
+    notes: |
+      Written by the /buildanything:verify iOS twin (Phase 5 dispatch).
+      Required before Phase 6 on iOS per protocols/ios-phase-branches.md.
+  - path: docs/plans/ios-ux-review-report.md
+    platform: ios
+    writer: phase-5
+    readers: [phase-6]
+    notes: |
+      Written by the /buildanything:ux-review iOS twin (Phase 5 dispatch).
+      Required before Phase 6 on iOS per protocols/ios-phase-branches.md.
 
 phase_internal_scratch:
   path_glob: docs/plans/phase1-scratch/*.{md,json}
