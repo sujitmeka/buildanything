@@ -44,6 +44,12 @@ const TRACKED_FLAGS = [
   "BUILDANYTHING_STRICT_TASK_ID",
 ] as const;
 
+// Distinct unset sentinel — angle brackets make it un-shell-settable without
+// quoting, six chars, no sane operator uses this literal. Replaces the prior
+// colliding default of "false" which silently swallowed real operator opt-outs
+// like BUILDANYTHING_ENFORCE_WRITER_OWNER=false (warn-mode rollback).
+const UNSET_SENTINEL = "<unset>";
+
 type FlagName = (typeof TRACKED_FLAGS)[number];
 type FlagSnapshot = Record<FlagName, string>;
 
@@ -61,14 +67,58 @@ interface BuildState {
   [key: string]: unknown;
 }
 
-function defaultFor(flag: FlagName): string {
-  // BUILDANYTHING_SDK defaults to "on" when unset (v2 opt-out contract).
-  // All other tracked flags use "false" as the unset sentinel — that includes
-  // the ENFORCE_* / SCRIBE_SINGLE_WRITER / STRICT_TASK_ID flags whose runtime
-  // default is "enforced" (the hook only checks for the literal opt-out value
-  // "off"/"false"). Any non-default override the operator sets will diff
-  // against this sentinel and produce a mode_transition row.
+function defaultFor(_flag: FlagName): string {
+  // Unified sentinel for all tracked flags — collision-free with any plausible
+  // operator value. See UNSET_SENTINEL comment above.
+  return UNSET_SENTINEL;
+}
+
+// Legacy default the pre-fix recorder wrote to post_flags snapshots when a
+// tracked env var was unset. Only consulted during prev-vs-curr equivalence so
+// the first post-fix run does not spuriously record transitions against old
+// state files. Matches the old defaultFor() behavior exactly.
+function legacyDefaultFor(flag: FlagName): string {
   return flag === "BUILDANYTHING_SDK" ? "on" : "false";
+}
+
+// True when the `prev` snapshot was written by the pre-fix recorder. Signal:
+// every tracked flag in the snapshot equals its legacy default ("on" for SDK,
+// "false" for everything else) and no `<unset>` appears anywhere. Once even a
+// single flag has been recorded as `<unset>` (or as any operator-set literal),
+// the snapshot is post-fix and legacy-compat does NOT apply — keeps real
+// "false" → `<unset>` transitions visible.
+function isLegacyDefaultOnlySnapshot(snap: FlagSnapshot): boolean {
+  for (const flag of TRACKED_FLAGS) {
+    if (snap[flag] !== legacyDefaultFor(flag)) return false;
+  }
+  return true;
+}
+
+// True when `prev` (from disk) and `curr` (from env this run) both represent
+// the "unset / default" state, so no real transition occurred. Handles:
+//   - exact match: prev == curr (any literal operator value)         → equivalent
+//   - new shape:   prev=<unset>, curr=<unset>                        → equivalent
+//   - legacy whole-snapshot: prev is pristine legacy defaults AND curr=<unset>
+//     for this flag → equivalent (suppresses spurious diff on first post-fix
+//     run against a state file written by the pre-fix recorder)
+// Any other mismatch — including the critical "false" → `<unset>` un-set after
+// a real operator flip — falls through to non-equivalent and records a diff.
+function flagValuesEquivalent(
+  flag: FlagName,
+  prev: string,
+  curr: string,
+  prevSnapshot: FlagSnapshot,
+): boolean {
+  if (prev === curr) return true;
+  if (prev === UNSET_SENTINEL && curr === UNSET_SENTINEL) return true;
+  if (
+    curr === UNSET_SENTINEL &&
+    prev === legacyDefaultFor(flag) &&
+    isLegacyDefaultOnlySnapshot(prevSnapshot)
+  ) {
+    return true;
+  }
+  return false;
 }
 
 function readCurrentFlags(): FlagSnapshot {
@@ -97,7 +147,7 @@ function lastRecordedFlags(state: BuildState): FlagSnapshot | null {
 function diffFlags(prev: FlagSnapshot, curr: FlagSnapshot): FlagName[] {
   const changed: FlagName[] = [];
   for (const flag of TRACKED_FLAGS) {
-    if (prev[flag] !== curr[flag]) changed.push(flag);
+    if (!flagValuesEquivalent(flag, prev[flag], curr[flag], prev)) changed.push(flag);
   }
   return changed;
 }

@@ -37,12 +37,15 @@ artifacts:
       captures the architect's initial decisions plus any peer-driven
       revisions. Read by the Phase 2.3.1 Implementation Blueprint synthesizer.
   - path: docs/plans/visual-dna-preview.md
-    writer: phase-2
+    writers: [phase-2, design-brand-guardian, ios-swift-ui-design]
     readers: [phase-2, phase-3]
     notes: |
       Lightweight directional DNA preview surfaced at Gate 2. Web writer is
-      design-brand-guardian; iOS writer is ios-swift-ui-design. Discarded
-      after Gate 2 — Phase 3.0 re-invokes to produce the locked card.
+      design-brand-guardian (protocols/web-phase-branches.md:33); iOS writer
+      is ios-swift-ui-design (protocols/ios-phase-branches.md:172). Agent-role
+      enforcement fires alongside the phase-2 phase-match so only the two
+      legitimate dispatching subagents can write this file. Discarded after
+      Gate 2 — Phase 3.0 re-invokes to produce the locked card.
   - path: docs/plans/visual-design-spec.md
     platform: web
     writer: phase-3
@@ -94,12 +97,14 @@ artifacts:
     readers: [phase-3, phase-5, phase-6]
   - path: docs/plans/a11y-design-review.md
     platform: web
-    writer: phase-3
+    writers: [phase-3, a11y-architect]
     readers: [phase-5, phase-6-a11y-chapter]
     notes: |
       Phase 3.7 WCAG 2.2 AA design-time review. Written by a11y-architect
-      acting as Phase 3 step owner; LRR A11y chapter reads this plus the
-      Phase 5 runtime audit per protocols/launch-readiness.md.
+      acting as Phase 3 step owner (protocols/web-phase-branches.md:151);
+      agent-role enforcement fires alongside the phase-3 phase-match. LRR
+      A11y chapter reads this plus the Phase 5 runtime audit per
+      protocols/launch-readiness.md.
   - path: docs/plans/refs.json
     writers: [phase-2, phase-3]
     readers: [phase-4-briefing-officer]
@@ -120,12 +125,15 @@ artifacts:
     contributors: [phase-4]
     readers: [phase-6, phase-7]
   - path: docs/plans/evidence/*.md
-    writers: [phase-5]
+    writers: [phase-5, design-brand-guardian]
     readers: [phase-5, phase-6, phase-7]
     notes: |
       Top-level evidence markdown (fake-data-audit.md, brand-drift findings
       outside a nested dir, etc.). Matched explicitly because the **/*.md
       glob requires an intermediate directory segment.
+      design-brand-guardian is named explicitly as the Phase 5.1 writer of
+      brand-drift.md (commands/build.md:806, protocols/web-phase-branches.md:251);
+      agent-role enforcement fires alongside the phase-5 phase-match.
   - path: docs/plans/evidence/**/*.json
     writers: [phase-4, phase-5, phase-6]
     readers: [phase-6, phase-7]

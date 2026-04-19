@@ -1,7 +1,7 @@
 ---
 name: ios-swift-ui-design
 description: READS `docs/plans/ios-design-board.md` + user-provided mockups/screenshots and produces a SwiftUI implementation plan for impl agents. Does NOT generate the design board itself (that's `/buildanything:build` Phase 3 Step 3.1). Use when starting from a visual design or UI description before feature planning.
-tools: Read, Glob, Grep, Skill
+tools: [Read, Write, Glob, Grep, Skill]
 model: opus
 color: cyan
 ---
