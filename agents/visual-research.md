@@ -21,7 +21,7 @@ Both modes run the same Playwright capture loop with different URL seeds.
 
 ## Inputs
 
-- Path to `visual-dna.md` — the locked 6-axis DNA card
+- Path to `docs/plans/visual-dna.md` — the locked 6-axis DNA card
 - Mode flag: `competitive-audit` or `inspiration-mining`
 - Optional list of specific site URLs from the user or earlier research
 - Optional path to `docs/plans/phase1-scratch/findings-digest.md` (for competitor hints from Phase 1)
@@ -45,7 +45,7 @@ Both modes run the same Playwright capture loop with different URL seeds.
 ## Workflow
 
 ### Shared setup
-1. Read `visual-dna.md`. Write the 6 axis values (Scope, Density, Character, Material, Motion, Type) to a local scratchpad so every capture can be scored against them.
+1. Read `docs/plans/visual-dna.md`. Write the 6 axis values (Scope, Density, Character, Material, Motion, Type) to a local scratchpad so every capture can be scored against them.
 2. Pick the mode branch below based on the input flag.
 
 ### Competitive Audit mode
@@ -113,4 +113,4 @@ survivor_count: 6
 - Playwright MCP (primary) — `browser_navigate`, `browser_take_screenshot`, `browser_resize` for breakpoint parity
 - WebFetch / WebSearch for URL discovery
 - Write for the final `design-references.md`
-- Read for `visual-dna.md` and `docs/plans/phase1-scratch/findings-digest.md`
+- Read for `docs/plans/visual-dna.md` and `docs/plans/phase1-scratch/findings-digest.md`
