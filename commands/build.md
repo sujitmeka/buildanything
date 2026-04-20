@@ -36,6 +36,7 @@ Live downstream docs (read across Phase 3+):
   - `sprint-tasks.md`        — P2 writer
   - `quality-targets.json`   — P2 writer
   - `visual-design-spec.md`  — P3 writer (web) / `ios-design-board.md` P3 writer (iOS)
+  - `ux-flow-validation.md`  — design-ux-researcher writer (web, Step 3.3b)
   - `refs.json`              — P2 writer + P3 writer (P3 extends after visual spec lands)
   - `decisions.jsonl`        — orchestrator-scribe ONLY via `scribe_decision` MCP tool (subagents return `deviation_row` objects; the orchestrator forwards each row through the MCP, which owns ID allocation and atomic append)
   - `learnings.jsonl`        — P5, P7 writers
