@@ -28,8 +28,11 @@ Check the user's argument:
 | `security` | Check 5 only |
 | `diff` | Check 6 only |
 | `behavioral` | Check 7 only |
+| `static` | Checks 1, 2, 3, 6 (build + types + lint + diff — Phase 6 post-metric-loop) |
 
 Multiple scopes can be combined: `tests security` runs checks 4 and 5.
+
+The `static` macro is used by Phase 6 after the metric loop has already evaluated behavioral quality — see `protocols/verify.md` Step 2 "Scope macros".
 
 ## Step 2: Run the Verification Protocol
 

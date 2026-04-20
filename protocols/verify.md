@@ -47,6 +47,22 @@ The agent runs these checks in order, stopping on the first FAIL:
 ONE AGENT, ONE PASS: The orchestrator spawns exactly ONE agent for the entire verification. This is a single Agent tool call, not 6 separate agents. The agent runs each check as a sequential shell command and evaluates the result before proceeding.
 </HARD-GATE>
 
+**Scope macros** (the caller selects which subset of the 7 checks to run):
+
+| Scope | Checks included |
+|-------|-----------------|
+| `full` | All 7 checks (default) |
+| `build` | Check 1 only |
+| `types` | Check 2 only |
+| `lint` | Check 3 only |
+| `test` | Check 4 only |
+| `security` | Check 5 only |
+| `diff` | Check 6 only |
+| `behavioral` | Check 7 only |
+| `static` | Checks 1, 2, 3, 6 (build, types, lint, diff — no test/security/behavioral) |
+
+The `static` macro is the standard Phase 6 post-metric-loop scope — the metric loop owns behavioral evaluation, so Phase 6 verify skips checks 4 (test), 5 (security), and 7 (behavioral).
+
 ## Step 2b — Test stub detector
 
 After running the Test check in Step 2, AND after running it as PASS, the orchestrator MUST run the test-stub detector. The detector greps every test file in the project's test directory and fails the verification if any file matches a stub pattern.
@@ -105,9 +121,14 @@ exit $EXIT
 
 ## Step 3: Handle Result
 
-**On PASS:** Log `VERIFY: PASS (7/7)` to `docs/plans/.build-state.md`. Proceed to next phase.
+**On PASS:** Return `VERIFY: PASS (N/N)` to the caller via stdout. State persistence is the orchestrator's responsibility (`.build-state.json.verification` is Reality Checker's field, not the gate's). Proceed to next phase.
 
 **On FAIL:** Read the failure reason and spawn a targeted fix agent:
+
+**Fix-agent dispatch mode (SDK-gated — matches `commands/build.md:946`):**
+
+- **`BUILDANYTHING_SDK=on` (default):** dispatch the fix agent through `claude-agent-sdk` with `maxTurns: 15`. This is a hard safety rail preventing runaway remediation loops. If a fix exceeds 15 turns, the orchestrator flags to user (interactive mode) or logs a warning and fails the verify (autonomous mode) — do NOT let the subagent churn indefinitely.
+- **`BUILDANYTHING_SDK=off`:** fall back to Agent tool dispatch with a self-reported 15-tool-call cap (surfaced via `tool_calls_used` in the agent's return). Same enforcement policy as SDK mode.
 
 | Failed Check | Fix Strategy |
 |-------------|-------------|
@@ -118,6 +139,8 @@ exit $EXIT
 | Behavioral | Spawn fix agent: "The acceptance test expects [expected] but the app does [actual]. Read the failing test in tests/e2e/acceptance/, read the implementation, fix the implementation to match the expected behavior." |
 
 After the fix agent completes, re-run verification from Step 2.
+
+**Token accounting (Stage 3 G3):** each fix-agent dispatch emits a cost line to `docs/plans/build-log.md` via `src/orchestrator/hooks/token-accounting-emitter.ts`. Under `BUILDANYTHING_SDK=on`, the emitter subscribes to SDK `usage` messages automatically. Under markdown fallback, the orchestrator writes the line using the subagent's self-reported token count. Verify's fix loop is a known cost hotspot and must be attributed to the parent phase.
 
 <HARD-GATE>
 MAX 3 FIX ATTEMPTS: If verification fails 3 times on the same phase:

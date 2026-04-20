@@ -10,7 +10,7 @@
  * Migration ref: MIGRATION-PLAN-FINAL.md §4 Stage 1 (tasks 1.2.1–1.2.3)
  */
 
-import { writeFileSync, readFileSync, existsSync, mkdirSync } from 'node:fs';
+import { writeFileSync, readFileSync, existsSync, mkdirSync, renameSync } from 'node:fs';
 import { dirname } from 'node:path';
 
 // ---------------------------------------------------------------------------
@@ -225,6 +225,9 @@ export function scribeDecision(input: ScribeInput, filePath: string): DecisionRo
   try {
     validate(input);
 
+    // Auto-rehydrate counters from disk (idempotent — takes max per phase)
+    loadCounters(filePath);
+
     // Enforce max 5 rows per phase
     const existing = countPhaseRows(filePath, input.phase);
     if (existing >= MAX_ROWS_PER_PHASE) {
@@ -252,8 +255,12 @@ export function scribeDecision(input: ScribeInput, filePath: string): DecisionRo
       mkdirSync(dir, { recursive: true });
     }
 
-    // Append-only write — NEVER rewrite or truncate
-    writeFileSync(filePath, JSON.stringify(row) + '\n', { flag: 'a' });
+    // ATOMIC: read existing + append new row + write-to-tmp + rename
+    const existingContent = existsSync(filePath) ? readFileSync(filePath, 'utf-8') : '';
+    const newContent = existingContent + JSON.stringify(row) + '\n';
+    const tmp = `${filePath}.tmp`;
+    writeFileSync(tmp, newContent, 'utf-8');
+    renameSync(tmp, filePath); // atomic on POSIX same-filesystem
 
     return row;
   } finally {

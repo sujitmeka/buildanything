@@ -8,6 +8,7 @@
  */
 
 import type { InFlightBackwardEdge, BackwardRoutingCounters } from '../schemas/backward-edge';
+import { STALE_EDGE_THRESHOLD_MS } from '../schemas/backward-edge';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -93,7 +94,7 @@ export function clearInFlightEdge(state: CounterState): void {
  * If edge is older than threshold, decrement both counters and clear the edge.
  * Returns true if a stale edge was cleaned up.
  */
-export function handleStaleEdge(state: CounterState, thresholdMs: number = 60_000): boolean {
+export function handleStaleEdge(state: CounterState, thresholdMs: number = STALE_EDGE_THRESHOLD_MS): boolean {
   const edge = state.in_flight_backward_edge;
   if (!edge) return false;
 

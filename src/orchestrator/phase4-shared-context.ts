@@ -32,10 +32,26 @@ export function renderSprintContext(input: SprintContextInput): SprintContextBlo
 }
 
 /**
- * Check if the sprint context needs re-rendering (hash invalidation).
- * Returns true if refs have changed since last render.
+ * Hash only the inputs that affect rendered output (excludes buildState).
+ * Cheaper than a full renderSprintContext — no section joins or content hashing.
+ * Callers should store this hash and pass it to shouldInvalidate.
  */
-export function shouldInvalidate(currentHash: string, newInput: SprintContextInput): boolean {
-  const newBlock = renderSprintContext(newInput);
-  return newBlock.hash !== currentHash;
+export function inputHash(input: SprintContextInput): string {
+  return createHash('sha256')
+    .update(JSON.stringify({
+      architecture: input.architecture,
+      qualityTargets: input.qualityTargets,
+      refs: input.refs,
+      iosFeatures: input.iosFeatures ?? null,
+    }))
+    .digest('hex')
+    .slice(0, 16);
+}
+
+/**
+ * Check if the sprint context needs re-rendering (hash invalidation).
+ * Compares input hashes directly — avoids a full render just to get a hash.
+ */
+export function shouldInvalidate(currentInputHash: string, newInput: SprintContextInput): boolean {
+  return inputHash(newInput) !== currentInputHash;
 }

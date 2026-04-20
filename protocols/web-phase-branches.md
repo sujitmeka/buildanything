@@ -92,6 +92,16 @@ Call the Agent tool once:
 
 Output: `docs/plans/ux-architecture.md`.
 
+### Step 3.3b — UX Flow Validation
+
+Validate the UX architecture against the target persona's actual goals and jobs-to-be-done before the Visual Design Spec is built on top of it.
+
+Call the Agent tool once:
+
+1. Description: "UX flow validation" — subagent_type: `design-ux-researcher` — prompt: "[CONTEXT header above — phase: 3] Read `docs/plans/ux-architecture.md`, `docs/plans/design-doc.md` (#persona, #jobs-to-be-done, #scope sections), and `docs/plans/visual-dna.md`. For each user flow in the UX architecture, walk through it as the target persona: narrate the steps, flag friction points, check if the flow serves the persona's jobs-to-be-done efficiently. Specifically check: (1) Are there screens or sections the persona doesn't need? (2) Are critical tasks reachable in the minimum number of steps? (3) Does the information hierarchy match what the persona cares about most? (4) Does the navigation pattern fit the persona's context (mobile-first for on-the-go users, sidebar for desktop power users, etc.)? (5) Does the responsive strategy degrade gracefully for the persona's primary device? Report findings to `docs/plans/ux-flow-validation.md` with pass/flag per flow. If critical flow issues are found, the UX Architect should revise `ux-architecture.md` before proceeding (backward edge to Step 3.3)."
+
+Output: `docs/plans/ux-flow-validation.md`.
+
 ### Step 3.4 — Visual Design Spec (single agent, second Visual Designer invocation)
 
 The Visual Designer re-invokes as writer this time, producing the much richer Visual Design Spec with four new layers on top of the existing tokens.

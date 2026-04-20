@@ -213,7 +213,7 @@ function registerTools(server: McpServer, decisionsPath: string): void {
     },
     async (args) => {
       try {
-        const result = acquireWriteLease(args.task_id, args.file_paths);
+        const result = await acquireWriteLease(args.task_id, args.file_paths);
         return okResult(result);
       } catch (err) {
         return errResult("acquire_write_lease", err);

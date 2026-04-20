@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert';
-import { renderSprintContext, shouldInvalidate, SprintContextInput } from '../../src/orchestrator/phase4-shared-context';
+import { renderSprintContext, shouldInvalidate, inputHash, SprintContextInput } from '../../src/orchestrator/phase4-shared-context';
 
 const base: SprintContextInput = {
   buildState: { status: 'green' },
@@ -17,8 +17,8 @@ describe('sprint-context cache-hit', () => {
   });
 
   it('shouldInvalidate returns false for unchanged input', () => {
-    const block = renderSprintContext(base);
-    assert.strictEqual(shouldInvalidate(block.hash, base), false);
+    const hash = inputHash(base);
+    assert.strictEqual(shouldInvalidate(hash, base), false);
   });
 
   it('different buildState alone does not change hash (not in content)', () => {

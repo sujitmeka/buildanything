@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert';
-import { renderSprintContext, shouldInvalidate, SprintContextInput } from '../../src/orchestrator/phase4-shared-context';
+import { renderSprintContext, shouldInvalidate, inputHash, SprintContextInput } from '../../src/orchestrator/phase4-shared-context';
 
 const base: SprintContextInput = {
   buildState: { status: 'green' },
@@ -24,8 +24,8 @@ describe('sprint-context render', () => {
   });
 
   it('invalidates when refs mutate', () => {
-    const block = renderSprintContext(base);
+    const hash = inputHash(base);
     const mutated = { ...base, refs: { api: '/v2', db: 'postgres' } };
-    assert.strictEqual(shouldInvalidate(block.hash, mutated), true);
+    assert.strictEqual(shouldInvalidate(hash, mutated), true);
   });
 });

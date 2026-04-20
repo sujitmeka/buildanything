@@ -13,8 +13,9 @@ export interface RenderedHeader {
   hash: string;
 }
 
-/** Cache: rendered header keyed by phase + input hash for automatic invalidation */
+/** Cache: rendered header keyed by buildId + phase + input hash for automatic invalidation */
 let cachedHeader: RenderedHeader | null = null;
+let cachedBuildId: string | null = null;
 let cachedPhase: number | null = null;
 let cachedInputHash: string | null = null;
 
@@ -38,10 +39,15 @@ function inputHash(input: ContextHeaderInput): string {
  * Automatically invalidates if inputs change within the same phase
  * (e.g., ios_features mutating mid-build per spec pass criteria).
  */
-export function renderContextHeader(input: ContextHeaderInput): RenderedHeader {
+export function renderContextHeader(input: ContextHeaderInput, buildId: string): RenderedHeader {
   const currentInputHash = inputHash(input);
-  // Return cached if same phase AND same inputs
-  if (cachedPhase === input.phase && cachedInputHash === currentInputHash && cachedHeader) return cachedHeader;
+  // Return cached if same build, same phase, AND same inputs
+  if (
+    cachedBuildId === buildId &&
+    cachedPhase === input.phase &&
+    cachedInputHash === currentInputHash &&
+    cachedHeader
+  ) return cachedHeader;
 
   const lines: string[] = ['CONTEXT:'];
   lines.push(`  project_type: ${input.projectType}`);
@@ -72,6 +78,7 @@ export function renderContextHeader(input: ContextHeaderInput): RenderedHeader {
   const content = lines.join('\n');
   const hash = createHash('sha256').update(content).digest('hex').slice(0, 16);
 
+  cachedBuildId = buildId;
   cachedHeader = { content, hash };
   cachedPhase = input.phase;
   cachedInputHash = currentInputHash;
@@ -83,13 +90,15 @@ export function renderContextHeader(input: ContextHeaderInput): RenderedHeader {
  */
 export function invalidateCache(): void {
   cachedHeader = null;
+  cachedBuildId = null;
   cachedPhase = null;
   cachedInputHash = null;
 }
 
 /**
- * Check if the cache is valid for a given phase.
+ * Check if the cache is valid for a given build + phase.
  */
-export function isCacheValid(phase: number): boolean {
+export function isCacheValid(phase: number, buildId?: string): boolean {
+  if (buildId !== undefined && cachedBuildId !== buildId) return false;
   return cachedPhase === phase && cachedHeader !== null;
 }

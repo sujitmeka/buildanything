@@ -14,6 +14,7 @@ export interface AggregateResult {
   chapters: ChapterResult[];
   star_rule_triggered?: boolean;
   star_rule_decision_ids?: string[];
+  cross_chapter_contradiction?: string;
 }
 
 export function aggregate(chapters: ChapterResult[]): AggregateResult {
@@ -21,23 +22,24 @@ export function aggregate(chapters: ChapterResult[]): AggregateResult {
   if (chapters.some(c => c.override_blocks_launch))
     return { combined_verdict: 'BLOCKED', triggered_rule: 1, chapters };
 
-  // Rule 6: contradictions between chapters on typed fields → BLOCKED
-  // Two chapters contradict if they reference the same finding description
-  // but assign conflicting verdicts (one PASS, one BLOCK on the same topic).
-  const findingsByDesc = new Map<string, Set<Verdict>>();
+  // Rule 6: contradictions between chapters on related_decision_id → BLOCKED
+  // Two chapters contradict if they reference the same decision_id
+  // but assign conflicting verdicts (one PASS, one BLOCK).
+  const verdictByDecisionId = new Map<string, Set<Verdict>>();
   for (const ch of chapters) {
     for (const f of ch.findings) {
-      const key = f.description.toLowerCase().trim();
-      if (!findingsByDesc.has(key)) findingsByDesc.set(key, new Set());
-      findingsByDesc.get(key)!.add(ch.verdict);
+      if (!f.related_decision_id) continue;
+      const key = f.related_decision_id;
+      if (!verdictByDecisionId.has(key)) verdictByDecisionId.set(key, new Set());
+      verdictByDecisionId.get(key)!.add(ch.verdict);
     }
   }
-  for (const [desc, verdicts] of findingsByDesc) {
+  for (const [decId, verdicts] of verdictByDecisionId) {
     if (verdicts.has('PASS') && verdicts.has('BLOCK')) {
       return {
         combined_verdict: 'BLOCKED', triggered_rule: 6, chapters,
-        cross_chapter_contradiction: desc,
-      } as AggregateResult;
+        cross_chapter_contradiction: decId,
+      };
     }
   }
 

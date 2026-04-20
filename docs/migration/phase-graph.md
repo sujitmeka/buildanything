@@ -188,6 +188,7 @@ Structured representation. Every phase has: `id`, `name`, `kind`, `skip_conditio
 | 3.2 | Component Library Mapping (HARD-GATE source) | dispatch-single | `design-ui-designer` reads catalog + DNA, writes `component-manifest.md` |
 | 3.2b | DNA Persona Check | dispatch-single | `design-ux-researcher` validates DNA vs persona/JTBD; may route back to 3.0 |
 | 3.3 | UX Architecture | dispatch-single | `design-ux-architect` writes `ux-architecture.md` |
+| 3.3b | UX Flow Validation | dispatch-single | `design-ux-researcher` walks each user flow as target persona, flags friction points, checks JTBD alignment; critical issues → backward edge to Step 3.3. Writes `ux-flow-validation.md` |
 | 3.4 | Visual Design Spec | dispatch-single | `design-ui-designer` (writer invocation) writes `visual-design-spec.md` with tokens + material + motion + typography + state matrix |
 | 3.5 | Inclusive Visuals Check | dispatch-single | `design-inclusive-visuals-specialist` writes `inclusive-visuals-audit.md` |
 | 3.6 | Style Guide Implementation | loop (generator/critic, callable) | generator: `engineering-frontend-developer` builds `/design-system`. critic: `design-critic` scores 6 DNA axes × 5 craft dims = /220, target 180. Max 5 iters |

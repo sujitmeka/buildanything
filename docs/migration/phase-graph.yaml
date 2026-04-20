@@ -91,6 +91,13 @@ artifacts:
     platform: web
     writer: phase-3
     readers: [phase-3, phase-4, phase-5]
+  - path: docs/plans/ux-flow-validation.md
+    platform: web
+    writer: design-ux-researcher
+    readers: [phase-3, phase-4, phase-5]
+    notes: |
+      Step 3.3b persona-driven flow validation. Flags friction points
+      and unnecessary screens before the Visual Design Spec is built.
   - path: docs/plans/inclusive-visuals-audit.md
     platform: web
     writer: phase-3
@@ -560,6 +567,15 @@ phases:
           kind: dispatch-single
           subagent_type: design-ux-architect
           writes: [ux-architecture.md]
+        - id: "3.3b"
+          name: UX Flow Validation
+          kind: dispatch-single
+          dispatches: [design-ux-researcher]
+          reads: [docs/plans/ux-architecture.md, docs/plans/design-doc.md, docs/plans/visual-dna.md]
+          writes: [docs/plans/ux-flow-validation.md]
+          backward_edges:
+            - from: critical-flow-issues
+              to: phase-3.step-3.3
         - id: "3.4"
           name: Visual Design Spec
           kind: dispatch-single

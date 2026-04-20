@@ -92,24 +92,41 @@ function persistLeases(): void {
 }
 
 /**
+ * Process-level async mutex for acquireWriteLease.
+ *
+ * Serializes all callers through a promise chain so that even if two async
+ * dispatch paths call acquireWriteLease concurrently, the overlap check and
+ * push are never interleaved. This prevents a TOCTOU race where both callers
+ * read the leases array before either persists, granting conflicting leases.
+ */
+let acquireLock: Promise<void> = Promise.resolve();
+
+/**
  * Acquire a write lease for the given file paths.
  * Persists to disk atomically so the PreToolUse hook sees the lease.
+ *
+ * Serialized via an async mutex (promise chain) to prevent TOCTOU races
+ * when called from concurrent async dispatch paths.
  */
-export function acquireWriteLease(taskId: string, filePaths: string[]): AcquireResult {
-  if (!taskId) throw new Error('task_id is required');
-  if (!filePaths.length) throw new Error('file_paths must be non-empty');
+export async function acquireWriteLease(taskId: string, filePaths: string[]): Promise<AcquireResult> {
+  const result = acquireLock.then(() => {
+    if (!taskId) throw new Error('task_id is required');
+    if (!filePaths.length) throw new Error('file_paths must be non-empty');
 
-  for (const existing of leases) {
-    const overlap = filePaths.filter(p => existing.paths.includes(p));
-    if (overlap.length > 0) {
-      return { granted: false, conflict: { holder: existing.holder, paths: overlap } };
+    for (const existing of leases) {
+      const overlap = filePaths.filter(p => existing.paths.includes(p));
+      if (overlap.length > 0) {
+        return { granted: false, conflict: { holder: existing.holder, paths: overlap } };
+      }
     }
-  }
 
-  const lease: Lease = { holder: taskId, paths: [...filePaths], acquired_at: new Date().toISOString() };
-  leases.push(lease);
-  persistLeases();
-  return { granted: true, lease };
+    const lease: Lease = { holder: taskId, paths: [...filePaths], acquired_at: new Date().toISOString() };
+    leases.push(lease);
+    persistLeases();
+    return { granted: true, lease };
+  });
+  acquireLock = result.then(() => {}, () => {}); // advance chain regardless of success/failure
+  return result;
 }
 
 /**

@@ -274,12 +274,13 @@ async function renderHeader(
   }
 
   try {
+    const buildId = pickString(state.session_id) ?? '';
     return mod.renderContextHeader({
       projectType,
       phase,
       iosFeatures: pickIosFeatures(state.ios_features),
       visualDnaPath: resolve(projectDir, VISUAL_DNA_PATH_REL),
-    });
+    }, buildId);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     process.stderr.write(
