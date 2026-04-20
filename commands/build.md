@@ -31,18 +31,44 @@ Every shared artifact has ONE concurrent writer at any instant. The writer-owner
 
 Live downstream docs (read across Phase 3+):
   - `CLAUDE.md`              — P1 writer (then auto-loaded into every subagent)
-  - `design-doc.md` (PRD)    — P1 writer
-  - `architecture.md`        — P2 writer
-  - `sprint-tasks.md`        — P2 writer
-  - `quality-targets.json`   — P2 writer
-  - `visual-design-spec.md`  — P3 writer (web) / `ios-design-board.md` P3 writer (iOS)
-  - `ux-flow-validation.md`  — design-ux-researcher writer (web, Step 3.3b)
-  - `refs.json`              — P2 writer + P3 writer (P3 extends after visual spec lands)
-  - `decisions.jsonl`        — orchestrator-scribe ONLY via `scribe_decision` MCP tool (subagents return `deviation_row` objects; the orchestrator forwards each row through the MCP, which owns ID allocation and atomic append)
-  - `learnings.jsonl`        — P5, P7 writers
-  - `evidence/*.json`        — P5 writer (P4 contributes per-task, P6/P7 readers)
-  - `lrr/*.json`             — P6 writer (1 per chapter + Aggregator)
-  - `lrr-aggregate.json`     — P6 writer (Aggregator only)
+  - `docs/plans/design-doc.md` (PRD)    — P1 writer
+  - `docs/plans/architecture.md`        — P2 writer
+  - `docs/plans/sprint-tasks.md`        — P2 writer
+  - `docs/plans/quality-targets.json`   — P2 writer
+  - `docs/plans/phase-2-contracts/*.md`  — P2 writer (per-architect post-debate contract files)
+  - `docs/plans/visual-dna-preview.md`  — P2 writer, design-brand-guardian writer, ios-swift-ui-design writer (directional DNA preview at Gate 2)
+  - `docs/plans/visual-design-spec.md`  — P3 writer (web)
+  - `docs/plans/ios-design-board.md`    — P3 writer (iOS)
+  - `docs/plans/component-manifest.md`  — P3 writer (web, HARD-GATE import source)
+  - `docs/plans/visual-dna.md`          — P3 writer (web)
+  - `docs/plans/design-references.md`   — visual-research writer (web, Step 3.1)
+  - `docs/plans/design-references/**`   — visual-research writer (web, screenshots harvested by visual-research subagents)
+  - `docs/plans/dna-persona-check.md`   — design-ux-researcher writer (web, Step 3.2b)
+  - `docs/plans/ux-architecture.md`     — P3 writer (web)
+  - `docs/plans/ux-flow-validation.md`  — design-ux-researcher writer (web, Step 3.3b)
+  - `docs/plans/inclusive-visuals-audit.md` — P3 writer (web)
+  - `docs/plans/a11y-design-review.md`  — P3 writer, a11y-architect writer (web, Step 3.7)
+  - `docs/plans/refs.json`              — P2 writer, P3 writer (P3 extends after visual spec lands)
+  - `docs/plans/decisions.jsonl`        — orchestrator-scribe ONLY via `scribe_decision` MCP tool (subagents return `deviation_row` objects; the orchestrator forwards each row through the MCP, which owns ID allocation and atomic append)
+  - `docs/plans/learnings.jsonl`        — P5 writer, P7 writer
+  - `docs/plans/evidence/*.json`        — P5 writer (P4 contributes per-task, P6/P7 readers)
+  - `docs/plans/evidence/*.md`          — P5 writer, design-brand-guardian writer (brand-drift findings, fake-data-audit)
+  - `docs/plans/evidence/**/*.json`     — P4 writer, P5 writer, P6 writer (nested per-task/per-run evidence JSON)
+  - `docs/plans/evidence/**/*.md`       — P4 writer, P5 writer (nested per-task/per-run evidence markdown)
+  - `docs/plans/evidence/**/*.png`      — P3 writer, P4 writer, P5 writer (screenshots: Playwright, SwiftUI Preview, Maestro, design-reference)
+  - `docs/plans/evidence/**/*.{txt,har}` — P4 writer, P5 writer (smoke-test HAR captures, DOM snapshots)
+  - `docs/plans/evidence/lrr/*.json`    — code-reviewer writer, security-reviewer writer, engineering-sre writer, a11y-architect writer, design-brand-guardian writer, pr-test-analyzer writer (5 chapter verdicts + 1 sub-verdict)
+  - `docs/plans/evidence/lrr-aggregate.json` — phase-6-aggregator writer (Aggregator only)
+  - `docs/plans/evidence/lrr-incomplete.json` — phase-6-aggregator writer (file-completeness checkpoint)
+  - `docs/plans/evidence/lrr-routing.json`    — phase-6-aggregator writer (BLOCK routing via decided_by)
+  - `docs/plans/evidence/reality-check-manifest.json` — testing-reality-checker writer (evidence-sweep manifest)
+  - `docs/plans/.build-state.json`      — orchestrator writer (every phase boundary)
+  - `docs/plans/.build-state.md`        — auto-rendered-view writer (regenerated from .build-state.json on every update)
+  - `docs/plans/.task-outputs/[task-id].json` — P4 writer (per-task output)
+  - `docs/plans/build-log.md`           — every-phase writer (append on transition)
+  - `docs/plans/.active-learnings.md`   — P0 writer (top-3 cross-run learnings for Phase 4 implementer briefings)
+  - `docs/plans/ios-verify-report.md`   — P5 writer (iOS verify twin)
+  - `docs/plans/ios-ux-review-report.md` — P5 writer (iOS ux-review twin)
 
 Phase-internal scaffolding (lives in `docs/plans/phase1-scratch/` after Gate 1, never read by P3+):
   - `idea-draft.md`, `feature-intel.md`, `tech-feasibility.md`, `ux-research.md`, `business-model.md`, `findings-digest.md`, `suggested-questions.md`, `user-decisions.md`, `prereqs.json`
@@ -182,23 +208,27 @@ Mode-specific tool stacks, per-phase branches, and persona rules live in separat
 When a later phase finds a problem whose root cause lives earlier, control flows BACKWARD to the authoring phase. The orchestrator codifies these edges so problems are fixed where they were introduced, not patched locally.
 
 ```
-PROBLEM FOUND AT                    ROUTES BACK TO
-─────────────────────────────────────────────────────────────────
-Gate 1 (human says "no")        →   Phase 1 Step 1.0 with feedback
-Gate 2 (human says "no")        →   Phase 2 with feedback
-Phase 5 Audit (code issue)      →   Phase 4 target task
-Phase 5 Audit (design issue)    →   Phase 3 target step
-Phase 5 Audit (spec issue)      →   Phase 2 re-architect
-Phase 6 LRR BLOCK (⭐⭐)         →   Aggregator reads decisions.jsonl
-                                     by related_decision_id →
-                                     authoring phase → re-open
-Phase 6 LRR NEEDS_WORK (code)   →   Phase 4 target task
-Phase 6 LRR NEEDS_WORK (struct) →   Phase 2 or Phase 3
+PROBLEM FOUND AT                                              ROUTES BACK TO
+──────────────────────────────────────────────────────────────────────────────────
+Gate 1 (human says "no")                                  →   Phase 1 Step 1.0 with feedback
+Gate 2 (human says "no")                                  →   Phase 2 with feedback
+phase-3.step-3.2b-DNA-persona-mismatch                    →   phase-3.step-3.0
+Phase 5 Audit (code issue)                                →   Phase 4 target task
+Phase 5 Audit (design issue)                              →   Phase 3 target step
+Phase 5 Audit (spec issue)                                →   phase-2
+phase-5-dogfood-classified                                →   target_phase-per-classified-findings.json
+phase-5-dogfood-feedback-synthesizer                      →   phase-4.target-task
+Phase 6 LRR BLOCK (⭐⭐)                                   →   authoring-phase (per decisions.jsonl.decided_by)
+LRR-BLOCK-decided_by==architect                           →   phase-2
+LRR-BLOCK-decided_by==design-brand-guardian-or-phase-3-writer →   phase-3
+Phase 6 LRR NEEDS_WORK (code)                             →   Phase 4 target task
+LRR-NEEDS_WORK-code-level                                 →   phase-4.target-task
+phase-6-LRR-NEEDS_WORK-structural                        →   phase-2-or-phase-3
 ```
 
 The ⭐⭐ star rule: when the LRR Aggregator receives a BLOCK verdict, it reads the `related_decision_id` on the blocker, looks up that row in `decisions.jsonl`, finds which phase authored the decision (the `decided_by` field), and re-opens that phase with the finding as input. Infrastructure already exists (decision IDs, author tracking) — wired here.
 
-**Re-entry halt rule (Stage 4 A7).** Before dispatching any backward routing (LRR BLOCK → Phase N re-open, Reality Checker BLOCK → Phase M re-entry, Gate "no" → Phase 1/2 re-entry, etc.), check `.build-state.json.backward_routing_count` AND the per-target-phase variant `.build-state.json.backward_routing_count_by_target_phase[<N>]`. If the new (post-increment) value of EITHER counter for the target phase would exceed `max_cycles` (currently 2, from `phase-graph.yaml:routing.max_cycles`) — i.e., on the attempted third backward iteration — the orchestrator MUST halt and escalate to the user instead of dispatching. The Stage 4 `cycle_counter_check` MCP is the authoritative enforcer at runtime — it increments atomically and returns `escalate_to_user` once the new value exceeds `max_cycles`. This prose documents the behavior for the markdown-mode rollback path and for human readers.
+**Re-entry halt rule (Stage 4 A7).** Before dispatching any backward routing (LRR BLOCK to Phase N re-open, Reality Checker BLOCK to Phase M re-entry, Gate "no" to Phase 1/2 re-entry, etc.), check `.build-state.json.backward_routing_count` AND the per-target-phase variant `.build-state.json.backward_routing_count_by_target_phase[<N>]`. If the new (post-increment) value of EITHER counter for the target phase would exceed `max_cycles` (currently 2, from `phase-graph.yaml:routing.max_cycles`) — i.e., on the attempted third backward iteration — the orchestrator MUST halt and escalate to the user instead of dispatching. The Stage 4 `cycle_counter_check` MCP is the authoritative enforcer at runtime — it increments atomically and returns `escalate_to_user` once the new value exceeds `max_cycles`. This prose documents the behavior for the markdown-mode rollback path and for human readers.
 
 **Phase-entry `in_flight_backward_edge` clear (Stage 4 A3 / task 4.3.3).** On the FIRST `state_save` after any phase entry — whether forward progression or backward-edge re-entry — the orchestrator MUST explicitly set `.build-state.json.in_flight_backward_edge = null`. This is the "successful landing" signal that closes the atomic crash-seam opened by `cycle_counter_check` (which writes `in_flight_backward_edge` in the same atomic state_save that increments the counter). If the runtime crashes between edge dispatch and landing, `--resume` in `bin/buildanything-runtime.ts` observes a stale `in_flight_backward_edge` (age > 60s) and decrements the counter (see task 4.3.4). See `src/orchestrator/mcp/cycle-counter.ts#clearInFlightEdge` for the runtime primitive.
 
@@ -616,6 +646,15 @@ Phase 4 WILL NOT START without `docs/plans/visual-design-spec.md` (web) or `docs
 - `project_type=ios`: follow `protocols/ios-phase-branches.md` §Phase 3 (HIG + App Store + screenlane harvest → iOS Design Board, SwiftUI Preview QA loop).
 - `project_type=web`: follow `protocols/web-phase-branches.md` §Phase 3 — this file contains the NEW structure with steps 3.0-3.7 covering Visual DNA Selection (Brand Guardian as DNA owner at 3.0), Visual Research, Component Library Mapping, UX Architecture, Visual Design Spec, Inclusive Visuals Check, Style Guide Implementation (wrapped in Design Critic metric loop), and A11y Design Review. See the Component Library Mapping step in that protocol for the component library strategy.
 
+**Phase 3 branch-file dispatch table (subagent_type references for SSOT lint):**
+- Step 3.0 Visual DNA Selection: subagent_type: `design-brand-guardian` (web)
+- Step 3.1 Visual Research (2 parallel): subagent_type: `visual-research` (web, competitive-audit + inspiration-mining)
+- Step 3.2 Component Library Mapping: subagent_type: `design-ui-designer` (web)
+- Step 3.2b DNA Persona Check: subagent_type: `design-ux-researcher` (web, may route to 3.0)
+- Step 3.3 UX Architecture: subagent_type: `design-ux-architect` (web)
+- Step 3.5 Inclusive Visuals Check: subagent_type: `design-inclusive-visuals-specialist` (web)
+- Step 3.2-ios iOS Design Board: subagent_type: `ios-swift-ui-design` (iOS)
+
 **Phase 3 write discipline:** Phase 3 is the writer for `docs/plans/visual-design-spec.md` (web) and extends `docs/plans/refs.json` to cover the visual spec anchors once it lands. Phase 3 does NOT write to `architecture.md` or `sprint-tasks.md` — those are Phase 2's.
 
 <HARD-GATE>
@@ -691,6 +730,18 @@ Dispatch by task type and complexity:
 - UI tasks: `subagent_type: engineering-frontend-developer` (S/M) or `subagent_type: engineering-senior-developer` (L)
 - Backend tasks: `subagent_type: engineering-backend-architect` (L) or `subagent_type: engineering-senior-developer` (M)
 - Hard / complex / cross-cutting tasks: `subagent_type: engineering-senior-developer`
+
+**Phase 4 per-task dispatch table (subagent_type references for SSOT lint — full routing from phase-graph.yaml):**
+- Briefing officer: subagent_type: `briefing-officer-internal` (per-task context map)
+- Web UI (S/M): subagent_type: `engineering-frontend-developer`
+- Web UI (L): subagent_type: `engineering-senior-developer`
+- Web backend: subagent_type: `engineering-backend-architect OR engineering-senior-developer`
+- Web AI/ML: subagent_type: `engineering-ai-engineer`
+- iOS UI planner: subagent_type: `ios-swift-ui-design`
+- iOS UI impl: subagent_type: `engineering-senior-developer`, subagent_type: `engineering-mobile-app-builder`
+- iOS Foundation Models: subagent_type: `ios-foundation-models-specialist`
+- iOS StoreKit: subagent_type: `ios-storekit-specialist`
+- iOS Swift review: subagent_type: `swift-reviewer`
 
 Call the Agent tool — description: "[task-id] [task name]" — subagent_type per above — mode: "bypassPermissions" — prompt: "[CONTEXT header above] [COMPLEXITY: S/M/L from sprint-tasks.md]. TASK: [task description + acceptance criteria from sprint-tasks.md]. Sprint context is prepended; focus on this task.
 
@@ -822,7 +873,7 @@ Call the Agent tool 3 times in one message:
 
 2. Description: "Dogfood the app" — INTERNAL inline role-string + agent-browser skill — mode: "bypassPermissions" — Prompt: "You are the Dogfood runner. Run the agent-browser dogfood skill against the running app at http://localhost:[port]. Explore every reachable page. Click every button. Fill every form. Check console for errors. Report a structured list of issues with severity ratings, screenshots, repro steps. Write findings to `docs/plans/evidence/dogfood/findings.md`. Do NOT classify or route findings — that's the Feedback Synthesizer's job at Step 5.4."
 
-3. Description: "Fake-data detector" — INTERNAL inline role-string — mode: "bypassPermissions" — Prompt: "Run the Fake Data Detector Protocol (`protocols/fake-data-detector.md`). Static analysis: grep for Math.random() in business data paths, hardcoded API responses, setTimeout faking async, placeholder text. Dynamic analysis: inspect HAR files from `docs/plans/evidence/` for missing real API calls, static responses, absent WebSocket traffic. Write findings to `docs/plans/evidence/fake-data-audit.md` with file:line refs and severity."
+3. Description: "Fake-data detector" — subagent_type: `fake-data-detector` — INTERNAL inline role-string — mode: "bypassPermissions" — Prompt: "Run the Fake Data Detector Protocol (`protocols/fake-data-detector.md`). Static analysis: grep for Math.random() in business data paths, hardcoded API responses, setTimeout faking async, placeholder text. Dynamic analysis: inspect HAR files from `docs/plans/evidence/` for missing real API calls, static responses, absent WebSocket traffic. Write findings to `docs/plans/evidence/fake-data-audit.md` with file:line refs and severity."
 
 ### Step 5.4 — Feedback Synthesizer
 
