@@ -77,6 +77,15 @@ def _walk_yaml_dispatches(data: Any) -> list[dict]:
         per_task = phase.get("per_task_flow")
         if isinstance(per_task, dict):
             _collect_from_steps(per_task.get("sub_steps") or [], entries)
+        # Reality check dispatch
+        rc = phase.get("reality_check")
+        if isinstance(rc, dict):
+            dispatch = rc.get("dispatch")
+            if isinstance(dispatch, dict) and dispatch.get("subagent_type"):
+                entries.append({
+                    "step_id": str(phase.get("id", "")),
+                    "subagent_type": str(dispatch["subagent_type"]),
+                })
         # Chapters (Phase 6)
         chapters = phase.get("chapters")
         if isinstance(chapters, dict):
@@ -90,11 +99,17 @@ def _walk_yaml_dispatches(data: Any) -> list[dict]:
                         "subagent_type": str(panel_entry["subagent_type"]),
                     })
                 st = panel_entry.get("subagent_types")
-                if isinstance(st, dict) and st.get("primary"):
-                    entries.append({
-                        "step_id": f"6.1-ch{step_id}",
-                        "subagent_type": str(st["primary"]),
-                    })
+                if isinstance(st, dict):
+                    if st.get("primary"):
+                        entries.append({
+                            "step_id": f"6.1-ch{step_id}",
+                            "subagent_type": str(st["primary"]),
+                        })
+                    if st.get("parallel_sub_dispatch"):
+                        entries.append({
+                            "step_id": f"6.1-ch{step_id}",
+                            "subagent_type": str(st["parallel_sub_dispatch"]),
+                        })
     return entries
 
 
@@ -141,10 +156,13 @@ def _collect_from_steps(steps: list, entries: list[dict]) -> None:
                 if isinstance(routes, dict):
                     for _slot, agent in routes.items():
                         if isinstance(agent, str):
-                            entries.append({
-                                "step_id": step_id,
-                                "subagent_type": agent,
-                            })
+                            # Handle compound "X OR Y" strings
+                            parts = agent.split(" OR ")
+                            for part in parts:
+                                entries.append({
+                                    "step_id": step_id,
+                                    "subagent_type": part,
+                                })
                         elif isinstance(agent, list):
                             for a in agent:
                                 entries.append({
