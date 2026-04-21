@@ -102,7 +102,7 @@ organized by theme. Include direct quotes where the user's exact words matter.]
 
 1. **market-intel agent** — Research market size (TAM/SAM/SOM), competitive landscape (5-10 players), timing/macro trends, and market structure for this idea: [paste SCQA]. Founder context: [paste Context Brief]
 
-2. **tech-feasibility agent** — Evaluate technical architecture, hard problems, build-vs-buy decisions, MVP scope, and stack recommendation for this idea: [paste SCQA]. Founder context: [paste Context Brief]
+2. **tech-feasibility agent** — Evaluate technical architecture, hard problems, build-vs-buy decisions, scope, and stack recommendation for this idea: [paste SCQA]. Founder context: [paste Context Brief]
 
 3. **user-research agent** — Analyze target user persona, jobs-to-be-done, current alternatives, behavioral barriers to adoption, and activation metrics for this idea: [paste SCQA]. Founder context: [paste Context Brief]
 
@@ -157,7 +157,7 @@ Write a markdown document titled `# [IDEA NAME] — Decision Brief` with these s
 - **Critical Tensions** — 2-3 contradictions that must be resolved during build
 - **Kill Criteria Status** — Table: Criterion | Status (CLEAR/AMBER/RED) | Evidence
 - **Recommended Action** — One of: GO (proceed to brainstorming), PIVOT (adjacent opportunity), INVESTIGATE (specific questions), KILL (reason)
-- **If GO: MVP Definition** — Core value prop, primary user, MVP scope (under 50 words), revenue model, first 1,000 users channel, tech stack, first milestone
+- **If GO: Product Definition** — Core value prop, primary user, feature scope (under 50 words), revenue model, first 1,000 users channel, tech stack, first milestone
 
 Save this document to `docs/briefs/` with today's date and a slug of the idea name.
 

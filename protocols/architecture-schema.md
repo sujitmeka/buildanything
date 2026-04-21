@@ -14,7 +14,7 @@ The synthesized `architecture.md` MUST contain these top-level headings, in this
 - `# Data Model`
 - `# Security`
 - `# Infrastructure`
-- `# MVP Scope`
+- `# Scope`
 - `# Out of Scope`
 
 For iOS builds, `# Frontend` MAY be titled `# App` and `# Backend` MAY be omitted if the app is fully on-device (the `refs.json` index reflects whatever headings exist). For web builds, all eight headings are required.

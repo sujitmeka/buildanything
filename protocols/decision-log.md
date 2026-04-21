@@ -11,12 +11,12 @@ Rows live in `docs/plans/decisions.jsonl`, one JSON object per line, append-only
   "decision_id": "D-<phase>-<seq>",
   "phase": "2.2",
   "timestamp": "<ISO8601>",
-  "decision": "chose SQLite over Postgres for MVP persistence",
+  "decision": "chose SQLite over Postgres for initial persistence",
   "chosen_approach": "SQLite with single-file .db in project root",
   "rejected_alternatives": [
     {
       "approach": "Postgres via Supabase",
-      "reason": "adds infra setup to Phase 0 prereqs; overkill for single-user MVP",
+      "reason": "adds infra setup to Phase 0 prereqs; overkill for single-user app",
       "revisit_criterion": "multi-user access OR >10k rows OR concurrent writes"
     }
   ],
@@ -96,12 +96,12 @@ Subagents return `deviation_row` objects in their structured result. The orchest
   "decision_id": "D-2-03",
   "phase": "2.2",
   "timestamp": "2026-04-13T16:05:41Z",
-  "decision": "chose SQLite over Postgres for MVP persistence",
+  "decision": "chose SQLite over Postgres for initial persistence",
   "chosen_approach": "SQLite with single-file .db in project root, migrations via drizzle-kit",
   "rejected_alternatives": [
     {
       "approach": "Postgres via Supabase",
-      "reason": "adds infra setup to Phase 0 prereqs; overkill for single-user MVP.",
+      "reason": "adds infra setup to Phase 0 prereqs; overkill for single-user app.",
       "revisit_criterion": "multi-user access OR >10k rows OR concurrent writes"
     },
     {

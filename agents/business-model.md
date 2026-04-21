@@ -45,7 +45,7 @@ Everything else is out of scope. If your conclusion requires more than 500 words
 3. **Acquisition channels** — list 2-3 plausible first-1000-users channels. Be specific — "viral via shared whiteboards" is a channel, "social media" is not. For each, note the approximate cost signal from benchmarks (with source URLs).
 4. **Unit economics sketch** — high-level CAC and LTV ranges for the primary model + channel combination. Flag the LTV:CAC ratio target. One paragraph max — if you're reaching for a spreadsheet, stop.
 5. **Product-impact extraction** — this is the only section the downstream phases actually consume. Write 3-5 bullets that each answer one of:
-   - Which features does the chosen revenue model require us to ship in the MVP? (e.g., "freemium with team plans → we need workspaces, invites, and a per-seat billing surface")
+   - Which features does the chosen revenue model require us to ship? (e.g., "freemium with team plans → we need workspaces, invites, and a per-seat billing surface")
    - Which channels gate specific product decisions? (e.g., "viral loop via shared canvases → we need public-share-by-default with a unique URL per canvas")
    - What is the cheapest validation path? (e.g., "waitlist + single-tier paid beta — skip the freemium tier until retention is proven")
 6. Write `docs/plans/phase1-scratch/business-model.md` using the Write tool. Return the file path and a one-line summary.
@@ -74,14 +74,14 @@ Rejected: transactional per-canvas, enterprise-only. Rationale: category expecta
 3. **Slack / Linear integration partners** — embed previews in partner apps. Signal: Loom growth via Slack embeds.
 
 ## Unit economics sketch
-CAC: $30-80 for content/SEO-led growth in SaaS collaboration (source URL). LTV: $180-360 at $15/seat with 12-24 month retention. Target LTV:CAC ≥ 3:1 means we need content-led growth, not paid acquisition, on the MVP.
+CAC: $30-80 for content/SEO-led growth in SaaS collaboration (source URL). LTV: $180-360 at $15/seat with 12-24 month retention. Target LTV:CAC ≥ 3:1 means we need content-led growth, not paid acquisition.
 
 ## Product impact (THE SECTION DOWNSTREAM READS)
 
-1. **Need workspaces + invites + per-seat billing in MVP** — team subscription is the primary model; seat-based billing is table stakes and blocks launch until it ships.
+1. **Need workspaces + invites + per-seat billing** — team subscription is the primary model; seat-based billing is table stakes and blocks launch until it ships.
 2. **Need public-share-by-default with unique URLs** — viral channel is gated on this; if canvases are private-by-default we kill the primary acquisition loop.
-3. **Need templates library in MVP** — SEO channel depends on indexable template pages; without templates we have no content-led acquisition surface.
-4. **Can skip enterprise features for MVP** — SSO, audit logs, SCIM are not required for the first paying customers; defer until the first 100 paid teams land.
+3. **Need templates library** — SEO channel depends on indexable template pages; without templates we have no content-led acquisition surface.
+4. **Can skip enterprise features initially** — SSO, audit logs, SCIM are not required for the first paying customers; defer until the first 100 paid teams land.
 5. **Cheapest validation path**: single paid tier ($15/seat), waitlist, no freemium — tests willingness to pay before we spend tokens building a freemium-tier gate.
 ```
 

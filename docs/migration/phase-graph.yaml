@@ -244,8 +244,12 @@ phase_internal_scratch:
     - suggested-questions.md
     - user-decisions.md
     - prereqs.json
-  readers: [phase-1-only]
-  notes: Never read by phase 3+.
+  readers: [phase-1-only, phase-1.6-product-spec]
+  notes: |
+    SPENT after Step 1.6 (Product Spec — TODO: implement). The product
+    spec is the last consumer of raw research files. Until Step 1.6 is
+    implemented, files remain SPENT after Phase 2 dispatch as before.
+    Never read by Phase 3+.
 
 # ---------------------------------------------------------------------------
 # 2. Classification matrix

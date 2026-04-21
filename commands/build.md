@@ -73,7 +73,7 @@ Live downstream docs (read across Phase 3+):
 Phase-internal scaffolding (lives in `docs/plans/phase1-scratch/` after Gate 1, never read by P3+):
   - `idea-draft.md`, `feature-intel.md`, `tech-feasibility.md`, `ux-research.md`, `business-model.md`, `findings-digest.md`, `suggested-questions.md`, `user-decisions.md`, `prereqs.json`
 
-Phase 4 implementers never reference Phase 1 raw research files. They are SPENT after Phase 2 dispatch.
+Phase 4 implementers never reference Phase 1 raw research files. They are SPENT after the Product Spec step (Step 1.6 — TODO: implement). The product spec is the LAST consumer of raw research. After Step 1.6, research insights survive in `product-spec.md`, `design-doc.md`, and `CLAUDE.md`. Until Step 1.6 is implemented, research files remain SPENT after Phase 2 dispatch as before.
 </HARD-GATE>
 
 > **Default-deny (Stage 2+):** Once Stage 2 of the SDK migration activates, any `Write|Edit` tool call targeting a path absent from this table will be denied by the `PreToolUse` hook with message `"path not in writer-owner table — please add to phase-graph.yaml or route through scribe MCP"`. This is a pre-announcement; actual hook wiring ships in Task 2.1.3.
@@ -262,7 +262,7 @@ Scan for existing context:
 | Context Level | What You Have | What Happens |
 |---|---|---|
 | **Full design** | Design doc with decisions, scope, tech stack, data models | Skip Phase 1. Feed design into Phase 2. |
-| **Decision brief** | An idea-sweep brief with verdicts and MVP definition | Phase 1 skips Step 1.1 research (already done). Brainstorming refines the brief into a design. |
+| **Decision brief** | An idea-sweep brief with verdicts and product definition | Phase 1 skips Step 1.1 research (already done). Brainstorming refines the brief into a design. |
 | **Partial context** | Some notes, conversation, rough sketch | Phase 1 runs fully. Feed context into brainstorming + research. |
 | **Raw idea** | One-line build request, no prior work | Phase 1 runs fully from scratch. |
 
@@ -364,7 +364,7 @@ Call the Agent tool 4 times in a single message. Each gets the build request + `
 
 1. Description: "Feature intel" — subagent_type: `feature-intel` — Prompt: "[CONTEXT header above] Extract competitor feature matrix for: [build request]. Idea draft: read docs/plans/phase1-scratch/idea-draft.md with your Read tool. Walk 5-10 rivals. Return must-haves (features present in >=80% of rivals — table stakes) + stand-outs (features unique to individual rivals — differentiation opportunities), sorted by competitor. Save to `docs/plans/phase1-scratch/feature-intel.md`."
 
-2. Description: "Tech feasibility" — subagent_type: `tech-feasibility` — Prompt: "[CONTEXT header above] Evaluate hard technical problems (Solved/Hard/Unsolved), build-vs-buy decisions, MVP scope, stack validation for: [build request]. Idea draft: read docs/plans/phase1-scratch/idea-draft.md with your Read tool. Verify APIs and libraries from the draft exist and are maintained. Save to `docs/plans/phase1-scratch/tech-feasibility.md`. Report with a Technical Verdict."
+2. Description: "Tech feasibility" — subagent_type: `tech-feasibility` — Prompt: "[CONTEXT header above] Evaluate hard technical problems (Solved/Hard/Unsolved), build-vs-buy decisions, stack validation for: [build request]. Idea draft: read docs/plans/phase1-scratch/idea-draft.md with your Read tool. Verify APIs and libraries from the draft exist and are maintained. Save to `docs/plans/phase1-scratch/tech-feasibility.md`. Report with a Technical Verdict."
 
 3. Description: "UX research" — subagent_type: `design-ux-researcher` — Prompt: "[CONTEXT header above] Analyze target persona, jobs-to-be-done, current alternatives, and behavioral barriers for: [build request]. Idea draft: read docs/plans/phase1-scratch/idea-draft.md with your Read tool. Save to `docs/plans/phase1-scratch/ux-research.md`. Report with a User Verdict."
 
@@ -422,7 +422,7 @@ Write TWO outputs.
 OUTPUT 1 — `docs/plans/design-doc.md` — **THE PRD** (authoritative product document). Header MUST begin with `# [Product Name] — PRD`. Structure:
   - Product — what it is, core value prop, success criteria
   - User — persona, JTBD, hard constraints
-  - Scope — MVP features (must-haves + chosen stand-outs), explicit Out-of-Scope boundary
+  - Scope — Features in scope (must-haves + chosen stand-outs), explicit Out-of-Scope boundary
   - Tech Stack — chosen stack with 1-line rationale
   - Data Model — shape of core entities
   - Decisions — links to `decisions.jsonl` rows
@@ -442,7 +442,7 @@ OUTPUT 2 — `CLAUDE.md` (project root, NOT `docs/plans/`). <200-line product br
 [Stack choices with 1-line rationale for each]
 
 ## Scope
-[What's in MVP vs. deferred. Hard boundaries.]
+[What's in scope vs. deferred. Hard boundaries.]
 
 ## Rules
 [Project-specific hard rules derived from the product and user context.]
@@ -579,9 +579,9 @@ Four sequential dispatches.
 
 **CONTEXT header:** Reuse `rendered_context_header` from phase 2 (already rendered above). Prepend to Step 2.3 synthesizer + sprint-breakdown prompts.
 
-1. Description: "Implementation blueprint" — subagent_type: `code-architect` — Prompt: "[CONTEXT header above] Implementation blueprint. Read the PRD via your Read tool: `docs/plans/design-doc.md`. Read all 6 post-debate architect positions via your own Read tool from `docs/plans/phase-2-contracts/`:\n  - `backend-architect.md`\n  - `frontend-architect.md`\n  - `data-engineer.md`\n  - `security-engineer.md`\n  - `accessibility-auditor.md`\n  - `performance-benchmarker.md`\n\nThese files are the authoritative team positions AFTER any SendMessage-driven revisions — the architects already cross-checked each other's contract boundaries, so you can stitch without re-debating. Your job is to assemble, not adjudicate. Include specific files to create/modify, build sequence, dependency order. Write `docs/plans/architecture.md` with stable section anchors per `protocols/architecture-schema.md`. Required top-level sections: Overview, Frontend, Backend, Data Model, Security, Infrastructure, MVP Scope, Out of Scope. Scope to MVP boundary from the PRD."
+1. Description: "Implementation blueprint" — subagent_type: `code-architect` — Prompt: "[CONTEXT header above] Implementation blueprint. Read the PRD via your Read tool: `docs/plans/design-doc.md`. Read all 6 post-debate architect positions via your own Read tool from `docs/plans/phase-2-contracts/`:\n  - `backend-architect.md`\n  - `frontend-architect.md`\n  - `data-engineer.md`\n  - `security-engineer.md`\n  - `accessibility-auditor.md`\n  - `performance-benchmarker.md`\n\nThese files are the authoritative team positions AFTER any SendMessage-driven revisions — the architects already cross-checked each other's contract boundaries, so you can stitch without re-debating. Your job is to assemble, not adjudicate. Include specific files to create/modify, build sequence, dependency order. Write `docs/plans/architecture.md` with stable section anchors per `protocols/architecture-schema.md`. Required top-level sections: Overview, Frontend, Backend, Data Model, Security, Infrastructure, Scope, Out of Scope. Scope to the boundary from the PRD."
 
-2. Description: "Sprint breakdown" — subagent_type: `planner` — Prompt: "[CONTEXT header above] Break this architecture into ordered, atomic tasks. Each task needs: description, acceptance criteria, **dependencies** (list of task IDs this depends on), size (S/M/L), **Behavioral Test** field for every UI task (concrete interaction: 'Navigate to [page], click [element], verify [outcome]') or curl-based acceptance test for API tasks. Read these files via your Read tool before starting:\n  - ARCHITECTURE: `docs/plans/architecture.md`\n  - PRD: `docs/plans/design-doc.md`\nScope to MVP only. Save to `docs/plans/sprint-tasks.md`. Dependencies field is load-bearing — Phase 4 uses it to batch independent tasks in parallel."
+2. Description: "Sprint breakdown" — subagent_type: `planner` — Prompt: "[CONTEXT header above] Break this architecture into ordered, atomic tasks. Each task needs: description, acceptance criteria, **dependencies** (list of task IDs this depends on), size (S/M/L), **Behavioral Test** field for every UI task (concrete interaction: 'Navigate to [page], click [element], verify [outcome]') or curl-based acceptance test for API tasks. Read these files via your Read tool before starting:\n  - ARCHITECTURE: `docs/plans/architecture.md`\n  - PRD: `docs/plans/design-doc.md`\nSave to `docs/plans/sprint-tasks.md`. Dependencies field is load-bearing — Phase 4 uses it to batch independent tasks in parallel."
 
 3. Description: "Task DAG validator" — INTERNAL inline role-string — Prompt: "You are the Task DAG Validator. Read `docs/plans/sprint-tasks.md`. Validate for DAG correctness:
   - No circular dependencies
@@ -958,13 +958,13 @@ Call the Agent tool 5 times in ONE message. Note: the Eng-Quality chapter dispat
 
 Read: `docs/plans/architecture.md`, `docs/plans/design-doc.md` (PRD — needed for requirements coverage evaluation), `docs/plans/sprint-tasks.md`, `docs/plans/.task-outputs/`, `protocols/verify.md` check outputs from `.build-state.json`, test results from Phase 4 and 5, eval-harness results from `docs/plans/evidence/eval-harness/`. Also read `docs/plans/decisions.jsonl` for cross-chapter context.
 
-Requirements coverage is folded into this chapter — not a separate dispatch. For EVERY feature listed in the MVP scope of `design-doc.md`, evaluate: (1) does it have a corresponding implemented task in sprint-tasks.md, (2) does it have a passing test or behavioral verification in evidence, (3) is it reachable and functional per the task-outputs. Emit a `requirements_coverage` field in your verdict JSON with shape `[{feature: \"<name>\", status: \"COVERED\" | \"PARTIAL\" | \"MISSING\"}, ...]`. Any MISSING feature is a BLOCK finding. Any PARTIAL feature is a CONCERNS finding at minimum.
+Requirements coverage is folded into this chapter — not a separate dispatch. For EVERY feature listed in the scope of `design-doc.md`, evaluate: (1) does it have a corresponding implemented task in sprint-tasks.md, (2) does it have a passing test or behavioral verification in evidence, (3) is it reachable and functional per the task-outputs. Emit a `requirements_coverage` field in your verdict JSON with shape `[{feature: \"<name>\", status: \"COVERED\" | \"PARTIAL\" | \"MISSING\"}, ...]`. Any MISSING feature is a BLOCK finding. Any PARTIAL feature is a CONCERNS finding at minimum.
 
 Before writing the final verdict, spawn a parallel subagent dispatch: description: 'LRR test coverage adequacy' — subagent_type: `pr-test-analyzer` — prompt: 'You are a test-coverage auditor for the Eng-Quality LRR chapter. Read the test files under tests/, task-outputs/, and behavioral-test stub detector output. Evaluate: (1) do declared behavioral tests have non-stub bodies, (2) does coverage match the PR diff scope, (3) are edge cases covered, (4) are any tests flaky markers set. Return a JSON summary with test_coverage_score (0-100), stub_flagged_count, edge_case_gap_count, recommendations[]. Save to docs/plans/evidence/lrr/eng-quality-coverage.json.' Read the resulting eng-quality-coverage.json and fold its findings into your verdict.
 
-Evaluate code quality + test coverage adequacy + architecture conformance + requirements coverage TOGETHER (single coherent view — merged from old Eng + QA chapters). Check: do declared behavioral tests actually exercise the features? Are there stub-flagged tests? Do tests match task acceptance criteria? Does the built code match architecture MUSTs? Are MVP features all COVERED?
+Evaluate code quality + test coverage adequacy + architecture conformance + requirements coverage TOGETHER (single coherent view — merged from old Eng + QA chapters). Check: do declared behavioral tests actually exercise the features? Are there stub-flagged tests? Do tests match task acceptance criteria? Does the built code match architecture MUSTs? Are features all COVERED?
 
-Write verdict to `docs/plans/evidence/lrr/eng-quality.json` per `protocols/launch-readiness.md` schema. Fields: `chapter=eng-quality`, `verdict` (PASS|CONCERNS|BLOCK), `override_blocks_launch` (false unless BLOCK), `evidence_files_read` (non-empty, MUST include eng-quality-coverage.json), `findings[]` (each with `severity`, `description`, `evidence_ref`, `related_decision_id` if blocker ties to a decisions.jsonl row), `requirements_coverage[]` (one entry per MVP feature with `{feature, status}`), `follow_up_spawned=false`, `follow_up_findings=null`. Eng-Quality CANNOT spawn follow-ups."
+Write verdict to `docs/plans/evidence/lrr/eng-quality.json` per `protocols/launch-readiness.md` schema. Fields: `chapter=eng-quality`, `verdict` (PASS|CONCERNS|BLOCK), `override_blocks_launch` (false unless BLOCK), `evidence_files_read` (non-empty, MUST include eng-quality-coverage.json), `findings[]` (each with `severity`, `description`, `evidence_ref`, `related_decision_id` if blocker ties to a decisions.jsonl row), `requirements_coverage[]` (one entry per feature with `{feature, status}`), `follow_up_spawned=false`, `follow_up_findings=null`. Eng-Quality CANNOT spawn follow-ups."
 
 2. Description: "LRR Security chapter" — subagent_type: `security-reviewer` — Prompt: "[CONTEXT header above] You are the Security chapter of the LRR. Read: `docs/plans/evidence/fake-data-audit.md`, Phase 5 security audit output (from Step 5.1), eval-harness security cases. Also read `docs/plans/decisions.jsonl` for context.
 
@@ -999,7 +999,7 @@ Write verdict to `docs/plans/evidence/lrr/brand-guardian.json` per schema. Field
 
 ### Step 6.1a — PM coverage fold-in
 
-PM coverage is a sub-input of the Eng-Quality chapter — evaluated inline within the Eng-Quality dispatch at Step 6.1 above against `design-doc.md` MVP scope and emitted as a `requirements_coverage[]` field on `eng-quality.json`. The LRR Aggregator runs exactly once. Chapter count stays 5.
+PM coverage is a sub-input of the Eng-Quality chapter — evaluated inline within the Eng-Quality dispatch at Step 6.1 above against `design-doc.md` scope and emitted as a `requirements_coverage[]` field on `eng-quality.json`. The LRR Aggregator runs exactly once. Chapter count stays 5.
 
 ### Step 6.2 — LRR Aggregator (sequential, after all 5 chapter files exist)
 

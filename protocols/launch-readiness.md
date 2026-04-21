@@ -10,13 +10,13 @@ LRR replaces the monolithic Reality Checker verdict with five independent chapte
 
 LRR runs **five chapters**: Eng-Quality, Security, SRE, A11y, and Brand Guardian.
 
-Requirements coverage is evaluated as a sub-input of the Eng-Quality chapter. There is no separate PM chapter, no `pm.json` file, and the LRR Aggregator runs exactly once. The Eng-Quality chapter agent reads the Design Doc + `sprint-tasks.md` MVP scope directly alongside its other evidence and emits COVERED/PARTIAL/MISSING per feature inline on its own verdict (see the `requirements_coverage` field in the schema below). There is no separate Step 7.0 dispatch and no Aggregator re-run.
+Requirements coverage is evaluated as a sub-input of the Eng-Quality chapter. There is no separate PM chapter, no `pm.json` file, and the LRR Aggregator runs exactly once. The Eng-Quality chapter agent reads the Design Doc + `sprint-tasks.md` scope directly alongside its other evidence and emits COVERED/PARTIAL/MISSING per feature inline on its own verdict (see the `requirements_coverage` field in the schema below). There is no separate Step 7.0 dispatch and no Aggregator re-run.
 
 ### Primary evidence inputs
 
 | Chapter | Primary evidence inputs |
 |---|---|
-| Eng-Quality | `architecture.md`, `task-outputs/`, `verify.md` check outputs, test results, eval results, Design Doc + `sprint-tasks.md` MVP scope (read directly for the Requirements Coverage sub-input) |
+| Eng-Quality | `architecture.md`, `task-outputs/`, `verify.md` check outputs, test results, eval results, Design Doc + `sprint-tasks.md` scope (read directly for the Requirements Coverage sub-input) |
 | Security | `evidence/fake-data-audit.md`, Phase 5 security audit output, eval-harness security cases |
 | SRE | Phase 5 performance-audit outputs, Performance Benchmarker evidence, NFRs from `sprint-tasks.md`, reliability checks |
 | A11y | Phase 5 a11y audit output, Phase 3.7 `a11y-design-review.md`, WCAG 2.2 AA runtime findings, per-page accessibility findings |
@@ -50,7 +50,7 @@ The **Eng-Quality** chapter additionally carries the Requirements Coverage sub-i
 }
 ```
 
-This field carries the PM coverage signal directly on the Eng-Quality verdict — there is no separate `pm.json` file and no separate PM dispatch. The Eng-Quality chapter agent reads the Design Doc + `sprint-tasks.md` MVP scope as part of its own evidence sweep and emits the coverage list alongside its code-quality judgment.
+This field carries the PM coverage signal directly on the Eng-Quality verdict — there is no separate `pm.json` file and no separate PM dispatch. The Eng-Quality chapter agent reads the Design Doc + `sprint-tasks.md` scope as part of its own evidence sweep and emits the coverage list alongside its code-quality judgment.
 
 <HARD-GATE>
 SCHEMA CONTRACT:

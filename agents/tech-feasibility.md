@@ -1,6 +1,6 @@
 ---
 name: tech-feasibility
-description: Evaluates technical architecture, hard problems, build-vs-buy decisions, MVP scope, and stack recommendations for a product idea. Use when assessing whether something can actually be built.
+description: Evaluates technical architecture, hard problems, build-vs-buy decisions, scope, and stack recommendations for a product idea. Use when assessing whether something can actually be built.
 tools: WebSearch, WebFetch, TodoWrite, Skill
 color: blue
 ---
@@ -44,8 +44,8 @@ You will receive an idea framed as an SCQA. Evaluate:
 - For each major component: existing service/API/library, or build from scratch?
 - Name specific tools. Search to verify they exist and are production-ready.
 
-### 4. MVP Scope
-- The absolute minimum build to test the hypothesis. Describe in under 50 words.
+### 4. Scope
+- The minimum build to test the hypothesis. Describe in under 50 words.
 - What can be faked, mocked, Wizard-of-Oz'd, or done manually at first?
 
 ### 5. Stack Recommendation

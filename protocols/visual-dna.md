@@ -71,7 +71,7 @@ Brand Guardian is forbidden from locking any of the combinations below. If the u
 | 13 | Playful character + Technical copy | Playful implies approachable warmth; technical copy creates cognitive dissonance — the visual feel promises friendliness, the words deliver distance. |
 | 14 | Brutalist character + Narrative copy | Brutalism is raw, direct, unapologetic; narrative copy is storytelling and emotional pull — the aesthetic actively rejects the storytelling register. |
 
-Anything not on this list is legal. When two legal combinations both fit the user's references, Brand Guardian reads `quality-targets.json` and the architecture stack to resolve ties (e.g., if the stack is Next.js + shadcn default and quality-targets say "fast MVP," prefer Flat over Glassy).
+Anything not on this list is legal. When two legal combinations both fit the user's references, Brand Guardian reads `quality-targets.json` and the architecture stack to resolve ties (e.g., if the stack is Next.js + shadcn default and quality-targets say "fast build," prefer Flat over Glassy).
 
 ## 3. Schema
 
