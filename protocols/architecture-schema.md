@@ -56,6 +56,12 @@ Every synthesized `architecture.md` MUST provide at least these subsection ancho
 - `security/input-validation` — boundary validation rules.
 - `security/secrets` — secret storage and rotation.
 
+### Under `# Infrastructure`
+
+- `infrastructure/deployment` — deployment target (Vercel, AWS, self-hosted, TestFlight), CI/CD approach, environment strategy (dev/staging/prod).
+- `infrastructure/caching` — caching strategy (CDN, in-memory, database query cache), cache invalidation approach, what's cached and for how long. Stub with "N/A — no caching layer needed" if the product doesn't warrant it.
+- `infrastructure/background-jobs` — async processing model (email sending, webhook handling, scheduled tasks, queue system). Stub with "N/A — no background processing needed" if all operations are synchronous.
+
 ## Ref format used by implementer prompts
 
 Phase 5.1 implementer prompts inject a `ARCHITECTURE REFS:` block in place of pasted architecture content. The block is parsed by the implementer agent, which uses the `Read` tool to fetch refs on demand.
