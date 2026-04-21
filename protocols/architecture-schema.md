@@ -34,7 +34,7 @@ Every synthesized `architecture.md` MUST provide at least these subsection ancho
 
 ### Under `# Frontend`
 
-- `frontend/layout` — page hierarchy, routing, navigation structure. MUST state whether the product exposes a public, unauthenticated, content-indexable surface (yes / no / partial) — downstream SEO skill loading keys off this answer.
+- `frontend/layout` — page hierarchy, routing, navigation structure. MUST state whether the product exposes a public, unauthenticated, content-indexable surface (yes / no / partial) — downstream SEO skill loading keys off this answer. MUST include a navigation map listing every route with its nav element (sidebar item, tab, breadcrumb, direct URL only).
 - `frontend/components` — core component list and responsibilities.
 - `frontend/state` — state management approach (stores, context, local state boundaries).
 - `frontend/styling` — design tokens, CSS/styling approach.
@@ -61,6 +61,7 @@ Every synthesized `architecture.md` MUST provide at least these subsection ancho
 - `infrastructure/deployment` — deployment target (Vercel, AWS, self-hosted, TestFlight), CI/CD approach, environment strategy (dev/staging/prod).
 - `infrastructure/caching` — caching strategy (CDN, in-memory, database query cache), cache invalidation approach, what's cached and for how long. Stub with "N/A — no caching layer needed" if the product doesn't warrant it.
 - `infrastructure/background-jobs` — async processing model (email sending, webhook handling, scheduled tasks, queue system). Stub with "N/A — no background processing needed" if all operations are synchronous.
+- `infrastructure/env-vars` — required environment variables and secrets for each environment (dev/staging/prod). List every key the app needs to run, which service it authenticates with, and whether it's a secret or a config value. Format: `STRIPE_SECRET_KEY — Stripe payment processing — secret — required`.
 
 ## Ref format used by implementer prompts
 

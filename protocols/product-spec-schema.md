@@ -140,10 +140,12 @@ Format:
 Include based on product type. Omit if not applicable — do not stub empty sections.
 
 - **Notification Triggers** — channel (email/push/in-app), timing (immediate/delayed/batched), content summary, opt-out mechanism. Required for: SaaS with user accounts, marketplaces, mobile apps.
+- **Technical Constraints & Integrations** — third-party services this feature depends on (payment processor, geocoding API, email provider, analytics), rate limits, SDK requirements, authentication method for each. Required for: features that call external APIs or use third-party SDKs.
 - **Copy Direction** — tone examples for CTAs, errors, empty states, confirmations specific to this feature. Required for: consumer-facing products, marketplaces.
 - **Offline Behavior** — what's cached, what degrades, what's blocked. Required for: mobile apps, PWAs.
 - **Multi-User Scenarios** — concurrent access, conflict resolution, real-time sync. Required for: collaborative tools, marketplaces, multi-tenant SaaS.
 - **Performance Expectations** — latency targets per interaction. Required for: search-heavy products, real-time dashboards, e-commerce checkout.
+- **Inter-Screen Data Flow** — what state carries from this feature's screens to other screens (URL params, local storage, context providers, server session). What data this feature reads that another feature writes, and vice versa. Required for: multi-screen flows, features that share state.
 
 ## Anchor Naming Convention
 
