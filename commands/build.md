@@ -48,6 +48,7 @@ Live downstream docs (read across Phase 3+):
   - `docs/plans/ux-flow-validation.md`  — design-ux-researcher writer (web, Step 3.3b)
   - `docs/plans/inclusive-visuals-audit.md` — P3 writer (web)
   - `docs/plans/a11y-design-review.md`  — P3 writer, a11y-architect writer (web, Step 3.7)
+  - `docs/plans/page-specs/*.md`        — P3 writer, design-ux-architect writer (web, Step 3.9 — per-screen wireframes + layout specs)
   - `docs/plans/refs.json`              — P2 writer, P3 writer (P3 extends after visual spec lands)
   - `docs/plans/decisions.jsonl`        — orchestrator-scribe ONLY via `scribe_decision` MCP tool (subagents return `deviation_row` objects; the orchestrator forwards each row through the MCP, which owns ID allocation and atomic append)
   - `docs/plans/learnings.jsonl`        — P5 writer, P7 writer

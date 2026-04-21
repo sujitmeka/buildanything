@@ -166,7 +166,30 @@ Output: `docs/plans/a11y-design-review.md`.
 
 Log to `docs/plans/build-log.md`: final screenshot paths, Design Critic score history (per-round totals plus per-axis subscores), a11y findings count by severity, and a DNA compliance score derived from the critic's 6 DNA-axis subscores. No user pause.
 
-Phase 4 HARD-GATE: web mode requires BOTH `docs/plans/visual-dna.md` AND `docs/plans/visual-design-spec.md` AND `docs/plans/component-manifest.md` to exist before Phase 4 starts. If any is missing, return to Phase 3.
+### Step 3.9 — Page Specs / Wireframes (one agent, per-screen)
+
+For every screen in the product spec's Screen Inventory, produce a page-level specification with ASCII wireframe + structured metadata. This is the final synthesis step — it applies the design system to the product spec's screen inventory using the architecture's data model.
+
+Call the Agent tool once:
+
+1. Description: "Page specs" — subagent_type: `design-ux-architect` — mode: "bypassPermissions" — prompt: "[CONTEXT header above — phase: 3] Read the page spec schema at `protocols/page-spec-schema.md` before writing. Then read these inputs via your Read tool:
+  - Screen Inventory: `docs/plans/product-spec.md` (## Screen Inventory section — this is your screen list)
+  - Feature specs: `docs/plans/product-spec.md` (per-feature sections — data requirements, states, persona constraints)
+  - Navigation model: `docs/plans/ux-architecture.md`
+  - Visual DNA: `docs/plans/visual-dna.md` (Density axis drives layout — Airy = generous whitespace, Dense = compact data)
+  - Design tokens: `docs/plans/visual-design-spec.md` (spacing scale, typography ramp)
+  - Components: `docs/plans/component-manifest.md` (which library components for which slots)
+  - API contracts: `docs/plans/architecture.md#backend/api` (what data is available from each endpoint)
+  - Frontend architecture: `docs/plans/architecture.md#frontend/layout` (routing, navigation structure)
+  - Design references: `docs/plans/design-references/` (competitor/inspiration screenshots for layout reference)
+
+For EVERY screen in the Screen Inventory, write a page spec file to `docs/plans/page-specs/{screen-name}.md` following the schema. Each file must include: ASCII wireframe (desktop + mobile for web), content hierarchy with component refs and data sources, key copy, responsive behavior, platform conventions, data loading strategy, and screen-specific states.
+
+The Density axis from visual-dna.md is your primary layout driver. Airy = generous spacing, fewer items visible per viewport, breathing room. Dense = compact rows, data tables, more items per viewport. Match the density to the persona constraints from the product spec."
+
+Output: `docs/plans/page-specs/*.md` — one file per screen.
+
+Phase 4 HARD-GATE: web mode requires `docs/plans/visual-dna.md` AND `docs/plans/visual-design-spec.md` AND `docs/plans/component-manifest.md` AND `docs/plans/page-specs/` (at least one file) to exist before Phase 4 starts. If any is missing, return to Phase 3.
 
 ## Phase 4 — Build (web branch)
 

@@ -112,6 +112,16 @@ artifacts:
       agent-role enforcement fires alongside the phase-3 phase-match. LRR
       A11y chapter reads this plus the Phase 5 runtime audit per
       protocols/launch-readiness.md.
+  - path: docs/plans/page-specs/*.md
+    platform: web
+    writer: design-ux-architect
+    readers: [phase-4, phase-5, phase-6]
+    notes: |
+      Per-screen wireframes + layout specs written at Step 3.9 by
+      design-ux-architect. ASCII wireframes + content hierarchy + key copy
+      + responsive behavior + data loading strategy. One file per screen
+      from the product-spec Screen Inventory. Follows
+      protocols/page-spec-schema.md.
   - path: docs/plans/refs.json
     writers: [phase-2, phase-3]
     readers: [phase-4-briefing-officer]
@@ -611,6 +621,16 @@ phases:
           kind: gate
           action: log-summary-to-build-log.md
           user_pause: false
+        - id: "3.9"
+          name: Page Specs / Wireframes
+          kind: dispatch-single
+          subagent_type: design-ux-architect
+          reads: [product-spec.md, architecture.md, ux-architecture.md, visual-dna.md, visual-design-spec.md, component-manifest.md, design-references/]
+          writes: [docs/plans/page-specs/*.md]
+          notes: |
+            Per-screen ASCII wireframes + structured layout specs.
+            One file per screen from product-spec Screen Inventory.
+            Follows protocols/page-spec-schema.md.
       hard_gates:
         - UI/UX IS THE PRODUCT — do NOT skip this phase.
         - Compositional not reconstructive — every element with a library variant MUST be mapped to that variant in component-manifest.md.
@@ -618,6 +638,7 @@ phases:
         - visual-dna.md
         - visual-design-spec.md
         - component-manifest.md
+        - page-specs/ (at least one file)
     ios_branch:
       source: protocols/ios-phase-branches.md
       steps:
