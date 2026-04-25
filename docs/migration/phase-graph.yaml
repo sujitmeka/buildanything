@@ -117,7 +117,7 @@ artifacts:
     writer: design-ux-architect
     readers: [phase-4, phase-5, phase-6]
     notes: |
-      Per-screen wireframes + layout specs written at Step 3.9 by
+      Per-screen wireframes + layout specs written at Step 3.3 by
       design-ux-architect. ASCII wireframes + content hierarchy + key copy
       + responsive behavior + data loading strategy. One file per screen
       from the product-spec Screen Inventory. Follows
@@ -129,6 +129,19 @@ artifacts:
       Phase 2 Refs Indexer writes the initial anchor index after architecture.md
       lands. Phase 3 extends it after visual-design-spec.md lands (see
       commands/build.md:167). Both phases are legitimate writers.
+  - path: docs/plans/feature-delegation-plan.json
+    writer: product-owner
+    readers: [orchestrator, briefing-officer]
+    notes: |
+      Feature delegation plan written by the Product Owner at Step 4.1.
+      Contains wave assignments, feature priorities, and acceptance criteria.
+  - path: docs/plans/feature-briefs/*.md
+    writers: [briefing-officer]
+    readers: [orchestrator, phase-4-execution-agents]
+    notes: |
+      Per-feature briefs written by the Briefing Officer at Step 4.2
+      (one per feature per wave). Consumed by the orchestrator-driven
+      per-task pipeline during wave execution.
   - path: docs/plans/decisions.jsonl
     writer: orchestrator-scribe
     write_mode: append-only
@@ -256,10 +269,8 @@ phase_internal_scratch:
     - prereqs.json
   readers: [phase-1-only, phase-1.6-product-spec]
   notes: |
-    SPENT after Step 1.6 (Product Spec — TODO: implement). The product
-    spec is the last consumer of raw research files. Until Step 1.6 is
-    implemented, files remain SPENT after Phase 2 dispatch as before.
-    Never read by Phase 3+.
+    SPENT after Step 1.6 (Product Spec). The product spec is the last
+    consumer of raw research files. Never read by Phase 3+.
 
 # ---------------------------------------------------------------------------
 # 2. Classification matrix
@@ -577,15 +588,22 @@ phases:
           subagent_type: design-ux-researcher
           may_route_to: "3.0"
         - id: "3.3"
-          name: UX Architecture
+          name: UX Architecture + Page Layouts
           kind: dispatch-single
           subagent_type: design-ux-architect
-          writes: [ux-architecture.md]
+          reads: [product-spec.md, visual-dna.md, component-manifest.md, architecture.md, design-references/]
+          writes: [ux-architecture.md, docs/plans/page-specs/*.md]
+          notes: |
+            Merged Step 3.3 + former Step 3.9 (Option C). Produces both
+            UX architecture (flows, navigation, IA) AND per-screen ASCII
+            wireframes + structured layout specs together. Flows and layouts
+            inform each other. Follows protocols/page-spec-schema.md.
+            One file per screen from product-spec Screen Inventory.
         - id: "3.3b"
           name: UX Flow Validation
           kind: dispatch-single
           dispatches: [design-ux-researcher]
-          reads: [docs/plans/ux-architecture.md, docs/plans/design-doc.md, docs/plans/visual-dna.md]
+          reads: [docs/plans/ux-architecture.md, docs/plans/page-specs/, docs/plans/product-spec.md, docs/plans/design-doc.md, docs/plans/visual-dna.md]
           writes: [docs/plans/ux-flow-validation.md]
           backward_edges:
             - from: critical-flow-issues
@@ -621,16 +639,6 @@ phases:
           kind: gate
           action: log-summary-to-build-log.md
           user_pause: false
-        - id: "3.9"
-          name: Page Specs / Wireframes
-          kind: dispatch-single
-          subagent_type: design-ux-architect
-          reads: [product-spec.md, architecture.md, ux-architecture.md, visual-dna.md, visual-design-spec.md, component-manifest.md, design-references/]
-          writes: [docs/plans/page-specs/*.md]
-          notes: |
-            Per-screen ASCII wireframes + structured layout specs.
-            One file per screen from product-spec Screen Inventory.
-            Follows protocols/page-spec-schema.md.
       hard_gates:
         - UI/UX IS THE PRODUCT — do NOT skip this phase.
         - Compositional not reconstructive — every element with a library variant MUST be mapped to that variant in component-manifest.md.
@@ -701,91 +709,135 @@ phases:
           kind: gate
           service: verify-protocol
           notes: 7 checks must PASS before Step 4.1
-    per_task_flow:
-      executes: every task in every dependency-ordered batch
-      parallelism: Independent sibling tasks run in parallel (~30-50% wall-clock saving)
-      sub_steps:
-        - id: briefing
+    product_owner_planning:
+      steps:
+        - id: "4.1"
+          name: Product Owner planning
           kind: dispatch-single
-          subagent_type: briefing-officer-internal
-          reads: [refs.json, task-row]
-          writes: ~40-line CONTEXT MAP
-        - id: impl
+          subagent_type: product-owner
+          reads: [sprint-tasks.md, architecture.md, design-doc.md]
+          writes: [docs/plans/feature-delegation-plan.json]
+          writes_state: [feature_delegation_plan_path, current_wave]
+          notes: |
+            Product Owner decomposes sprint tasks into features, assigns
+            wave priorities, and defines acceptance criteria per feature.
+            Sets current_wave=1 in build state.
+    wave_execution:
+      id: "4.2"
+      name: Wave execution
+      kind: wave-loop
+      notes: |
+        For each wave in the feature delegation plan:
+        1. Dispatch briefing-officer per feature in the wave (writes feature-briefs/{feature}.md)
+        2. Orchestrator-driven per-task pipeline per feature (unchanged mechanics from prior per_task_flow)
+      briefing:
+        kind: dispatch-single
+        subagent_type: briefing-officer
+        reads: [refs.json, feature-delegation-plan.json, task-rows-for-feature]
+        writes: [docs/plans/feature-briefs/*.md]
+      per_task_flow:
+        executes: every task in every dependency-ordered batch within the feature
+        parallelism: Independent sibling tasks run in parallel (~30-50% wall-clock saving)
+        sub_steps:
+          - id: impl
+            kind: dispatch-single
+            dispatch_table:
+              web:
+                ui_SM: engineering-frontend-developer
+                ui_L: engineering-senior-developer
+                backend: engineering-backend-architect OR engineering-senior-developer
+                ai_ml: engineering-ai-engineer
+              ios:
+                ui_planner: ios-swift-ui-design
+                ui_impl: [engineering-senior-developer, engineering-mobile-app-builder]
+                foundation_models: ios-foundation-models-specialist
+                storekit: ios-storekit-specialist
+          - id: impl.re-entry
+            kind: dispatch-single
+            trigger: LRR backward-routing
+            inputs: [blocking_finding, prior_output, decision_row]
+            constraint: revise ONLY what finding requires
+          - id: sec-review
+            kind: dispatch-single
+            subagent_type: security-reviewer
+            conditional_on: [auth, PII, Keychain, credential tasks]
+          - id: swift-review
+            kind: dispatch-single
+            platform: ios
+            subagent_type: swift-reviewer
+            checklist: [Swift concurrency 6.2, SwiftUI, protocol DI, Foundation Models]
+          - id: cleanup
+            kind: dispatch-parallel
+            parallel_count: 2
+            dispatches:
+              - code-simplifier
+              - refactor-cleaner
+            scope: changeset-only
+          - id: review
+            kind: dispatch-parallel
+            parallel_count: 2
+            dispatch_mode: single-message
+            dispatches:
+              - code-reviewer
+              - silent-failure-hunter
+            confidence_threshold: 80
+          - id: metric-loop
+            kind: loop
+            service: metric-loop
+            max_iterations: 5
+            notes: THIS IS THE AUTHORITATIVE BEHAVIORAL VERIFICATION
+            ui_tooling:
+              web: agent-browser
+              ios: SwiftUI Preview captures
+          - id: smoke
+            kind: dispatch-single
+            platform: ios
+            tooling: Maestro flow against booted simulator
+            preconditions: [Maestro CLI installed, flow files exist, booted simulator available]
+            on_precondition_fail: BLOCKED
+          - id: verify
+            kind: gate
+            service: verify-protocol
+            scope: static-only
+            checks: [type-check, lint, build]
+            max_fix_attempts: 3
+            build_fix:
+              ios: swift-build-resolver
+          - id: scribe
+            kind: internal
+            role: orchestrator-scribe
+            action: |
+              Walks batch_results, collects non-null deviation_row objects, and
+              invokes the scribe_decision MCP tool once per row. The MCP is the
+              single writer for decisions.jsonl — it allocates D-{phase}-<seq>
+              IDs, stamps timestamp + status, validates against
+              decisions.schema.json, and atomically appends. The orchestrator
+              MUST NOT Write/Edit decisions.jsonl directly and MUST NOT
+              pre-compute IDs. .build-state.json.decisions_next_id is
+              deprecated under Stage 2 and removed at Stage 4 A7.
+    product_owner_acceptance:
+      steps:
+        - id: "4.3"
+          name: Product Owner acceptance
           kind: dispatch-single
-          dispatch_table:
-            web:
-              ui_SM: engineering-frontend-developer
-              ui_L: engineering-senior-developer
-              backend: engineering-backend-architect OR engineering-senior-developer
-              ai_ml: engineering-ai-engineer
-            ios:
-              ui_planner: ios-swift-ui-design
-              ui_impl: [engineering-senior-developer, engineering-mobile-app-builder]
-              foundation_models: ios-foundation-models-specialist
-              storekit: ios-storekit-specialist
-        - id: impl.re-entry
-          kind: dispatch-single
-          trigger: LRR backward-routing
-          inputs: [blocking_finding, prior_output, decision_row]
-          constraint: revise ONLY what finding requires
-        - id: sec-review
-          kind: dispatch-single
-          subagent_type: security-reviewer
-          conditional_on: [auth, PII, Keychain, credential tasks]
-        - id: swift-review
-          kind: dispatch-single
-          platform: ios
-          subagent_type: swift-reviewer
-          checklist: [Swift concurrency 6.2, SwiftUI, protocol DI, Foundation Models]
-        - id: cleanup
-          kind: dispatch-parallel
-          parallel_count: 2
-          dispatches:
-            - code-simplifier
-            - refactor-cleaner
-          scope: changeset-only
-        - id: review
-          kind: dispatch-parallel
-          parallel_count: 2
-          dispatch_mode: single-message
-          dispatches:
-            - code-reviewer
-            - silent-failure-hunter
-          confidence_threshold: 80
-        - id: metric-loop
-          kind: loop
-          service: metric-loop
-          max_iterations: 5
-          notes: THIS IS THE AUTHORITATIVE BEHAVIORAL VERIFICATION
-          ui_tooling:
-            web: agent-browser
-            ios: SwiftUI Preview captures
-        - id: smoke
-          kind: dispatch-single
-          platform: ios
-          tooling: Maestro flow against booted simulator
-          preconditions: [Maestro CLI installed, flow files exist, booted simulator available]
-          on_precondition_fail: BLOCKED
-        - id: verify
-          kind: gate
-          service: verify-protocol
-          scope: static-only
-          checks: [type-check, lint, build]
-          max_fix_attempts: 3
-          build_fix:
-            ios: swift-build-resolver
-        - id: scribe
+          subagent_type: product-owner
+          reads: [feature-delegation-plan.json, task-outputs, evidence]
+          writes_state: [feature_acceptance, completed_features]
+          verdict: ACCEPTED | NEEDS_REVISION
+          notes: |
+            Product Owner reviews each feature in the completed wave.
+            ACCEPTED features are added to completed_features.
+            NEEDS_REVISION features are flagged for re-work in a subsequent wave.
+    wave_transition:
+      steps:
+        - id: "4.4"
+          name: Wave transition
           kind: internal
-          role: orchestrator-scribe
-          action: |
-            Walks batch_results, collects non-null deviation_row objects, and
-            invokes the scribe_decision MCP tool once per row. The MCP is the
-            single writer for decisions.jsonl — it allocates D-{phase}-<seq>
-            IDs, stamps timestamp + status, validates against
-            decisions.schema.json, and atomically appends. The orchestrator
-            MUST NOT Write/Edit decisions.jsonl directly and MUST NOT
-            pre-compute IDs. .build-state.json.decisions_next_id is
-            deprecated under Stage 2 and removed at Stage 4 A7.
+          writes_state: [current_wave]
+          notes: |
+            Increments current_wave. If more waves remain in the feature
+            delegation plan, loops back to Step 4.2. If all waves complete
+            (all features ACCEPTED), Phase 4 ends.
     hard_gates:
       - decisions.jsonl is orchestrator-scribe ONLY. Subagents return deviation_row objects.
       - "Web compositional: component-manifest.md variants MUST be imported; writing from scratch triggers cleanup revert."
@@ -794,9 +846,9 @@ phases:
       - docs/plans/.task-outputs/[task-id].json
     backward_edges:
       - from: LRR-NEEDS_WORK-code-level
-        to: phase-4.target-task
+        to: phase-4.target-feature
       - from: phase-5-dogfood-feedback-synthesizer
-        to: phase-4.target-task
+        to: phase-4.target-feature
 
   - id: "5"
     name: Audit
@@ -1162,11 +1214,12 @@ callable_services:
     cross_run_injection: phase-4 implementer reads .active-learnings.md (top-3 filtered at phase-0)
 
   briefing_officer:
-    kind: INTERNAL
-    callable_per: phase-4-task
+    kind: dispatch-single
+    subagent_type: briefing-officer
+    callable_per: phase-4-feature
     contract:
-      reads: [refs.json, task-row]
-      writes: CONTEXT MAP (~40 lines)
+      reads: [refs.json, feature-delegation-plan.json, task-rows-for-feature]
+      writes: [docs/plans/feature-briefs/*.md]
       mode: refs-not-pastes
       excluded: [CLAUDE.md (auto-loaded), phase1-scratch (SPENT)]
     context_map_shape:
@@ -1194,7 +1247,7 @@ backward_routing:
     to: phase-3.step-3.0
     note: re-lock DNA
   - from: phase-5-audit-code-issue
-    to: phase-4.target-task
+    to: phase-4.target-feature
   - from: phase-5-audit-design-issue
     to: phase-3.target-step
   - from: phase-5-audit-spec-issue
@@ -1206,7 +1259,7 @@ backward_routing:
     via: star-star-rule
     to: authoring-phase (per decisions.jsonl.decided_by)
   - from: phase-6-LRR-NEEDS_WORK-code
-    to: phase-4.target-task
+    to: phase-4.target-feature
     via: related_decision_id
   - from: phase-6-LRR-NEEDS_WORK-structural
     to: phase-2-or-phase-3
@@ -1220,7 +1273,7 @@ re_entry_template: |
 re_entry_rules:
   phase-2: "Only the architect whose domain matches decision_row.author re-runs. Synthesizer re-runs once."
   phase-3: "Only the step named by decision_row.author re-runs (DNA lock, component manifest, or visual spec)."
-  phase-4: "Target task only. Reads prior_output + changed files. Revises ONLY what blocking_finding requires. Does NOT re-run acceptance tests that passed. Does NOT touch files outside finding blast radius."
+  phase-4: "Target feature's Briefing Officer re-plans affected task(s). Orchestrator re-executes. Product-level issues route to Product Owner. Does NOT re-run unaffected tasks."
 
 needs_work_loop_cap:
   max_cycles: 2

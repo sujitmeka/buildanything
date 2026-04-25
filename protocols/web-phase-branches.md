@@ -50,7 +50,7 @@ Dispatch a single agent to lock the 6-axis Visual DNA card that governs every do
 
 Call the Agent tool once:
 
-1. Description: "Visual DNA selection" — subagent_type: `design-brand-guardian` — prompt: "[CONTEXT header above — phase: 3. NOTE: Step 3.0 omits `dna` because this step PRODUCES it.] You are the DNA Owner for this build. Read these inputs: `docs/plans/design-doc.md` (product concept, user, voice), `docs/plans/phase1-scratch/findings-digest.md` (reference sites the user mentioned, competitor aesthetic landscape), `docs/plans/architecture.md` (stack constraints — e.g. server-rendered Rails can't ship Three.js), `docs/plans/quality-targets.json` (perf budget constrains motion and material choices), `docs/plans/phase1-scratch/user-decisions.md` (if the user said 'like Linear' or 'make it playful' during brainstorm). Lock a 6-axis Visual DNA card per the schema in `protocols/visual-dna.md`. The 6 axes: **Scope** (Marketing / Product / Dashboard / Internal Tool — gates library install), **Density** (Airy / Balanced / Dense), **Character** (Minimal / Editorial / Maximalist / Brutalist / Playful), **Material** (Flat / Glassy / Physical / Neumorphic), **Motion** (Still / Subtle / Expressive / Cinematic), **Type** (Neutral Sans / Humanist Sans / Serif-forward / Display-forward / Mono-accented). Consult the incompatibility matrix in `protocols/visual-dna.md` — you are FORBIDDEN from picking illegal combinations (e.g. Dashboard + Cinematic is contradictory). Write the locked DNA card to `docs/plans/visual-dna.md`."
+1. Description: "Visual DNA selection" — subagent_type: `design-brand-guardian` — prompt: "[CONTEXT header above — phase: 3. NOTE: Step 3.0 omits `dna` because this step PRODUCES it.] You are the DNA Owner for this build. Read these inputs: `docs/plans/product-spec.md` (## App Overview for product identity, ## Screen Inventory for what screens exist, ## Permissions & Roles for complexity level — a dense admin panel needs different DNA than a simple consumer app), `docs/plans/design-doc.md` (product concept, user, voice), `docs/plans/phase1-scratch/findings-digest.md` (reference sites the user mentioned, competitor aesthetic landscape), `docs/plans/architecture.md` (stack constraints — e.g. server-rendered Rails can't ship Three.js), `docs/plans/quality-targets.json` (perf budget constrains motion and material choices), `docs/plans/phase1-scratch/user-decisions.md` (if the user said 'like Linear' or 'make it playful' during brainstorm). Lock a 6-axis Visual DNA card per the schema in `protocols/visual-dna.md`. The 6 axes: **Scope** (Marketing / Product / Dashboard / Internal Tool — gates library install), **Density** (Airy / Balanced / Dense), **Character** (Minimal / Editorial / Maximalist / Brutalist / Playful), **Material** (Flat / Glassy / Physical / Neumorphic), **Motion** (Still / Subtle / Expressive / Cinematic), **Type** (Neutral Sans / Humanist Sans / Serif-forward / Display-forward / Mono-accented). Consult the incompatibility matrix in `protocols/visual-dna.md` — you are FORBIDDEN from picking illegal combinations (e.g. Dashboard + Cinematic is contradictory). Write the locked DNA card to `docs/plans/visual-dna.md`."
 
 Output: `docs/plans/visual-dna.md` — the locked DNA card. Every downstream Phase 3 step reads this file, and Phase 4 implementers read it via `refs.json`.
 
@@ -72,7 +72,7 @@ This is the compositional step. The Visual Designer picks specific library compo
 
 Call the Agent tool once:
 
-1. Description: "Component library mapping" — subagent_type: `design-ui-designer` — prompt: "[CONTEXT header above — phase: 3] Read `docs/plans/visual-dna.md`, `docs/plans/design-references.md`, and `docs/library-refs/component-library-catalog.md` (the static reference mapping DNA-axis combinations to library component variants). Pick specific component variants for each slot the product needs: hero, cards, cta, nav, marquee, chart, 3D, form elements, modals. The catalog is authoritative — when the DNA matches a row, use the variants that row specifies; do not reinvent. Write `docs/plans/component-manifest.md` with the locked component picks, one row per slot, naming the library and the variant. For any slot the catalog doesn't cover, emit a row tagged 'manifest gap' with a short fallback plan (stock shadcn primitive plus notes)."
+1. Description: "Component library mapping" — subagent_type: `design-ui-designer` — prompt: "[CONTEXT header above — phase: 3] Read `docs/plans/visual-dna.md`, `docs/plans/design-references.md`, `docs/plans/product-spec.md` (## Screen Inventory for what screens exist, per-feature States and Empty/Loading/Error States sections for what component states are needed — e.g. a feature with 7 states needs more component variants than one with 3), and `docs/library-refs/component-library-catalog.md` (the static reference mapping DNA-axis combinations to library component variants). Pick specific component variants for each slot the product needs: hero, cards, cta, nav, marquee, chart, 3D, form elements, modals. The catalog is authoritative — when the DNA matches a row, use the variants that row specifies; do not reinvent. Write `docs/plans/component-manifest.md` with the locked component picks, one row per slot, naming the library and the variant. For any slot the catalog doesn't cover, emit a row tagged 'manifest gap' with a short fallback plan (stock shadcn primitive plus notes)."
 
 Output: `docs/plans/component-manifest.md` — locked component manifest.
 
@@ -80,17 +80,34 @@ Output: `docs/plans/component-manifest.md` — locked component manifest.
 
 ### Step 3.2b — DNA Persona Check
 
-Call the Agent tool — description: "DNA persona check" — subagent_type: design-ux-researcher — prompt: "[CONTEXT header above — phase: 3] Read docs/plans/visual-dna.md (the locked 6-axis DNA card) + docs/plans/design-doc.md (#persona and #jobs-to-be-done sections) + docs/plans/phase1-scratch/findings-digest.md. Validate: does the chosen Visual DNA actually serve this persona and these jobs-to-be-done? Cross-check each DNA axis against the persona's context (e.g., if persona is 'senior enterprise buyer on a tight schedule' but DNA chose Maximalist + Cinematic, that's wrong — Enterprise/Minimal/Subtle fits better). Report any DNA-persona mismatches. If mismatches found, the Brand Guardian may need to re-lock the DNA (backward edge to Step 3.0). Save findings to docs/plans/dna-persona-check.md."
+Call the Agent tool — description: "DNA persona check" — subagent_type: design-ux-researcher — prompt: "[CONTEXT header above — phase: 3] Read docs/plans/visual-dna.md (the locked 6-axis DNA card) + docs/plans/design-doc.md (#persona and #jobs-to-be-done sections) + docs/plans/product-spec.md (## App Overview and per-feature Persona Constraints sections — these carry the specific behavioral patterns from research, e.g. 'user scans, doesn't read') + docs/plans/phase1-scratch/findings-digest.md. Validate: does the chosen Visual DNA actually serve this persona and these jobs-to-be-done? Cross-check each DNA axis against the persona's context (e.g., if persona is 'senior enterprise buyer on a tight schedule' but DNA chose Maximalist + Cinematic, that's wrong — Enterprise/Minimal/Subtle fits better). Report any DNA-persona mismatches. If mismatches found, the Brand Guardian may need to re-lock the DNA (backward edge to Step 3.0). Save findings to docs/plans/dna-persona-check.md."
 
-### Step 3.3 — UX Architecture (single agent)
+### Step 3.3 — UX Architecture + Page Layouts (single agent)
 
-Structural design must align to the locked DNA — a Dense layout behaves differently from an Airy layout even for the same user flow.
+Structural design must align to the locked DNA — a Dense layout behaves differently from an Airy layout even for the same user flow. This step produces BOTH the UX architecture (flows, navigation, IA) AND per-screen page specs with ASCII wireframes. Flows and layouts inform each other — a checkout flow might be 2 steps or 3 depending on what fits spatially, and a sidebar nav only makes sense if the screen count warrants it.
 
 Call the Agent tool once:
 
-1. Description: "UX architecture" — subagent_type: `design-ux-architect` — prompt: "[CONTEXT header above — phase: 3] Read `docs/plans/visual-dna.md`, `docs/plans/component-manifest.md`, and the #frontend anchor in `docs/plans/architecture.md`. Design information architecture, user flows, interaction patterns, and responsive strategy — all aligned to the locked DNA. Dense layout behaves differently than Airy layout even for the same flow; Cinematic motion reshapes page transitions versus Subtle motion. Map each user flow to the component-manifest slots it needs. Save to `docs/plans/ux-architecture.md`."
+1. Description: "UX architecture + page layouts" — subagent_type: `design-ux-architect` — mode: "bypassPermissions" — prompt: "[CONTEXT header above — phase: 3] Read the page spec schema at `protocols/page-spec-schema.md` before writing. Then read these inputs via your Read tool:
+  - Product spec: `docs/plans/product-spec.md` (FULL document — this is your source of truth. Screen Inventory is your screen list. Per-feature sections define what each screen does, what data it shows, what states exist, what errors look like, persona constraints, business rules)
+  - Visual DNA: `docs/plans/visual-dna.md` (Density axis drives layout — Airy = generous whitespace, Dense = compact data. Character and Motion axes shape navigation transitions and interaction patterns)
+  - Components: `docs/plans/component-manifest.md` (which library components for which slots — use these in your wireframes)
+  - Frontend architecture: `docs/plans/architecture.md#frontend` (component hierarchy, routing, state management)
+  - API contracts: `docs/plans/architecture.md#backend/api` (what data is available from each endpoint)
+  - Design references: `docs/plans/design-references/` (competitor/inspiration screenshots for layout reference)
+  - PRD: `docs/plans/design-doc.md` (#persona, #jobs-to-be-done, #scope)
 
-Output: `docs/plans/ux-architecture.md`.
+Produce TWO outputs:
+
+**Output 1: `docs/plans/ux-architecture.md`** — information architecture, user flows (derived from product spec feature flows, not invented), navigation model, interaction patterns, responsive strategy. Map each user flow to the component-manifest slots it needs. The product spec's feature flows are your behavioral source of truth — refine and structure them into screen-to-screen journeys, don't reinvent them.
+
+**Output 2: `docs/plans/page-specs/*.md`** — one file per screen from the Screen Inventory, following `protocols/page-spec-schema.md`. Each file includes: ASCII wireframe (desktop + mobile for web), content hierarchy with component refs from the manifest and data sources from the API contracts, key copy, responsive behavior, platform conventions, data loading strategy, and screen-specific states from the product spec.
+
+The Density axis from visual-dna.md is your primary layout driver. Airy = generous spacing, fewer items visible per viewport. Dense = compact rows, data tables, more items per viewport. Match the density to the persona constraints from the product spec.
+
+NOTE: The visual design spec (exact spacing values, typography ramp) does not exist yet at this step. Use the DNA Density axis for spatial decisions (airy vs dense) and the component manifest for component choices. Phase 4 implementers have specialized build skills and will apply the final token values from the visual design spec when they build — your layouts define the spatial arrangement and content hierarchy, not pixel-precise measurements."
+
+Output: `docs/plans/ux-architecture.md` + `docs/plans/page-specs/*.md`.
 
 ### Step 3.3b — UX Flow Validation
 
@@ -98,7 +115,7 @@ Validate the UX architecture against the target persona's actual goals and jobs-
 
 Call the Agent tool once:
 
-1. Description: "UX flow validation" — subagent_type: `design-ux-researcher` — prompt: "[CONTEXT header above — phase: 3] Read `docs/plans/ux-architecture.md`, `docs/plans/design-doc.md` (#persona, #jobs-to-be-done, #scope sections), and `docs/plans/visual-dna.md`. For each user flow in the UX architecture, walk through it as the target persona: narrate the steps, flag friction points, check if the flow serves the persona's jobs-to-be-done efficiently. Specifically check: (1) Are there screens or sections the persona doesn't need? (2) Are critical tasks reachable in the minimum number of steps? (3) Does the information hierarchy match what the persona cares about most? (4) Does the navigation pattern fit the persona's context (mobile-first for on-the-go users, sidebar for desktop power users, etc.)? (5) Does the responsive strategy degrade gracefully for the persona's primary device? Report findings to `docs/plans/ux-flow-validation.md` with pass/flag per flow. If critical flow issues are found, the UX Architect should revise `ux-architecture.md` before proceeding (backward edge to Step 3.3)."
+1. Description: "UX flow validation" — subagent_type: `design-ux-researcher` — prompt: "[CONTEXT header above — phase: 3] Read `docs/plans/ux-architecture.md`, `docs/plans/page-specs/` (the ASCII wireframes — validate that layouts serve the persona), `docs/plans/product-spec.md` (per-feature Happy Path and Persona Constraints — these are the behavioral source of truth the flows must implement), `docs/plans/design-doc.md` (#persona, #jobs-to-be-done, #scope sections), and `docs/plans/visual-dna.md`. For each user flow in the UX architecture, walk through it as the target persona: narrate the steps, flag friction points, check if the flow serves the persona's jobs-to-be-done efficiently. Specifically check: (1) Are there screens or sections the persona doesn't need? (2) Are critical tasks reachable in the minimum number of steps? (3) Does the information hierarchy match what the persona cares about most? (4) Does the navigation pattern fit the persona's context (mobile-first for on-the-go users, sidebar for desktop power users, etc.)? (5) Does the responsive strategy degrade gracefully for the persona's primary device? Report findings to `docs/plans/ux-flow-validation.md` with pass/flag per flow. If critical flow issues are found, the UX Architect should revise `ux-architecture.md` before proceeding (backward edge to Step 3.3)."
 
 Output: `docs/plans/ux-flow-validation.md`.
 
@@ -108,7 +125,7 @@ The Visual Designer re-invokes as writer this time, producing the much richer Vi
 
 Call the Agent tool once:
 
-1. Description: "Visual design spec" — subagent_type: `design-ui-designer` — prompt: "[CONTEXT header above — phase: 3] Second invocation as writer. Read `docs/plans/visual-dna.md`, `docs/plans/component-manifest.md`, `docs/plans/ux-architecture.md`, and `docs/plans/design-references.md`. Write `docs/plans/visual-design-spec.md` with ALL the following layers:
+1. Description: "Visual design spec" — subagent_type: `design-ui-designer` — prompt: "[CONTEXT header above — phase: 3] Second invocation as writer. Read `docs/plans/visual-dna.md`, `docs/plans/component-manifest.md`, `docs/plans/ux-architecture.md`, `docs/plans/design-references.md`, `docs/plans/product-spec.md` (per-feature States and Empty/Loading/Error States — the state matrix must cover every state the product spec defines, not just generic defaults), and `docs/plans/page-specs/` (the ASCII wireframes — the typography ramp and spacing scale must work for the actual page layouts, not just in isolation). Write `docs/plans/visual-design-spec.md` with ALL the following layers:
 
 **TOKENS** (existing): color system (hex, light + dark), typography scale, spacing (8px base), shadows, radius.
 
@@ -144,7 +161,7 @@ Call the Agent tool once:
 
 **Metric loop wrapper** (per `protocols/metric-loop.md`):
 
-- **Critic** — Call the Agent tool — description: "Design critic scoring pass" — subagent_type: `design-critic` — prompt: "[CONTEXT header above — phase: 3] SCORING CRITERIA CHECKLIST: [paste the checklist from `active_metric_loop.scoring_criteria_checklist` in `.build-state.json` — NOT the raw reference docs]. Capture the rendered `/design-system` route via Playwright screenshot (desktop 1920x1080 + mobile 375x812). Score the gap on **6 DNA axes** (Scope fit, Density, Character, Material, Motion, Type — 20 points each) plus **5 craft dimensions** (whitespace rhythm, visual hierarchy, motion coherence, color harmony, typographic refinement — 20 points each). Total 220. Target 180. Every finding must cite a specific element with file:line reference AND reference the checklist criteria — score a gap, not an opinion. Suggest concrete improvements ('the card padding is 16px but the checklist says Density: Airy — 32px — bump to 32px'). Iteration 1 MAY Read `docs/plans/design-references.md` for visual comparison; iteration 2+ MUST NOT unless diagnosis explicitly flags a visual-reference gap. Default verdict: NEEDS WORK. Never edit code. Max 5 iterations before exit."
+- **Critic** — Call the Agent tool — description: "Design critic scoring pass" — subagent_type: `design-critic` — prompt: "[CONTEXT header above — phase: 3] SCORING CRITERIA CHECKLIST: [paste the checklist from `active_metric_loop.scoring_criteria_checklist` in `.build-state.json` — NOT the raw reference docs]. Capture the rendered `/design-system` route via Playwright screenshot (desktop 1920x1080 + mobile 375x812). Also read `docs/plans/page-specs/` to understand what page compositions these components will be used in — score components in the context of their actual usage, not just in isolation. Score the gap on **6 DNA axes** (Scope fit, Density, Character, Material, Motion, Type — 20 points each) plus **5 craft dimensions** (whitespace rhythm, visual hierarchy, motion coherence, color harmony, typographic refinement — 20 points each). Total 220. Target 180. Every finding must cite a specific element with file:line reference AND reference the checklist criteria — score a gap, not an opinion. Suggest concrete improvements ('the card padding is 16px but the checklist says Density: Airy — 32px — bump to 32px'). Iteration 1 MAY Read `docs/plans/design-references.md` for visual comparison; iteration 2+ MUST NOT unless diagnosis explicitly flags a visual-reference gap. Default verdict: NEEDS WORK. Never edit code. Max 5 iterations before exit."
 
 - **Generator (re-invocation, iteration 2+)** — Call the Agent tool — description: "Apply critic's top issue" — subagent_type: `engineering-frontend-developer` — mode: "bypassPermissions" — prompt: "TARGETED FIX from metric loop diagnosis: [paste top issue from Step 3 diagnosis]. Files: [paste file paths]. Relevant criteria from checklist: [paste the specific checklist values that relate to the top issue — e.g., 'Density: Airy — 32px card padding']. Apply ONLY the top issue. Do not re-critique. Do not refactor other parts. Re-render the `/design-system` route. Return the commit SHA." NOTE: Do NOT include `[CONTEXT header above]` on iteration 2+ — the generator already has the codebase context from iteration 1. Per `protocols/metric-loop.md` Step 4 iteration-aware context rule.
 
@@ -165,29 +182,6 @@ Output: `docs/plans/a11y-design-review.md`.
 ### Step 3.8 — Autonomous Quality Gate
 
 Log to `docs/plans/build-log.md`: final screenshot paths, Design Critic score history (per-round totals plus per-axis subscores), a11y findings count by severity, and a DNA compliance score derived from the critic's 6 DNA-axis subscores. No user pause.
-
-### Step 3.9 — Page Specs / Wireframes (one agent, per-screen)
-
-For every screen in the product spec's Screen Inventory, produce a page-level specification with ASCII wireframe + structured metadata. This is the final synthesis step — it applies the design system to the product spec's screen inventory using the architecture's data model.
-
-Call the Agent tool once:
-
-1. Description: "Page specs" — subagent_type: `design-ux-architect` — mode: "bypassPermissions" — prompt: "[CONTEXT header above — phase: 3] Read the page spec schema at `protocols/page-spec-schema.md` before writing. Then read these inputs via your Read tool:
-  - Screen Inventory: `docs/plans/product-spec.md` (## Screen Inventory section — this is your screen list)
-  - Feature specs: `docs/plans/product-spec.md` (per-feature sections — data requirements, states, persona constraints)
-  - Navigation model: `docs/plans/ux-architecture.md`
-  - Visual DNA: `docs/plans/visual-dna.md` (Density axis drives layout — Airy = generous whitespace, Dense = compact data)
-  - Design tokens: `docs/plans/visual-design-spec.md` (spacing scale, typography ramp)
-  - Components: `docs/plans/component-manifest.md` (which library components for which slots)
-  - API contracts: `docs/plans/architecture.md#backend/api` (what data is available from each endpoint)
-  - Frontend architecture: `docs/plans/architecture.md#frontend/layout` (routing, navigation structure)
-  - Design references: `docs/plans/design-references/` (competitor/inspiration screenshots for layout reference)
-
-For EVERY screen in the Screen Inventory, write a page spec file to `docs/plans/page-specs/{screen-name}.md` following the schema. Each file must include: ASCII wireframe (desktop + mobile for web), content hierarchy with component refs and data sources, key copy, responsive behavior, platform conventions, data loading strategy, and screen-specific states.
-
-The Density axis from visual-dna.md is your primary layout driver. Airy = generous spacing, fewer items visible per viewport, breathing room. Dense = compact rows, data tables, more items per viewport. Match the density to the persona constraints from the product spec."
-
-Output: `docs/plans/page-specs/*.md` — one file per screen.
 
 Phase 4 HARD-GATE: web mode requires `docs/plans/visual-dna.md` AND `docs/plans/visual-design-spec.md` AND `docs/plans/component-manifest.md` AND `docs/plans/page-specs/` (at least one file) to exist before Phase 4 starts. If any is missing, return to Phase 3.
 
@@ -221,27 +215,55 @@ Call the Agent tool — description: "Scaffold acceptance tests" — subagent_ty
 
 ## Phase 4 — Build per-task flow (web branch)
 
-These are the web-specific prompt templates for the per-task flow inside Phase 4 Step 4.1+. The orchestrator-side machinery (wave-based parallel dispatch by DAG, Briefing Officer, Senior Dev cleanup, code review pair, Metric Loop, Verify Service) lives in `commands/build.md` Phase 4. This section only overrides the implementer dispatch and UI-specific verification prompts.
+These are the web-specific prompt templates for the per-task flow inside Phase 4 Step 4.1+. The orchestrator-side machinery (**three-tier: Product Owner → Briefing Officer → Execution Agents**, Senior Dev cleanup, code review pair, Metric Loop, Verify Service) lives in `commands/build.md` Phase 4. This section only overrides the implementer dispatch and UI-specific verification prompts.
 
-### Wave dispatch (topological, dependency-bounded)
+### Wave dispatch (feature-grained, from feature-delegation-plan.json)
 
-Build the DAG from the `Dependencies:` field on each row in `docs/plans/sprint-tasks.md`. A wave is the set of all not-yet-dispatched tasks whose declared dependencies are ALL complete. Dispatch every task in a wave as parallel Agent tool calls in ONE message, wait for the full wave to return, write back any `deviation_row` payloads via the orchestrator-scribe (single-writer pattern per `commands/build.md` §Decision log scribe), then compute the next wave. Repeat until the graph is drained.
+The Product Owner (Step 4.1) groups features into waves and writes `docs/plans/feature-delegation-plan.json`. The orchestrator reads that plan — not sprint-tasks.md Dependencies — to determine wave membership. Each wave dispatches one Briefing Officer per feature in parallel. Within a feature, tasks run in DAG-parallel batches (topological order from the `Dependencies:` field in sprint-tasks.md — independent sibling tasks run in parallel, yielding ~30-50% wall-clock saving).
 
-No magic parallelism cap — the dependency graph is the limit. A task that declares no dependencies runs in wave 1 alongside every other root. A task that declares `Dependencies: T1, T2` runs in whichever wave first satisfies both.
+No magic parallelism cap — the dependency graph is the limit within a feature. A task that declares no dependencies runs in the first intra-feature batch alongside every other root. A task that declares `Dependencies: T1, T2` runs in whichever batch first satisfies both.
 
 ### Step 4.1+ — Task execution overrides (web)
 
 #### Implementer dispatch (web)
 
-Call the Agent tool — description: "[task name]" — subagent_type: `[pick per task type]` — mode: "bypassPermissions" — prompt: "[CONTEXT header above — phase: 4] TASK: [task description + acceptance criteria]. CONTEXT MAP from Briefing Officer: [paste Briefing Officer output]. Use the Read tool to pull refs on demand — design-doc.md, architecture.md, visual-design-spec.md, component-manifest.md — do NOT expect full pasted content. For UI tasks: the living style guide at /design-system shows every component's exact styling and states — match it, and import from the manifest-named library variants (Phase 4 HARD-GATE — do not write components from scratch when the manifest names one). Implement fully with real code and tests. Commit: 'feat: [task]'. Report what you built, files changed, and test results."
+The Briefing Officer's feature brief specifies the agent type (`subagent_type`) for each task — the orchestrator reads it from the brief rather than deciding itself.
 
-Pick the right developer framing AND the matching `subagent_type`:
-- Frontend / UI tasks → `engineering-frontend-developer`
-- Backend / API / data-layer tasks → `engineering-backend-architect`
-- AI / ML / model-integration tasks → `engineering-ai-engineer`
-- Generalist / refactor / cross-cutting tasks → `engineering-senior-developer`
+Call the Agent tool — description: "[task name]" — subagent_type: `[from BO brief]` — mode: "bypassPermissions" — prompt: "[CONTEXT header above — phase: 4] [COMPLEXITY: S/M/L from sprint-tasks.md].
 
-Set `[COMPLEXITY: S/M/L]` based on the task's Size from sprint-tasks.md.
+TASK: [task description from BO brief]
+
+FEATURE CONTEXT:
+[product_context from BO brief — persona constraints, business rules, key error scenarios]
+
+PAGE LAYOUT:
+[relevant wireframe section from page-spec, pasted from BO brief. Omit for backend-only tasks.]
+
+COMPONENTS:
+[component picks from BO brief — name, variant, which slot. HARD-GATE: import from manifest, do NOT write from scratch.]
+
+API CONTRACT:
+[endpoint shape from BO brief — route, method, request/response]
+
+ERROR STATES:
+[specific failure modes from BO brief — trigger, user message, recovery]
+
+BUSINESS RULES:
+[concrete rules from BO brief — values, not 'configurable']
+
+SKILLS ASSIGNED: [skill list from BO brief]
+
+ACCEPTANCE: [criteria from BO brief]
+
+## Prior Learnings
+[paste contents of docs/plans/.active-learnings.md if it exists]
+
+## Deviation Reporting
+If your implementation deviates from the planned architecture, return a deviation_row object per protocols/decision-log.md. If no deviation, return deviation_row: null. Do NOT write decisions.jsonl directly.
+
+For UI tasks: the living style guide at /design-system shows every component's exact styling and states — match it. Import from the manifest-named library variants (Phase 4 HARD-GATE).
+
+Implement fully with real code and tests. Commit: 'feat: [task]'. Report what you built, files changed, and test results."
 
 #### Metric Loop (web behavioral verification)
 

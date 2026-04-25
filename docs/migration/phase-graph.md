@@ -33,6 +33,8 @@ Every shared artifact has ONE concurrent writer at any instant. Non-owning phase
 | `docs/plans/component-manifest.md` (web) | Phase 3 | Phase 4 (HARD-GATE import source) |
 | `docs/plans/visual-dna.md` (web) | Phase 3 | Phase 3-6 |
 | `docs/plans/refs.json` | Phase 2 writer, Phase 3 extender | Phase 4 Briefing Officer |
+| `docs/plans/feature-delegation-plan.json` | Product Owner (Step 4.1) | orchestrator, briefing-officer |
+| `docs/plans/feature-briefs/*.md` | Briefing Officer (Step 4.2) | orchestrator, Phase 4 execution agents |
 | `docs/plans/decisions.jsonl` | orchestrator-scribe ONLY (subagents return `deviation_row`) | Phase 0 resume, Phase 5 reality-checker, Phase 6 LRR Aggregator |
 | `docs/plans/learnings.jsonl` | Phase 5, Phase 7 | Phase 0 Learnings Loader, Phase 5 reality sweep |
 | `docs/plans/evidence/*.json` | Phase 5 writer, Phase 4 contributors | Phase 6, Phase 7 |
@@ -187,8 +189,8 @@ Structured representation. Every phase has: `id`, `name`, `kind`, `skip_conditio
 | 3.1 | Visual Research (2 parallel, Playwright-driven) | dispatch-parallel | `visual-research` mode=`competitive-audit`, `visual-research` mode=`inspiration-mining` |
 | 3.2 | Component Library Mapping (HARD-GATE source) | dispatch-single | `design-ui-designer` reads catalog + DNA, writes `component-manifest.md` |
 | 3.2b | DNA Persona Check | dispatch-single | `design-ux-researcher` validates DNA vs persona/JTBD; may route back to 3.0 |
-| 3.3 | UX Architecture | dispatch-single | `design-ux-architect` writes `ux-architecture.md` |
-| 3.3b | UX Flow Validation | dispatch-single | `design-ux-researcher` walks each user flow as target persona, flags friction points, checks JTBD alignment; critical issues → backward edge to Step 3.3. Writes `ux-flow-validation.md` |
+| 3.3 | UX Architecture + Page Layouts | dispatch-single | `design-ux-architect` reads product-spec.md (source of truth), visual-dna.md, component-manifest.md, architecture.md, design-references/. Produces BOTH `ux-architecture.md` (flows, navigation, IA) AND `page-specs/*.md` (per-screen ASCII wireframes + structured layout specs). Flows and layouts inform each other. Follows `protocols/page-spec-schema.md` |
+| 3.3b | UX Flow Validation | dispatch-single | `design-ux-researcher` walks each user flow as target persona using ux-architecture.md + page-specs/ + product-spec.md, flags friction points, checks JTBD alignment and spatial feasibility; critical issues → backward edge to Step 3.3. Writes `ux-flow-validation.md` |
 | 3.4 | Visual Design Spec | dispatch-single | `design-ui-designer` (writer invocation) writes `visual-design-spec.md` with tokens + material + motion + typography + state matrix |
 | 3.5 | Inclusive Visuals Check | dispatch-single | `design-inclusive-visuals-specialist` writes `inclusive-visuals-audit.md` |
 | 3.6 | Style Guide Implementation | loop (generator/critic, callable) | generator: `engineering-frontend-developer` builds `/design-system`. critic: `design-critic` scores 6 DNA axes × 5 craft dims = /220, target 180. Max 5 iters |
@@ -199,7 +201,7 @@ Structured representation. Every phase has: `id`, `name`, `kind`, `skip_conditio
 1. UI/UX IS THE PRODUCT — do NOT skip this phase.
 2. Compositional not reconstructive — every element with a library variant MUST be mapped to that variant in `component-manifest.md`. Writing from scratch when the manifest covers the case is a HARD-GATE violation; cleanup agent reverts.
 
-**Phase 4 entry requirement (web):** `visual-dna.md` AND `visual-design-spec.md` AND `component-manifest.md` must all exist.
+**Phase 4 entry requirement (web):** `visual-dna.md` AND `visual-design-spec.md` AND `component-manifest.md` AND `page-specs/` (at least one file) must all exist.
 
 #### 3.b iOS branch (`protocols/ios-phase-branches.md`)
 
@@ -215,7 +217,7 @@ Structured representation. Every phase has: `id`, `name`, `kind`, `skip_conditio
 
 ---
 
-### Phase 4 — Build (parallel batches by task dependencies)
+### Phase 4 — Build (three-tier: Product Owner → Briefing Officer → Execution)
 
 **Kind:** `scaffold-then-parallel-task-batches`. **Skip conditions:** none.
 
@@ -229,13 +231,22 @@ Structured representation. Every phase has: `id`, `name`, `kind`, `skip_conditio
 | 4.0.d | Scaffold metric loop (iOS) | loop | — | builds clean via XcodeBuildMCP, `@Test`s pass. Max 3. Build-fix dispatch → `swift-build-resolver` |
 | 4.0.e | Verify gate | gate | Verify Protocol (7 checks) — must PASS before Step 4.1 | XcodeBuildMCP build + test |
 
-#### 4.1+ Per-task flow (runs for EVERY task in EVERY dependency-ordered batch)
+#### 4.1 Product Owner Planning (NEW)
 
-The orchestrator builds a DAG from `sprint-tasks.md` Dependencies fields and executes in batches. Independent sibling tasks run in parallel (~30-50% wall-clock saving on typical sprints).
+| Step | Name | Kind | Dispatches |
+|---|---|---|---|
+| 4.1 | Product Owner planning | dispatch-single | `product-owner` — decomposes sprint tasks into features, assigns wave priorities, defines acceptance criteria per feature. Writes `docs/plans/feature-delegation-plan.json`. Sets `current_wave=1` in build state |
+
+#### 4.2 Wave Execution (CHANGED)
+
+For each wave in the feature delegation plan:
+
+1. **Briefing Officer per feature:** dispatch `briefing-officer` (subagent_type) per feature in the wave. Reads `refs.json` + `feature-delegation-plan.json` + task rows for the feature. Writes `docs/plans/feature-briefs/{feature}.md`.
+
+2. **Orchestrator-driven per-task pipeline** (unchanged mechanics per feature):
 
 | Sub-step | Name | Kind | Dispatches |
 |---|---|---|---|
-| briefing | Briefing Officer (INTERNAL) | dispatch-single | reads `refs.json` + task row, writes ~40-line CONTEXT MAP |
 | impl | Implementer | dispatch-single | by task type: web UI → `engineering-frontend-developer` (S/M) or `engineering-senior-developer` (L); backend → `engineering-backend-architect` or `engineering-senior-developer`; AI/ML → `engineering-ai-engineer`. iOS UI → `ios-swift-ui-design` (planner) + `engineering-senior-developer` / `engineering-mobile-app-builder` (implementer); Foundation Models → `ios-foundation-models-specialist`; StoreKit → `ios-storekit-specialist` |
 | impl.re-entry | On re-entry from LRR | dispatch-single | implementer reads `blocking_finding` + `prior_output` + `decision_row`; revises ONLY what finding requires |
 | sec-review | Security review (conditional) | dispatch-single | `security-reviewer` — only for auth/PII/Keychain/credential tasks |
@@ -247,13 +258,25 @@ The orchestrator builds a DAG from `sprint-tasks.md` Dependencies fields and exe
 | verify | Verify Service (static checks only) | gate (callable service) | type-check + lint + build. Behavioral verification already done in metric loop. Max 3 fix attempts. Build-fix: `swift-build-resolver` (iOS) |
 | scribe | Orchestrator-scribe handler | internal | walks batch_results, collects non-null `deviation_row`s, invokes the `scribe_decision` MCP tool once per row. The MCP is the single writer for `decisions.jsonl` — it allocates `D-{phase}-<seq>` IDs, stamps timestamp + status, validates against `decisions.schema.json`, and atomically appends. `.build-state.json.decisions_next_id` is deprecated under Stage 2 (removed Stage 4 A7) |
 
+#### 4.3 Product Owner Acceptance (NEW)
+
+| Step | Name | Kind | Dispatches |
+|---|---|---|---|
+| 4.3 | Product Owner acceptance | dispatch-single | `product-owner` — reviews each feature in the completed wave. Verdict per feature: `ACCEPTED` or `NEEDS_REVISION`. ACCEPTED features added to `completed_features`. NEEDS_REVISION features flagged for re-work in a subsequent wave |
+
+#### 4.4 Wave Transition (NEW)
+
+| Step | Name | Kind | Notes |
+|---|---|---|---|
+| 4.4 | Wave transition | internal | Increments `current_wave`. If more waves remain in the feature delegation plan, loops back to Step 4.2. If all waves complete (all features ACCEPTED), Phase 4 ends |
+
 **HARD-GATE: `decisions.jsonl` is orchestrator-scribe ONLY.** Subagents return `deviation_row` objects in their structured result. Any prompt asking a subagent to write `decisions.jsonl` directly is a bug.
 
 **HARD-GATE (web compositional):** if a task needs a button/card/hero/chart/modal/form/marquee/bento/3D element, the implementer MUST import from `component-manifest.md`. Writing from scratch when manifest names the variant → cleanup reverts.
 
 **Per-task writes:** source code, `docs/plans/.task-outputs/[task-id].json` with `{files-changed, tests-passing, verify-status}`.
 
-**Backward edges:** `LRR NEEDS_WORK (code-level) → Phase 4 target task`. Dogfood → Phase 5 Feedback Synthesizer → Phase 4 target task.
+**Backward edges:** `LRR NEEDS_WORK (code-level) → Phase 4 target feature (via BO re-planning)`. Dogfood → Phase 5 Feedback Synthesizer → Phase 4 target feature.
 
 ---
 
@@ -434,9 +457,9 @@ Five services invoked from multiple phases:
 
 Phase 4 implementer dispatch reads `.active-learnings.md` (top 3 relevant filtered at Phase 0) and injects into prompts. This is how learnings from build N flow into build N+1.
 
-### 4.5 Briefing Officer (INTERNAL, callable per Phase 4 task)
+### 4.5 Briefing Officer (dispatch-single, subagent_type: briefing-officer, callable per Phase 4 feature)
 
-**Contract:** reads `refs.json` + task row, writes ~40-line CONTEXT MAP in exact shape below. Refs-not-pastes. `CLAUDE.md` NOT in the map (auto-loaded). Phase 1 scratch NOT in map (SPENT).
+**Contract:** reads `refs.json` + `feature-delegation-plan.json` + task rows for the feature, writes per-feature brief to `docs/plans/feature-briefs/{feature}.md`. Refs-not-pastes. `CLAUDE.md` NOT in the map (auto-loaded). Phase 1 scratch NOT in map (SPENT).
 
 ```
 CONTEXT MAP — [task-id] [task name]
@@ -461,12 +484,12 @@ PROBLEM FOUND AT                    ROUTES BACK TO
 Gate 1 NO                       →   Phase 1 Step 1.0 (Brainstorm Facilitator r1 with feedback)
 Gate 2 NO                       →   Phase 2 (with user feedback)
 Phase 3.2b (DNA-persona)        →   Phase 3 Step 3.0 (re-lock DNA)
-Phase 5 Audit — code issue      →   Phase 4 target task
+Phase 5 Audit — code issue      →   Phase 4 target feature (via BO re-planning)
 Phase 5 Audit — design issue    →   Phase 3 target step
 Phase 5 Audit — spec issue      →   Phase 2 (re-architect)
 Phase 5 Dogfood — classified    →   target_phase per classified-findings.json
 Phase 6 LRR BLOCK (⭐⭐)         →   Aggregator reads decisions.jsonl `decided_by` → re-open that phase
-Phase 6 LRR NEEDS_WORK (code)   →   Phase 4 target task via `related_decision_id`
+Phase 6 LRR NEEDS_WORK (code)   →   Phase 4 target feature (via BO re-planning)
 Phase 6 LRR NEEDS_WORK (struct) →   Phase 2 or Phase 3 (by finding classification)
 ```
 
@@ -482,7 +505,7 @@ Phase 2 re-entry: only the architect whose domain matches `decision_row.author` 
 
 Phase 3 re-entry: only the step named by `decision_row.author` re-runs (DNA lock, component manifest, or visual spec). Unaffected steps NOT re-run.
 
-Phase 4 re-entry: target task only. Reads `prior_output` under `.task-outputs/[task-id].json` + changed files. Revises ONLY what `blocking_finding` requires. Does NOT re-run acceptance tests that passed. Does NOT touch files outside finding blast radius.
+Phase 4 re-entry: target feature's Briefing Officer re-plans affected task(s). Orchestrator re-executes those tasks only. Product-level issues route to Product Owner. Does NOT re-run unaffected tasks. Does NOT touch files outside the finding's blast radius.
 
 **NEEDS_WORK loop cap:** Max 2 cycles. On third NEEDS_WORK → interactive: present all remaining issues, ask direction. Autonomous: log remaining, proceed to Phase 7 with warning in Completion Report.
 

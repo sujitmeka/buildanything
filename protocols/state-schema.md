@@ -16,6 +16,7 @@
 | 2 | Stage 4 | `backward_routing_count` (newly typed), `backward_routing_count_by_target_phase`, `in_flight_backward_edge`, `mode_transitions[]` | A7 forward-reject on `schema_version > MAX_SUPPORTED_SCHEMA_VERSION`; A3 stale-edge decrement on `--resume` |
 | 3 | Stage 5 | `lrr_cycle_state` (object; interior fields loose-typed pending Stage 5 iteration — see "Fields added at v3" below) | `BUILDANYTHING_SDK_LRR=false` reverts to markdown aggregator; `lrr_cycle_state` becomes an ignored field on the orchestrator read path (additive-only, no data loss on downgrade) |
 | 4 | Stage 6 | `current_sprint_context_hash` | `BUILDANYTHING_SDK_SPRINT_CONTEXT=false` (web) and/or `BUILDANYTHING_SDK_SPRINT_CONTEXT_IOS=false` (iOS parity gate) reverts Phase 4 to per-task refs re-send; `current_sprint_context_hash` becomes an ignored field on the orchestrator read path (additive-only, no data loss on downgrade) |
+| 5 | Stage 7 | `feature_delegation_plan_path`, `current_wave`, `completed_features`, `feature_acceptance`, `feature_briefs` | Feature-level fields are additive and optional; a Stage 6 runtime reading a Stage 7 state file with `schema_version` downgraded to `4` will ignore these fields without data loss on the read path |
 
 **A7 forward-reject rule.** When `bin/buildanything-runtime.ts` reads `.build-state.json` at session start, if `schema_version > MAX_SUPPORTED_SCHEMA_VERSION`, the runtime refuses to proceed and emits a clear error pointing to the compat matrix (`docs/migration/sdk-host-compat.md`). This is the A7 defense against silent schema drift — an old runtime must never silently ignore fields a newer runtime persisted. See **Task 4.5.2** for the runtime implementation (out of scope for this prose-only update).
 
@@ -23,7 +24,7 @@
 
 ```jsonc
 {
-  "schema_version": 1,
+  "schema_version": 5,
   "project_type": "ios",
   "phase": 6,
   "step": "6.4",
@@ -53,7 +54,7 @@
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
-| `schema_version` | integer | yes | Currently `2` (Stage 4); see version table above. Bumped on each Shape-B migration stage. |
+| `schema_version` | integer | yes | Currently `5`; see version table above. Bumped on each Shape-B migration stage. |
 | `project_type` | enum | yes | `"ios"` or `"web"`. Drives mode-branch routing. |
 | `phase` | integer | yes | Current phase, one of `-1, 0, 1, 2, 3, 4, 5, 6, 7`. |
 | `step` | string | yes | Dotted step identifier within the phase (e.g., `"5.3b"`, `"6.4"`). |
@@ -117,6 +118,22 @@ These fields are present only when `schema_version >= 4`. They support the Shape
 **v4 rollback semantics.** Rollback is via `BUILDANYTHING_SDK_SPRINT_CONTEXT=false` (web) and/or `BUILDANYTHING_SDK_SPRINT_CONTEXT_IOS=false` (iOS parity gate; see `MIGRATION-PLAN-FINAL.md` §Stage 6 rollback and Risk 2). Because `current_sprint_context_hash` is additive and optional, a Stage 5 runtime reading a Stage 6 state file with `schema_version` downgraded to `3` will ignore the field without data loss on the read path — Phase 4 simply reverts to per-task refs re-send. The persisted value survives in place until the next state write overwrites it; orchestrator code paths gated on the Stage 6 flags are responsible for not writing `current_sprint_context_hash` under per-task-refs mode.
 
 **SSOT note.** Kiro-owned `protocols/state-schema.json` is authoritative: `properties.current_sprint_context_hash` (string) is already declared, `schema_version.maximum` is already `4`, and the top-level `$comment` migration table already lists Stage 6. This prose mirrors that shape; any future interior fields (should the sprint-context module persist more than a hash) will be documented by tightening this entry alongside a JSON Schema update.
+
+### Fields added at v5 (Stage 7)
+
+These fields are present only when `schema_version >= 5`. They support the three-tier feature delegation architecture in Phase 4 — Product Owner planning, Briefing Officer per-feature briefs, and wave-based execution with acceptance gates.
+
+| Field | Type | Required | Added in | Notes |
+|---|---|---|---|---|
+| `feature_delegation_plan_path` | string | no | v5 | Path to `docs/plans/feature-delegation-plan.json`. Set at Step 4.1. |
+| `current_wave` | integer | no | v5 | Current wave being executed (1-indexed). Set at Step 4.1, incremented at Step 4.4. |
+| `completed_features` | string[] | no | v5 | Feature names that have been ACCEPTED by the Product Owner. |
+| `feature_acceptance` | object | no | v5 | Map of feature name → verdict (`ACCEPTED`, `NEEDS_REVISION`, `IN_PROGRESS`). |
+| `feature_briefs` | object | no | v5 | Map of feature name → path to feature brief file (`docs/plans/feature-briefs/{feature}.md`). |
+
+**v5 migration concern — none in wild.** As of this task, Stage 7 has not shipped. No `.build-state.json` files with `schema_version: 5` exist outside development probes. The runtime will be bumped to `5` as part of Stage 7 activation, not here.
+
+**v5 rollback semantics.** All five fields are additive and optional. A Stage 6 runtime reading a Stage 7 state file with `schema_version` downgraded to `4` will ignore these fields without data loss on the read path. Phase 4 simply reverts to the flat per-task execution model without feature-level delegation.
 
 ## Rendering contract
 

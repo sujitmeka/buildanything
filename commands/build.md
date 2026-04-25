@@ -32,6 +32,7 @@ Every shared artifact has ONE concurrent writer at any instant. The writer-owner
 Live downstream docs (read across Phase 3+):
   - `CLAUDE.md`              — P1 writer (then auto-loaded into every subagent)
   - `docs/plans/design-doc.md` (PRD)    — P1 writer
+  - `docs/plans/product-spec.md`        — P1 writer (Step 1.6), product-spec-writer writer
   - `docs/plans/architecture.md`        — P2 writer
   - `docs/plans/sprint-tasks.md`        — P2 writer
   - `docs/plans/quality-targets.json`   — P2 writer
@@ -48,7 +49,7 @@ Live downstream docs (read across Phase 3+):
   - `docs/plans/ux-flow-validation.md`  — design-ux-researcher writer (web, Step 3.3b)
   - `docs/plans/inclusive-visuals-audit.md` — P3 writer (web)
   - `docs/plans/a11y-design-review.md`  — P3 writer, a11y-architect writer (web, Step 3.7)
-  - `docs/plans/page-specs/*.md`        — P3 writer, design-ux-architect writer (web, Step 3.9 — per-screen wireframes + layout specs)
+  - `docs/plans/page-specs/*.md`        — P3 writer, design-ux-architect writer (web, Step 3.3 — per-screen wireframes + layout specs)
   - `docs/plans/refs.json`              — P2 writer, P3 writer (P3 extends after visual spec lands)
   - `docs/plans/decisions.jsonl`        — orchestrator-scribe ONLY via `scribe_decision` MCP tool (subagents return `deviation_row` objects; the orchestrator forwards each row through the MCP, which owns ID allocation and atomic append)
   - `docs/plans/learnings.jsonl`        — P5 writer, P7 writer
@@ -74,7 +75,7 @@ Live downstream docs (read across Phase 3+):
 Phase-internal scaffolding (lives in `docs/plans/phase1-scratch/` after Gate 1, never read by P3+):
   - `idea-draft.md`, `feature-intel.md`, `tech-feasibility.md`, `ux-research.md`, `business-model.md`, `findings-digest.md`, `suggested-questions.md`, `user-decisions.md`, `prereqs.json`
 
-Phase 4 implementers never reference Phase 1 raw research files. They are SPENT after the Product Spec step (Step 1.6 — TODO: implement). The product spec is the LAST consumer of raw research. After Step 1.6, research insights survive in `product-spec.md`, `design-doc.md`, and `CLAUDE.md`. Until Step 1.6 is implemented, research files remain SPENT after Phase 2 dispatch as before.
+Phase 4 implementers never reference Phase 1 raw research files. They are SPENT after the Product Spec step (Step 1.6). The product spec is the LAST consumer of raw research. After Step 1.6, research insights survive in `product-spec.md`, `design-doc.md`, and `CLAUDE.md`.
 </HARD-GATE>
 
 > **Default-deny (Stage 2+):** Once Stage 2 of the SDK migration activates, any `Write|Edit` tool call targeting a path absent from this table will be denied by the `PreToolUse` hook with message `"path not in writer-owner table — please add to phase-graph.yaml or route through scribe MCP"`. This is a pre-announcement; actual hook wiring ships in Task 2.1.3.
@@ -222,7 +223,7 @@ phase-5-dogfood-feedback-synthesizer                      →   phase-4.target-t
 Phase 6 LRR BLOCK (⭐⭐)                                   →   authoring-phase (per decisions.jsonl.decided_by)
 LRR-BLOCK-decided_by==architect                           →   phase-2
 LRR-BLOCK-decided_by==design-brand-guardian-or-phase-3-writer →   phase-3
-Phase 6 LRR NEEDS_WORK (code)                             →   Phase 4 target task
+Phase 6 LRR NEEDS_WORK (code)                             →   Phase 4 target feature (via BO re-planning)
 LRR-NEEDS_WORK-code-level                                 →   phase-4.target-task
 phase-6-LRR-NEEDS_WORK-structural                        →   phase-2-or-phase-3
 ```
@@ -496,6 +497,22 @@ Output: `docs/plans/phase1-scratch/prereqs.json` with shape `{supabase_url, supa
 
 ---
 
+### Step 1.6 — PRODUCT SPEC
+
+Call the Agent tool — description: "Product spec" — subagent_type: `product-spec-writer` — prompt: "[CONTEXT header above] Write `docs/plans/product-spec.md` following the structure in `protocols/product-spec-schema.md`. Read ALL of these via your Read tool before writing (do NOT expect pasted content):
+  - `docs/plans/design-doc.md` — PRD: features, persona, JTBD, value prop, scope, tech stack
+  - `docs/plans/phase1-scratch/findings-digest.md` — research synthesis
+  - `docs/plans/phase1-scratch/ux-research.md` — behavioral patterns, pain points
+  - `docs/plans/phase1-scratch/feature-intel.md` — competitive matrix, table-stakes vs differentiators
+  - `docs/plans/phase1-scratch/business-model.md` — revenue model implications
+  - `docs/plans/phase1-scratch/tech-feasibility.md` — technical constraints, rate limits, API limitations
+  - `docs/plans/phase1-scratch/user-decisions.md` — user's product decisions from informed brainstorm
+This is the LAST step that reads raw research files. Every actionable insight must survive in product-spec.md in structured, queryable form. Commit: 'feat: product spec'."
+
+**Compaction checkpoint.** Update `.build-state.json` per the format above.
+
+---
+
 ## Phase 2: Plan / Architect — TEAM of 6 + sequence
 
 **Goal**: Convert the PRD into a concrete architecture and ordered task list with explicit dependencies. Every architect receives the PRD (design-doc.md) + the Research Digest + its domain's raw research file (hybrid routing).
@@ -668,83 +685,99 @@ LRR BLOCK backward edge: `LRR BLOCK authoring=Phase 3 → back to Phase 3`. The 
 
 ---
 
-## Phase 4: Build — PARALLEL BATCHES by task dependencies
+## Phase 4: Build — THREE-TIER FEATURE-BASED EXECUTION
 
 <HARD-GATE>
-Before starting Phase 4: Phase 2 must be approved, Phase 3 must have produced the design artifact for this mode (`visual-design-spec.md` web / `ios-design-board.md` iOS). You MUST call the Agent tool for EVERY task. No exceptions.
+Before starting Phase 4: Phase 2 must be approved, Phase 3 must have produced the design artifact for this mode (`visual-design-spec.md` web / `ios-design-board.md` iOS), and `docs/plans/page-specs/` must contain at least one file (web). You MUST call the Agent tool for EVERY task. No exceptions.
 </HARD-GATE>
 
-**Goal**: Scaffold project + execute sprint tasks in dependency-ordered batches. Independent sibling tasks run in parallel (~30-50% wall-clock saving on typical sprint).
+**Goal**: Scaffold project, then execute sprint tasks organized by FEATURE with product adherence checked per-feature during build. Three tiers: Product Owner (product quality) → Briefing Officers (task planning per feature) → Execution Agents (code). The orchestrator drives all dispatches — PO and BO are planning agents that write artifacts to disk.
 
 **Mode-specific branch:**
-- `project_type=ios`: follow `protocols/ios-phase-branches.md` §Phase 4 (entitlements generator + Info.plist hardening, XcodeBuildMCP folder structure, SwiftUI design tokens, Maestro flow stubs).
-- `project_type=web`: follow `protocols/web-phase-branches.md` §Phase 4 (web project scaffolding, CSS design system tokens, Playwright acceptance test stubs).
+- `project_type=ios`: follow `protocols/ios-phase-branches.md` §Phase 4 for scaffold details and execution agent prompts.
+- `project_type=web`: follow `protocols/web-phase-branches.md` §Phase 4 for scaffold details and execution agent prompts.
 
-### Step 4.0 — Scaffold (old Phase 4 Foundation merged here)
-
-Scaffolding is project skeleton + design system + acceptance test stubs. Three sequential dispatches (full details in the mode-specific branch file):
-
-**CONTEXT header:** Render `rendered_context_header` for phase 4 per the canonical template (see CONTEXT HEADER HARD-GATE above). Includes `dna` field for web projects. Prepend to every Phase 4 scaffold prompt below; branch files do the same for per-task flow.
-
-1. Description: "Project scaffolding" — subagent_type: `engineering-rapid-prototyper` — mode: "bypassPermissions" — prompt per branch file (web: Next.js/Vite/etc; iOS: Xcode project from bootstrap). Prepend CONTEXT header above. [COMPLEXITY: M]
-
-2. Description: "Design system setup" — subagent_type: `engineering-frontend-developer` — mode: "bypassPermissions" — prompt per branch file. Prepend CONTEXT header above. Implements design tokens from `visual-design-spec.md` or `ios-design-board.md`. The living style guide from Phase 3 is the reference implementation — components must match. [COMPLEXITY: M]
-
-3. Description: "Scaffold acceptance tests" — INTERNAL inline role-string — mode: "bypassPermissions" — prompt: "[CONTEXT header above] Scaffold acceptance tests from sprint-tasks.md. Use Page Object Model. Read `docs/plans/sprint-tasks.md`. For every task with a Behavioral Test field, create a Playwright test stub (web) or Maestro flow stub (iOS). Each stub: navigate → interact → assert. Stubs must FAIL right now (features aren't built yet) — that's correct. Commit: 'test: scaffold acceptance tests from sprint tasks'."
-
-**Scaffold verification:** Run the Verify Protocol (INTERNAL inline — "Verify scaffolding") — 7 checks sequentially, stop on first FAIL. Do not proceed to Step 4.1 until PASS.
-
-### Step 4.1+ — Task execution in dependency-ordered batches
-
-Expand TodoWrite with each sprint task.
-
-Build a DAG from `sprint-tasks.md` Dependencies fields. Execute in batches: the next batch is the set of all tasks whose dependencies are all complete. Dispatch each batch as parallel Agent tool calls in ONE message.
-
-**Per-task flow (runs for every task in every batch):**
-
-#### Briefing Officer (INTERNAL inline)
-
-Dispatch before every implementer. Assembles a compact <40-line context map that tells the implementer EXACTLY where to look for each kind of context. Refs not pastes.
-
-Call the Agent tool — description: "Briefing for [task name]" — INTERNAL inline role-string — prompt: "You are the Briefing Officer. Read `docs/plans/refs.json` and the task row for [task-id] from `docs/plans/sprint-tasks.md`. Build a compact context map (~40 lines max) in this exact shape:
-
-```
-CONTEXT MAP — [task-id] [task name]
-  persona / JTBD     → design-doc.md#persona
-  product scope      → design-doc.md#scope
-  visual tokens      → visual-design-spec.md#tokens
-  component variants → component-manifest.md#[category]
-  auth model         → architecture.md#auth
-  data schema        → architecture.md#data-model
-  sibling task deps  → sprint-tasks.md#[dep-id-1], #[dep-id-2]
-  prior decisions    → decisions.jsonl rows [row-id-1], [row-id-2]
-  quality targets    → quality-targets.json (full file)
-```
-
-CLAUDE.md is NOT in the map — it auto-loads into every subagent. Raw Phase 1 research is NOT in the map — it is SPENT. The implementer reads refs on-demand using the Read tool; no full pastes."
-
-The Briefing Officer's output is the handoff payload for the implementer — not for the orchestrator to re-paste.
-
-#### Implementer dispatch (subagent_type by task type)
-
-Dispatch by task type and complexity:
-- UI tasks: `subagent_type: engineering-frontend-developer` (S/M) or `subagent_type: engineering-senior-developer` (L)
-- Backend tasks: `subagent_type: engineering-backend-architect` (L) or `subagent_type: engineering-senior-developer` (M)
-- Hard / complex / cross-cutting tasks: `subagent_type: engineering-senior-developer`
-
-**Phase 4 per-task dispatch table (subagent_type references for SSOT lint — full routing from phase-graph.yaml):**
-- Briefing officer: subagent_type: `briefing-officer-internal` (per-task context map)
+**Phase 4 dispatch table (subagent_type references for SSOT lint):**
+- Product Owner (planning): subagent_type: `product-owner`
+- Product Owner (acceptance): subagent_type: `product-owner`
+- Briefing Officer (per feature): subagent_type: `briefing-officer`
 - Web UI (S/M): subagent_type: `engineering-frontend-developer`
 - Web UI (L): subagent_type: `engineering-senior-developer`
-- Web backend: subagent_type: `engineering-backend-architect OR engineering-senior-developer`
+- Web backend: subagent_type: `engineering-backend-architect` OR `engineering-senior-developer`
 - Web AI/ML: subagent_type: `engineering-ai-engineer`
 - iOS UI planner: subagent_type: `ios-swift-ui-design`
-- iOS UI impl: subagent_type: `engineering-senior-developer`, subagent_type: `engineering-mobile-app-builder`
+- iOS UI impl: subagent_type: `engineering-senior-developer`, `engineering-mobile-app-builder`
 - iOS Foundation Models: subagent_type: `ios-foundation-models-specialist`
 - iOS StoreKit: subagent_type: `ios-storekit-specialist`
 - iOS Swift review: subagent_type: `swift-reviewer`
+- Security review: subagent_type: `security-reviewer`
+- Cleanup: subagent_type: `code-simplifier`, `refactor-cleaner`
+- Code review: subagent_type: `code-reviewer`, `silent-failure-hunter`
 
-Call the Agent tool — description: "[task-id] [task name]" — subagent_type per above — mode: "bypassPermissions" — prompt: "[CONTEXT header above] [COMPLEXITY: S/M/L from sprint-tasks.md]. TASK: [task description + acceptance criteria from sprint-tasks.md]. Sprint context is prepended; focus on this task.
+### Step 4.0 — Scaffold (unchanged)
+
+Scaffolding is project skeleton + design system + acceptance test stubs. Three sequential dispatches (full details in the mode-specific branch file):
+
+**CONTEXT header:** Render `rendered_context_header` for phase 4 per the canonical template (see CONTEXT HEADER HARD-GATE above). Includes `dna` field for web projects. Prepend to every Phase 4 prompt below.
+
+1. Description: "Project scaffolding" — subagent_type: `engineering-rapid-prototyper` — mode: "bypassPermissions" — prompt per branch file. [COMPLEXITY: M]
+
+2. Description: "Design system setup" — subagent_type: `engineering-frontend-developer` — mode: "bypassPermissions" — prompt per branch file. Implements design tokens from `visual-design-spec.md` or `ios-design-board.md`. [COMPLEXITY: M]
+
+3. Description: "Scaffold acceptance tests" — INTERNAL inline role-string — mode: "bypassPermissions" — prompt: "[CONTEXT header above] Scaffold acceptance tests from sprint-tasks.md. Use Page Object Model. For every task with a Behavioral Test field, create a Playwright test stub (web) or Maestro flow stub (iOS). Stubs must FAIL right now. Commit: 'test: scaffold acceptance tests from sprint tasks'."
+
+**Scaffold verification:** Run the Verify Protocol — 7 checks sequentially, stop on first FAIL. Do not proceed to Step 4.1 until PASS.
+
+### Step 4.1 — Product Owner: Feature Planning
+
+Dispatch the Product Owner in planning mode. It reads the full artifact set (via graph queries when available, raw doc reads as fallback), groups tasks by feature, sequences features into dependency-ordered waves, and writes a delegation plan.
+
+Call the Agent tool — description: "Product Owner: feature planning" — subagent_type: `product-owner` — prompt: "[CONTEXT header above] MODE: planning.
+
+Read these artifacts (use graph queries if available, otherwise Read tool):
+- `docs/plans/product-spec.md` — feature list, cross-feature interactions, screen inventory
+- `docs/plans/sprint-tasks.md` — task breakdown with dependencies
+- `docs/plans/architecture.md` — cross-feature API contracts, shared data entities
+- `docs/plans/page-specs/*.md` — screen assignments per feature
+- `docs/plans/quality-targets.json` — NFRs
+
+Produce `docs/plans/feature-delegation-plan.json` per the schema in `agents/product-owner.md`. For each feature: list assigned tasks (from sprint-tasks.md), write a product_context summary (~100-200 tokens: persona constraints, key business rules, critical error scenarios, competitive differentiators), extract cross-feature contracts, list page-spec refs (web: `page-specs/*.md` paths; iOS: `ios-design-board.md` section anchors). Sequence features into waves by dependency order."
+
+Output: `docs/plans/feature-delegation-plan.json`. Update `.build-state.json`: set `feature_delegation_plan_path`, initialize `current_wave: 1`, `completed_features: []`, `feature_acceptance: {}`.
+
+### Step 4.2 — Wave Execution (repeat for each wave)
+
+Read `feature-delegation-plan.json`. For each wave, execute all features. Features within a wave are independent and their Briefing Officers can be dispatched in parallel.
+
+#### 4.2.a — Briefing Officer dispatch (one per feature, parallel within wave)
+
+For each feature in the current wave, dispatch a Briefing Officer. If the wave has multiple independent features, dispatch all BOs in ONE message (parallel).
+
+Call the Agent tool — description: "Briefing Officer: [feature name]" — subagent_type: `briefing-officer` — mode: "bypassPermissions" — prompt: "[CONTEXT header above] FEATURE DELEGATION from Product Owner:
+
+Feature: [feature name]
+Product context: [paste product_context from delegation plan]
+Cross-feature contracts: [paste contracts from delegation plan]
+Assigned tasks: [paste task IDs]
+Page spec refs: [paste page_spec_refs from delegation plan]
+
+Read the full feature spec via graph query or `docs/plans/product-spec.md#[feature]`. Read task rows from `docs/plans/sprint-tasks.md`. Read page specs, architecture, component manifest, visual design spec for this feature's screens.
+
+Write `docs/plans/feature-briefs/[feature].md` per the schema in `agents/briefing-officer.md`. For each task: specify agent type, skills, structured context payload (layout, components, API contract, error states, business rules, persona constraints), and acceptance criteria."
+
+Output: `docs/plans/feature-briefs/[feature].md`. Update `.build-state.json.feature_briefs[feature]` with the path.
+
+#### 4.2.b — Task execution (orchestrator reads BO brief, dispatches per task)
+
+After the Briefing Officer writes the feature brief, the orchestrator reads it and executes each task. Tasks within a feature are executed in DAG-parallel batches (topological ordering from the Dependencies field — independent siblings run in parallel, yielding ~30-50% wall-clock saving). The per-task pipeline is unchanged in structure — only the input to the execution agent changes.
+
+**For each task in the feature brief:**
+
+**1. Implementer dispatch** — The orchestrator reads the task's execution spec from the feature brief and pastes the structured context directly into the execution agent's prompt. See mode-specific branch file (`protocols/web-phase-branches.md` §Phase 4 or `protocols/ios-phase-branches.md` §Phase 4) for the exact prompt template.
+
+Call the Agent tool — description: "[task-id] [task name]" — subagent_type: [from BO brief] — mode: "bypassPermissions" — prompt: "[CONTEXT header above] [COMPLEXITY: S/M/L from sprint-tasks.md].
+
+[Paste the full structured context payload from the feature brief — TASK, FEATURE CONTEXT, PAGE LAYOUT, COMPONENTS, API CONTRACT, ERROR STATES, BUSINESS RULES, SKILLS ASSIGNED, ACCEPTANCE. See branch file for exact format.]
 
 ## Prior Learnings
 [paste contents of `docs/plans/.active-learnings.md` if it exists, otherwise omit this section]
@@ -752,56 +785,62 @@ Call the Agent tool — description: "[task-id] [task name]" — subagent_type p
 ## Deviation Reporting
 If your implementation deviates from the planned architecture, return a `deviation_row` object per the schema in `protocols/decision-log.md`. If no deviation, return `deviation_row: null`. Do NOT write `decisions.jsonl` directly.
 
-Implement fully with real code and tests. Commit: 'feat: [task]'. Report what you built, files changed, and test results.
+Implement fully with real code and tests. Commit: 'feat: [task]'. Report what you built, files changed, and test results."
 
-## On Re-entry (from LRR backward routing)
-**[ORCHESTRATOR: Include the "On Re-entry" section below ONLY when this is a re-entry dispatch from LRR backward routing. For normal Phase 4 execution, OMIT it.]**
-
-If this dispatch is a re-entry (the orchestrator passes `blocking_finding`, `prior_output`, and `decision_row` in the prompt), DO NOT treat this as a fresh task. Read `prior_output` (the path to your previous task artifact under `.task-outputs/[task-id].json` + changed files) and `decision_row` (the original deviation rationale from decisions.jsonl). Revise ONLY what `blocking_finding` requires — do not redo unaffected code, do not re-run acceptance tests that already passed, do not touch files outside the blast radius of the finding. Return a fresh `deviation_row` in your result payload documenting the revision rationale (author=this task-id, type and summary describing the revision)."
-
-#### Per-task security review (auth/PII tasks only)
-
-FOR tasks touching auth, PII, secrets, or payment flows — add a per-task security review BEFORE Senior Dev cleanup:
+**2. Per-task security review (auth/PII tasks only)** — unchanged from prior design.
 
 Call the Agent tool — description: "Security review for [task-id]" — subagent_type: `security-reviewer` — prompt: "[CONTEXT header above] Review changed files from [task-id] for security issues. Scope: auth logic, input validation, secrets handling, dependency hygiene, OWASP Top 10 for web (or iOS Keychain / ATS / data protection for iOS). Return blocking findings only — 80%+ confidence threshold. Files to review: [list from implementer's changeset]."
 
-#### Senior Dev cleanup (simplifier + refactor-cleaner if TS)
+**3. Senior Dev cleanup** — unchanged. Two-pass, changeset-scoped.
 
-Two-pass cleanup. Scope is sacred: ONLY files from the implementation changeset. Zero exceptions.
+1. Call the Agent tool — description: "Simplify [task-id]" — subagent_type: `code-simplifier` — mode: "bypassPermissions" — prompt: "[CONTEXT header above] Simplify changed files from [task-id]. Remove dead code, unused imports, redundant abstractions. Do NOT add features. Do NOT change architecture. Do NOT touch files outside the changeset. Files: [list]."
 
-1. Call the Agent tool — description: "Simplify [task-id]" — subagent_type: `code-simplifier` — mode: "bypassPermissions" — prompt: "[CONTEXT header above] Simplify changed files from [task-id]. Remove dead code, unused imports, redundant abstractions. Do NOT add features. Do NOT change architecture. Do NOT touch files outside the changeset. If simplification breaks acceptance criteria, revert and skip. Files: [list]."
+2. If TS/JS task: Call the Agent tool — description: "Refactor [task-id]" — subagent_type: `refactor-cleaner` — mode: "bypassPermissions" — prompt: "[CONTEXT header above] Run knip/depcheck/ts-prune on changed files from [task-id]. Changeset only. Files: [list]."
 
-2. If TS/JS task: Call the Agent tool — description: "Refactor [task-id]" — subagent_type: `refactor-cleaner` — mode: "bypassPermissions" — prompt: "[CONTEXT header above] Run knip/depcheck/ts-prune on changed files from [task-id]. Remove orphaned exports, unused deps, dead files. Same scope rules as simplifier — changeset only. Files: [list]."
+**4. Per-task code review (parallel pair)** — unchanged.
 
-Skip cleanup if trivial (< 20 lines, single file).
+Call the Agent tool 2 times in one message:
 
-#### Per-task code review (parallel pair)
+1. Description: "Code review for [task-id]" — subagent_type: `code-reviewer` — Prompt: "[CONTEXT header above] Review changed files from [task-id]. 80%+ confidence threshold. Changeset only. Files: [list]."
 
-Call the Agent tool 2 times in one message after Senior Dev cleanup:
+2. Description: "Silent failure hunt for [task-id]" — subagent_type: `silent-failure-hunter` — Prompt: "[CONTEXT header above] Hunt silent failures in changed files from [task-id]. Files: [list]."
 
-1. Description: "Code review for [task-id]" — subagent_type: `code-reviewer` — Prompt: "[CONTEXT header above] Review changed files from [task-id]. Report findings with 80%+ confidence threshold only — skip low-confidence nitpicks. Scope: changeset only. Acceptance criteria: [paste from task]. Files: [list]."
+**5. Metric Loop** — unchanged. Authoritative behavioral check per `protocols/metric-loop.md`. Max 5 iterations.
 
-2. Description: "Silent failure hunt for [task-id]" — subagent_type: `silent-failure-hunter` — Prompt: "[CONTEXT header above] Hunt silent failures in changed files from [task-id]. Targets: empty catch blocks, try/catch returning null, swallowed errors, unhandled promise rejections, assertions disabled in production. Files: [list]. Report blocking findings only."
+**6. Verify Service** — unchanged. Static checks only (type-check, lint, build). Max 3 fix attempts.
 
-#### Metric Loop (generator/critic) — authoritative behavioral check
+**7. After each task completes** — Update TodoWrite and `.build-state.json`. Write summary to `docs/plans/.task-outputs/[task-id].json`.
 
-Run the Metric Loop Protocol (callable service) on the task implementation. Define a metric based on the task's acceptance criteria. For UI-facing tasks, include behavioral verification per the mode-specific branch file (web: agent-browser; iOS: SwiftUI Preview captures). Max 5 iterations.
+**8. Orchestrator-scribe** — After all tasks in a feature complete, collect deviation_rows and forward through `scribe_decision` MCP. Same mechanics as before.
 
-The metric loop's final measurement IS the authoritative behavioral verification for this task — no separate smoke-test dispatch. The critic's final score + pass/fail is what downstream steps consume.
+### Step 4.3 — Product Owner: Feature Acceptance
 
-Generator: same implementer agent re-invoked. Critic: measurement agent dispatched fresh. Never share context.
+After all tasks for a feature complete, dispatch the Product Owner in acceptance mode. It checks whether the built feature matches the product spec.
 
-On target met: mark task complete. On stall: accept if score >= 60% of target (autonomous) or present to user (interactive).
+Call the Agent tool — description: "Product Owner: accept [feature name]" — subagent_type: `product-owner` — prompt: "[CONTEXT header above] MODE: acceptance. FEATURE: [feature name].
 
-#### Verify Service (static checks only)
+Read the feature's acceptance criteria and business rules via graph query or `docs/plans/product-spec.md#[feature]`. Read the feature's page spec(s) from `docs/plans/page-specs/`. Use agent-browser (web) or XcodeBuildMCP + Maestro (iOS) to verify the built feature.
 
-Run the Verify Protocol (INTERNAL inline — "Verify scaffolding") after the metric loop exits. Verify now covers STATIC checks only: type-check, lint, build. Behavioral verification has already happened in the metric loop above — verify consumes the metric loop's final pass/fail + score from `.build-state.json.metric_loop_scores[]` rather than re-running behavioral checks. If any static check FAILS, dispatch a fix agent with the error, re-verify. Max 3 fix attempts.
+Check: (1) Does the feature implement the product spec's happy path? (2) Are business rules correct? (3) Are error states from the product spec handled? (4) Does the layout match the page spec? (5) Does component usage match the manifest?
 
-#### After each task completes
+Write verdict: ACCEPTED or NEEDS_REVISION with specific findings citing product-spec sections."
 
-Update TodoWrite and `.build-state.json`. Write a compact summary to `docs/plans/.task-outputs/[task-id].json` with {files-changed, tests-passing, verify-status}.
+**Verdict routing:**
+- `ACCEPTED` → mark feature complete in `.build-state.json.feature_acceptance`. Proceed.
+- `NEEDS_REVISION` → orchestrator re-dispatches the Briefing Officer for this feature with the findings. BO writes an updated brief targeting only the failing tasks. Orchestrator re-executes those tasks. Max 2 revision cycles per feature. After 2nd NEEDS_REVISION: interactive → present findings to user. Autonomous → accept with gap note in build-log.md.
 
-**Writes:** source code, `docs/plans/.task-outputs/`. Deviation rows flow through the orchestrator's `scribe_decision` MCP calls below — implementers do NOT touch `decisions.jsonl`.
+### Step 4.4 — Wave Transition
+
+After all features in the current wave are ACCEPTED:
+
+1. Update `.build-state.json`: add features to `completed_features`, increment `current_wave`.
+2. Handle shared file mutations: if any BO flagged shared file changes needed by the next wave, apply them now.
+3. Run a quick Verify Protocol (static checks) to confirm the wave didn't break anything.
+4. Proceed to next wave. Repeat Steps 4.2-4.4.
+
+After all waves complete, Phase 4 is done.
+
+**Writes:** source code, `docs/plans/.task-outputs/`, `docs/plans/feature-delegation-plan.json`, `docs/plans/feature-briefs/*.md`. Deviation rows flow through the orchestrator's `scribe_decision` MCP calls.
 
 <HARD-GATE>
 DECISIONS.JSONL — ORCHESTRATOR-SCRIBE ONLY via `scribe_decision` MCP. Only the orchestrator may cause appends to `docs/plans/decisions.jsonl`, and it does so exclusively by invoking the `scribe_decision` MCP tool. Any dispatch prompt asking a subagent to write this file is a bug. The orchestrator itself MUST NOT Write or Edit the file directly. Subagents return `deviation_row` objects in their structured result; the orchestrator forwards them through the MCP, which owns ID allocation and atomic append.
@@ -809,20 +848,20 @@ DECISIONS.JSONL — ORCHESTRATOR-SCRIBE ONLY via `scribe_decision` MCP. Only the
 
 #### Orchestrator-scribe dispatch (route deviation rows through `scribe_decision` MCP)
 
-Runs after every Phase 4 parallel batch returns (and anywhere else a subagent returns a `deviation_row`, including Phase 1 synthesis and Phase 2 architecture synthesis). The scribe MCP is the single writer for `docs/plans/decisions.jsonl`; the orchestrator is the single caller of the MCP.
+Runs after each feature's tasks complete. Same mechanics as before:
 
-1. Walk `batch_results`. Collect every non-null `deviation_row` from each subagent return.
-2. For each row, invoke the `scribe_decision` MCP tool with the row's fields (`phase`, `summary`, `decided_by`/`author`, `impact_level`, `chosen_approach`, `rejected_alternatives`, `ref`) per the MCP's documented schema. One MCP call per row.
-3. The MCP allocates the `decision_id` (`D-{N}-<seq>`), stamps `timestamp` (ISO-8601) and `status: "open"`, validates against `decisions.schema.json`, and atomically appends the line. The orchestrator MUST NOT Write or Edit `docs/plans/decisions.jsonl` directly, MUST NOT pre-compute decision IDs, and MUST NOT read or allocate `.build-state.json.decisions_next_id.P{N}` — ID allocation is the MCP's responsibility.
-4. Regenerate `.build-state.md` after the batch completes so the rendered view reflects the newly appended rows.
+1. Collect non-null `deviation_row` from each subagent return.
+2. For each row, invoke `scribe_decision` MCP. One call per row.
+3. MCP allocates `decision_id`, stamps timestamp, validates, atomically appends.
+4. Regenerate `.build-state.md`.
 
-**On resume:** the scribe MCP reconstructs its ID allocator internally on first invocation by scanning `docs/plans/decisions.jsonl` (for each phase `N`, `max(seq)+1` across rows whose `decision_id` matches `D-{N}-<seq>`). The orchestrator no longer maintains `decisions_next_id` in `.build-state.json`; the field is effectively deprecated under Stage 2 (scribe owns ID allocation end-to-end) and is scheduled for formal removal in Stage 4 schema bump A7 (see Task 4.5.1 in `docs/migration/sdk-hybrid/TASK-BREAKDOWN.md`). TODO(stage-4-A7): drop `decisions_next_id` from the state schema.
+**On resume:** scribe MCP reconstructs its ID allocator by scanning `decisions.jsonl`. The `decisions_next_id` field in `.build-state.json` is deprecated (scribe owns ID allocation).
 
 <HARD-GATE>
-LRR NEEDS_WORK backward edge: `LRR NEEDS_WORK (code-level) → back to Phase 4 target task`. The Aggregator classifies the finding and routes to the specific task via `related_decision_id` lookup; Phase 4 re-opens that task with the finding as input.
+LRR NEEDS_WORK backward edge: `LRR NEEDS_WORK (code-level) → back to Phase 4 target feature`. The Aggregator classifies the finding and routes to the specific feature's Briefing Officer via `related_decision_id` lookup. The BO re-plans the affected task(s), orchestrator re-executes. Product-level issues route to the Product Owner, who re-delegates to the relevant BO.
 </HARD-GATE>
 
-**Compaction checkpoint.** Update `.build-state.json` per the format above.
+**Compaction checkpoint.** Update `.build-state.json` per the format above. Feature-level state (`completed_features`, `current_wave`, `feature_acceptance`, `feature_briefs`) survives compaction — all planning artifacts are on disk.
 
 ---
 

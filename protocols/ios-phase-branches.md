@@ -219,9 +219,9 @@ After the retry, re-run the `find` command. If still `< 2`, HALT the build with 
 
 ## Phase 4 — Build per-task flow (iOS branch)
 
-These are the iOS-specific prompt templates for the per-task flow inside Phase 4 Step 4.1+. The orchestrator-side machinery (wave-based parallel dispatch by DAG, Briefing Officer, Senior Dev cleanup, code review pair, Metric Loop, Verify Service) lives in `commands/build.md` Phase 4. This section overrides the implementer dispatch and iOS-specific verification prompts.
+These are the iOS-specific prompt templates for the per-task flow inside Phase 4 Step 4.1+. The orchestrator-side machinery (**three-tier: Product Owner → Briefing Officer → Execution Agents**, Senior Dev cleanup, code review pair, Metric Loop, Verify Service) lives in `commands/build.md` Phase 4. This section overrides the implementer dispatch and iOS-specific verification prompts.
 
-**Wave dispatch (topological, dependency-bounded):** Build the DAG from the `Dependencies:` field on each row in `docs/plans/sprint-tasks.md`. A wave is the set of all not-yet-dispatched tasks whose declared dependencies are ALL complete. Dispatch every task in a wave as parallel Agent tool calls in ONE message, wait for the full wave to return, write back any `deviation_row` payloads via the orchestrator-scribe (single-writer pattern per `commands/build.md` §Decision log scribe), then compute the next wave. No magic parallelism cap — the dependency graph is the limit. iOS wave 1 commonly contains independent `Models/`, `Services/`, and static-view scaffolds; downstream view-model and navigation tasks fall into later waves as their deps clear.
+**Wave dispatch (feature-grained, from feature-delegation-plan.json):** The Product Owner (Step 4.1) groups features into waves and writes `docs/plans/feature-delegation-plan.json`. The orchestrator reads that plan to determine wave membership. Each wave dispatches one Briefing Officer per feature in parallel. Within a feature, tasks run in DAG-parallel batches (topological order from the `Dependencies:` field in sprint-tasks.md — independent sibling tasks run in parallel). iOS wave 1 commonly contains independent `Models/`, `Services/`, and static-view scaffolds; downstream view-model and navigation tasks fall into later waves as their deps clear.
 
 Load full iOS skill bundle per `protocols/ios-context.md` §Phase 4 — Build (Step 4.1+ per-task flow). Every implementation agent inherits the `ios-context.md` Senior iOS Engineer persona. Bundle includes: `swiftui-pro`, `swift-concurrency`, `swiftdata-pro`, `swift-security-expert`, `swift-accessibility`.
 
@@ -236,7 +236,39 @@ Load full iOS skill bundle per `protocols/ios-context.md` §Phase 4 — Build (S
 
 ### Step 4.1 — Implement (iOS)
 
-Call the Agent tool — description: "[task name]" — subagent_type per the Agent selection table below — mode: "bypassPermissions" — prompt: "[CONTEXT header above — phase: 4] TASK: [task description + acceptance criteria]. HANDOFF — Read these files via your Read tool before starting:\n  - Architecture: `docs/plans/architecture.md`\n  - Design board: `docs/plans/ios-design-board.md`\nFor UI tasks: also consult `skills/ios/swiftui-design-principles/` for the 10-rule polish checklist. Match the design board's tokens exactly. Previous task output: [if relevant]. Implement fully with real Swift code, Swift Testing `@Test`s, and XcodeBuildMCP validation. Commit: 'feat: [task]'. Report what you built, files changed, and test results."
+Call the Agent tool — description: "[task name]" — subagent_type: `[from BO brief]` — mode: "bypassPermissions" — prompt: "[CONTEXT header above — phase: 4] [COMPLEXITY: S/M/L from sprint-tasks.md].
+
+TASK: [task description from BO brief]
+
+FEATURE CONTEXT:
+[product_context from BO brief — persona constraints, business rules, key error scenarios]
+
+SCREEN SPEC:
+[relevant section from ios-design-board.md or page-spec, pasted from BO brief. Omit for non-UI tasks.]
+
+COMPONENTS:
+[SwiftUI component picks from BO brief — View types, SF Symbols, HIG patterns]
+
+API CONTRACT:
+[endpoint shape or SwiftData model from BO brief]
+
+ERROR STATES:
+[specific failure modes from BO brief — trigger, user message, recovery]
+
+BUSINESS RULES:
+[concrete rules from BO brief]
+
+SKILLS ASSIGNED: [skill list from BO brief]
+
+ACCEPTANCE: [criteria from BO brief]
+
+## Prior Learnings
+[paste contents of docs/plans/.active-learnings.md if it exists]
+
+## Deviation Reporting
+Return deviation_row or null. Do NOT write decisions.jsonl directly.
+
+Implement fully with real code and tests. Commit: 'feat: [task]'."
 
 Implementation agents edit Swift files directly and build/diagnose via XcodeBuildMCP. Set `[COMPLEXITY: S/M/L]` based on the task's Size from sprint-tasks.md.
 
