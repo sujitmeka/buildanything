@@ -1,6 +1,6 @@
 {
-  "passed": 25,
-  "total": 25,
+  "passed": 26,
+  "total": 26,
   "ok": true,
   "checks": [
     {
@@ -104,12 +104,17 @@
       "detail": "got 16 flags"
     },
     {
-      "name": "visual_design_spec_web",
+      "name": "design_md_no_platform_constraint",
+      "pass": true,
+      "detail": "DESIGN.md is shared web+iOS; should have no platform key"
+    },
+    {
+      "name": "design_md_writers_include_web_pass2",
       "pass": true,
       "detail": ""
     },
     {
-      "name": "ios_design_board_ios",
+      "name": "design_md_writers_include_ios_pass2",
       "pass": true,
       "detail": ""
     },

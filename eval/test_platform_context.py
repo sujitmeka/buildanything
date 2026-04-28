@@ -68,8 +68,10 @@ check("ios_features_16_flags", len(ios_flags) == 16, f"got {len(ios_flags)} flag
 
 # --- 6. Writer-owner table platform tags ---
 artifacts = {a["path"]: a for a in pg.get("artifacts", [])}
-check("visual_design_spec_web", artifacts.get("docs/plans/visual-design-spec.md", {}).get("platform") == "web")
-check("ios_design_board_ios", artifacts.get("docs/plans/ios-design-board.md", {}).get("platform") == "ios")
+design_md = artifacts.get("DESIGN.md", {})
+check("design_md_no_platform_constraint", "platform" not in design_md, "DESIGN.md is shared web+iOS; should have no platform key")
+check("design_md_writers_include_web_pass2", "design-ui-designer" in (design_md.get("writers") or []))
+check("design_md_writers_include_ios_pass2", "ios-swift-ui-design" in (design_md.get("writers") or []))
 check("component_manifest_web", artifacts.get("docs/plans/component-manifest.md", {}).get("platform") == "web")
 
 # --- 7. Skill directories ---

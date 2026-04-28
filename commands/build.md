@@ -38,8 +38,7 @@ Live downstream docs (read across Phase 3+):
   - `docs/plans/quality-targets.json`   — P2 writer
   - `docs/plans/phase-2-contracts/*.md`  — P2 writer (per-architect post-debate contract files)
   - `docs/plans/visual-dna-preview.md`  — P2 writer, design-brand-guardian writer, ios-swift-ui-design writer (directional DNA preview at Gate 2)
-  - `DESIGN.md`                         — P3 writers: design-brand-guardian (Pass 1 at Step 3.0), design-ui-designer (Pass 2 at Step 3.4). Web only. Replaces former visual-dna.md + visual-design-spec.md pair. Repo root.
-  - `docs/plans/ios-design-board.md`    — P3 writer (iOS)
+  - `DESIGN.md`                         — P3 writers: design-brand-guardian (Pass 1 at Step 3.0, both modes); design-ui-designer (Pass 2 at Step 3.4, web); ios-swift-ui-design (Pass 2 at Step 3.2-ios, iOS). Replaces former visual-dna.md + visual-design-spec.md pair (web) and ios-design-board.md (iOS). Repo root.
   - `docs/plans/component-manifest.md`  — P3 writer (web, HARD-GATE import source)
   - `docs/plans/design-references.md`   — visual-research writer (web, Step 3.1)
   - `docs/plans/design-references/**`   — visual-research writer (web, screenshots harvested by visual-research subagents)
@@ -508,6 +507,16 @@ Call the Agent tool — description: "Product spec" — subagent_type: `product-
   - `docs/plans/phase1-scratch/user-decisions.md` — user's product decisions from informed brainstorm
 This is the LAST step that reads raw research files. Every actionable insight must survive in product-spec.md in structured, queryable form. Commit: 'feat: product spec'."
 
+#### Step 1.6.idx — Slice 1 graph index
+
+After `product-spec-writer` returns and `docs/plans/product-spec.md` is on disk, index it into the build graph. Slice 1 graph index — best-effort, BO falls back to file reads on failure.
+
+Run via the Bash tool:
+
+- Command: `node ${CLAUDE_PLUGIN_ROOT}/bin/graph-index.js docs/plans/product-spec.md`
+- On exit 0: log success to `docs/plans/build-log.md` and continue.
+- On non-zero exit: log a warning line to `docs/plans/build-log.md` (`graph-index failed — continuing with file-read fallback`) and continue. The graph never blocks builds.
+
 **Compaction checkpoint.** Update `.build-state.json` per the format above.
 
 ---
@@ -656,7 +665,7 @@ Update TodoWrite and `.build-state.json`.
 <HARD-GATE>
 UI/UX IS THE PRODUCT. This phase is a full peer to Architecture and Build — not a footnote, not an afterthought. Do NOT skip, compress, or rush this phase for any reason.
 
-Phase 4 WILL NOT START without `DESIGN.md` (web) or `docs/plans/ios-design-board.md` (iOS). If the artifact does not exist, return here.
+Phase 4 WILL NOT START without `DESIGN.md` (Pass 1 + Pass 2 complete). If the artifact does not exist, return here.
 </HARD-GATE>
 
 **Mode-specific branch files drive Phase 3 in detail:**
@@ -687,7 +696,7 @@ LRR BLOCK backward edge: `LRR BLOCK authoring=Phase 3 → back to Phase 3`. The 
 ## Phase 4: Build — THREE-TIER FEATURE-BASED EXECUTION
 
 <HARD-GATE>
-Before starting Phase 4: Phase 2 must be approved, Phase 3 must have produced the design artifact for this mode (`DESIGN.md` web / `ios-design-board.md` iOS), and `docs/plans/page-specs/` must contain at least one file (web). You MUST call the Agent tool for EVERY task. No exceptions.
+Before starting Phase 4: Phase 2 must be approved, Phase 3 must have produced the design artifact (`DESIGN.md` — Pass 1 + Pass 2 complete; broken-refs lint == 0), and `docs/plans/page-specs/` must contain at least one file (web). You MUST call the Agent tool for EVERY task. No exceptions.
 </HARD-GATE>
 
 **Goal**: Scaffold project, then execute sprint tasks organized by FEATURE with product adherence checked per-feature during build. Three tiers: Product Owner (product quality) → Briefing Officers (task planning per feature) → Execution Agents (code). The orchestrator drives all dispatches — PO and BO are planning agents that write artifacts to disk.
@@ -721,7 +730,7 @@ Scaffolding is project skeleton + design system + acceptance test stubs. Three s
 
 1. Description: "Project scaffolding" — subagent_type: `engineering-rapid-prototyper` — mode: "bypassPermissions" — prompt per branch file. [COMPLEXITY: M]
 
-2. Description: "Design system setup" — subagent_type: `engineering-frontend-developer` — mode: "bypassPermissions" — prompt per branch file. Implements design tokens from `DESIGN.md` or `ios-design-board.md`. [COMPLEXITY: M]
+2. Description: "Design system setup" — subagent_type: `engineering-frontend-developer` — mode: "bypassPermissions" — prompt per branch file. Implements design tokens from `DESIGN.md`. [COMPLEXITY: M]
 
 3. Description: "Scaffold acceptance tests" — INTERNAL inline role-string — mode: "bypassPermissions" — prompt: "[CONTEXT header above] Scaffold acceptance tests from sprint-tasks.md. Use Page Object Model. For every task with a Behavioral Test field, create a Playwright test stub (web) or Maestro flow stub (iOS). Stubs must FAIL right now. Commit: 'test: scaffold acceptance tests from sprint tasks'."
 
@@ -740,7 +749,7 @@ Read these artifacts (use graph queries if available, otherwise Read tool):
 - `docs/plans/page-specs/*.md` — screen assignments per feature
 - `docs/plans/quality-targets.json` — NFRs
 
-Produce `docs/plans/feature-delegation-plan.json` per the schema in `agents/product-owner.md`. For each feature: list assigned tasks (from sprint-tasks.md), write a product_context summary (~100-200 tokens: persona constraints, key business rules, critical error scenarios, competitive differentiators), extract cross-feature contracts, list page-spec refs (web: `page-specs/*.md` paths; iOS: `ios-design-board.md` section anchors). Sequence features into waves by dependency order."
+Produce `docs/plans/feature-delegation-plan.json` per the schema in `agents/product-owner.md`. For each feature: list assigned tasks (from sprint-tasks.md), write a product_context summary (~100-200 tokens: persona constraints, key business rules, critical error scenarios, competitive differentiators), extract cross-feature contracts, list page-spec refs (web: `page-specs/*.md` paths; iOS: `DESIGN.md` section anchors). Sequence features into waves by dependency order."
 
 Output: `docs/plans/feature-delegation-plan.json`. Update `.build-state.json`: set `feature_delegation_plan_path`, initialize `current_wave: 1`, `completed_features: []`, `feature_acceptance: {}`.
 

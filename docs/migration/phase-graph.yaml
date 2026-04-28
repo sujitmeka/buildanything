@@ -47,25 +47,23 @@ artifacts:
       legitimate dispatching subagents can write this file. Discarded after
       Gate 2 — Phase 3.0 re-invokes to produce the locked card.
   - path: DESIGN.md
-    platform: web
-    writers: [phase-3, design-brand-guardian, design-ui-designer]
+    writers: [phase-3, design-brand-guardian, design-ui-designer, ios-swift-ui-design]
     readers: [phase-3, phase-4, phase-5, phase-6]
     notes: |
-      Single design-system artifact at repo root. Replaces the prior
-      visual-dna.md + visual-design-spec.md pair. Authored in two passes:
-      Step 3.0 (design-brand-guardian) writes Pass 1 — Overview, Brand DNA,
-      Rationale, Locked At, References, Do's and Don'ts; Step 3.4
-      (design-ui-designer) writes Pass 2 — YAML tokens (colors, typography,
-      rounded, spacing, components) plus the prose for Colors, Typography,
-      Layout, Elevation & Depth, Shapes, Components. Format spec is vendored
-      at protocols/design-md-spec.md (Apache 2.0). Pipeline contract is in
-      protocols/design-md-authoring.md. Agent-role enforcement fires
-      alongside the phase-3 phase-match so only the two legitimate
-      authoring subagents can write this file.
-  - path: docs/plans/ios-design-board.md
-    platform: ios
-    writer: phase-3
-    readers: [phase-4, phase-5, phase-6]
+      Single design-system artifact at repo root. Web + iOS. Replaces the
+      prior visual-dna.md + visual-design-spec.md pair (web) and
+      ios-design-board.md (iOS). Authored in two passes:
+      Step 3.0 (design-brand-guardian, both platforms) writes Pass 1 —
+      Overview, Brand DNA, Rationale, Locked At, References, Do's and Don'ts.
+      Pass 2 writer differs by platform: web uses design-ui-designer at
+      Step 3.4; iOS uses ios-swift-ui-design at Step 3.2-ios. Pass 2 fills
+      YAML tokens (colors, typography, rounded, spacing, components) plus
+      the prose for Colors, Typography, Layout, Elevation & Depth, Shapes,
+      Components. Format spec is vendored at protocols/design-md-spec.md
+      (Apache 2.0). Pipeline contract is in protocols/design-md-authoring.md
+      (§9 covers the iOS schema). Agent-role enforcement fires alongside
+      the phase-3 phase-match so only the three legitimate authoring
+      subagents can write this file.
   - path: docs/plans/component-manifest.md
     platform: web
     writer: phase-3
@@ -671,6 +669,16 @@ phases:
     ios_branch:
       source: protocols/ios-phase-branches.md
       steps:
+        - id: "3.0"
+          name: DESIGN.md Pass 1 — Brand DNA + Overview + Do's and Don'ts (shared with web)
+          kind: dispatch-single
+          subagent_type: design-brand-guardian
+          writes: [DESIGN.md]
+          notes: |
+            Same dispatch as web Step 3.0. Brand Guardian writes Pass 1
+            (Overview + 7-axis Brand DNA + Rationale + Locked At + References
+            + Do's and Don'ts). Pass 2 sections are placeholders. iOS-specific
+            Material gating (Liquid Glass requires iOS 26+ target) honored.
         - id: "3.1-ios"
           name: Visual research
           kind: dispatch-single
@@ -679,11 +687,14 @@ phases:
           sources: [screenlane.com, App Store web listings, Apple HIG pages, SF Symbols browser]
           constraints: [no paid sources]
         - id: "3.2-ios"
-          name: iOS Design Board
+          name: DESIGN.md Pass 2 — iOS YAML tokens + remaining prose
           kind: dispatch-single
           subagent_type: ios-swift-ui-design
-          writes: [ios-design-board.md]
-          grounded_in: [HIG, Liquid Glass, SF Symbols]
+          role: writer
+          writes: [DESIGN.md]
+          contains: [yaml-tokens, colors-with-dark-pairs, typography-as-DynamicType-roles, rounded, spacing, components-iOS-vocabulary, motion-as-h3, component-state-matrix-via-variants]
+          source: protocols/design-md-authoring.md
+          grounded_in: [HIG, Liquid Glass (iOS 26+), SF Symbols, design-references.md]
         - id: "3.4-ios"
           name: Visual QA loop
           kind: loop
@@ -692,8 +703,17 @@ phases:
           critic: design-critic
           tooling: XcodeBuildMCP SwiftUI Preview captures
           max_iterations: 3
+        - id: "3.8-ios"
+          name: DESIGN.md lint gate
+          kind: gate
+          tooling: hooks/design-md-lint
+          rules: |
+            broken-refs == 0 hard-fails back to Step 3.2-ios.
+            Warnings logged. Plus iOS-specific post-process checks
+            (dark-pair rule, Dynamic Type role check, iOS 26 gating)
+            per protocols/design-md-authoring.md §9.5.
       phase_4_entry_requirements:
-        - ios-design-board.md
+        - DESIGN.md (Pass 1 + Pass 2 complete; broken-refs lint == 0)
 
   - id: "4"
     name: Build
@@ -709,8 +729,15 @@ phases:
         - id: "4.0.b"
           name: Design system setup
           kind: dispatch-single
-          web: {subagent_type: engineering-frontend-developer, produces: CSS tokens from visual-design-spec}
-          ios: {subagent_type: engineering-senior-developer, produces: SwiftUI Color/Font/ShapeStyle tokens from ios-design-board.md}
+          web: {subagent_type: engineering-frontend-developer, produces: CSS tokens from DESIGN.md (YAML front matter)}
+          ios:
+            subagent_type: engineering-senior-developer
+            produces: |
+              Sources/<target>/DesignTokens.swift per protocols/design-md-authoring.md §9.4
+              SwiftUI translator (Color extensions Asset Catalog–backed with -dark pairs,
+              Font extensions mapped to Font.TextStyle Dynamic Type roles, Spacing/Radius
+              enums as CGFloat constants). Also Resources/Assets.xcassets color sets per
+              colors: token with light + dark appearances.
         - id: "4.0.c"
           name: Acceptance test scaffolding
           kind: dispatch-single-internal

@@ -43,7 +43,7 @@ You read the artifact set, sequence features into waves, and produce a delegatio
 - `docs/plans/product-spec.md` (features, business rules, states, acceptance criteria)
 - `docs/plans/sprint-tasks.md` (task breakdown, dependencies)
 - `docs/plans/architecture.md` (API contracts, data model, cross-feature dependencies)
-- `docs/plans/page-specs/*.md` (web) or `docs/plans/ios-design-board.md` sections (iOS) — screen layouts per feature
+- `docs/plans/page-specs/*.md` (web) or `DESIGN.md` sections (iOS) — screen layouts per feature
 - `docs/plans/component-manifest.md` (component assignments)
 - `docs/plans/quality-targets.json` (NFRs)
 
@@ -91,13 +91,13 @@ After a feature is built, you verify it matches the product spec.
 
 3. **Spot-check business rules.** Pick 2-3 concrete business rules from the product spec (e.g., "discount validates in real-time", "session expires after 30 minutes") and verify them behaviorally. Don't test everything — focus on rules that, if wrong, break the product promise.
 
-4. **Compare layout against page-spec.** Read the feature's `page-specs/*.md` wireframe (web) or relevant section of `docs/plans/ios-design-board.md` (iOS). Compare content hierarchy, above/below fold placement, and component usage against what agent-browser shows. Flag mismatches.
+4. **Compare layout against page-spec.** Read the feature's `page-specs/*.md` wireframe (web) or relevant section of `DESIGN.md` (iOS). Compare content hierarchy, above/below fold placement, and component usage against what agent-browser shows. Flag mismatches.
 
 5. **Write verdict.** Per feature: `ACCEPTED` or `NEEDS_REVISION`. For NEEDS_REVISION, list specific findings — what's wrong, what the spec says, what was observed. Be concrete enough that a Briefing Officer can act on each finding without re-reading the full spec.
 
 **Reads:**
 - `docs/plans/product-spec.md#[feature]` (acceptance criteria, business rules, states)
-- `docs/plans/page-specs/[screens].md` (web) or `docs/plans/ios-design-board.md#[feature]` (iOS) — expected layout
+- `docs/plans/page-specs/[screens].md` (web) or `DESIGN.md#[feature]` (iOS) — expected layout
 - Briefing Officer's completion report (if available)
 
 **Writes:** Verdict block in the dispatch response.

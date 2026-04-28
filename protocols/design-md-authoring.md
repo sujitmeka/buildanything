@@ -316,18 +316,173 @@ Linter rules (per vendored spec):
 
 Broken-refs is the only hard-fail. Warnings accumulate in the build log and feed the Phase 3.8 gate summary, but do not block Phase 4. The lint hook is invoked at Phase 3 Step 3.8 (Autonomous Quality Gate) — see `hooks/design-md-lint.ts`.
 
-## 9. iOS component vocabulary (Phase B placeholder)
+## 9. iOS DESIGN.md (Phase B)
 
-Phase A ships the web schema only. Phase B will adopt the same DESIGN.md format for iOS with these naming conventions inside the `components:` block:
+The same DESIGN.md format applies to iOS builds. The 7-axis Brand DNA, two-pass authoring, and lint gate are unchanged. iOS specifics live in this section.
 
-- `nav-tab-bar`, `nav-stack-bar`, `nav-large-title`
-- `list-row`, `list-row-grouped`, `list-row-inset`
-- `card-elevated`, `card-bordered`, `card-glass` (iOS 26+ Liquid Glass)
-- `button-primary`, `button-secondary`, `button-tertiary`, `button-tinted` (iOS 26+)
-- `input-text`, `input-search`, `input-stepper`, `input-toggle`
-- `sheet-modal`, `sheet-presented`, `popover`
+### 9.1 Authoring agents
 
-The same `<base>-<state>` variant convention applies (`button-primary-pressed`, `button-primary-disabled`). A SwiftUI translator at Phase 4 reads the tokens and emits `Color`, `Font`, `CGFloat` extensions — that is implementer-side work, not authoring.
+iOS uses a single Pass 2 author rather than the web's `design-ui-designer`. The dispatch table:
+
+| Pass | Step | Agent | Writes |
+|---|---|---|---|
+| 1 | 3.0 | `design-brand-guardian` | Markdown body (Overview + Brand DNA + Do's and Don'ts), shared with web. iOS-specific anti-slop guidance inline in §4. |
+| 2 | 3.2-ios | `ios-swift-ui-design` | YAML front matter + Pass 2 prose. Replaces the prior `ios-design-board.md` artifact entirely. |
+
+`ios-swift-ui-design` is the only iOS Pass 2 writer. The visual QA loop at Step 3.4-ios uses it as the generator (Preview tweaks) paired with `design-critic` as the critic — same pattern as web Step 3.6, just measuring against SwiftUI Preview captures instead of Playwright screenshots.
+
+### 9.2 iOS-specific YAML conventions
+
+The vendored spec is platform-agnostic. iOS authoring layers these conventions on top — they are NOT linter-enforced (the linter doesn't know about iOS), but downstream agents and the SwiftUI translator depend on them.
+
+**Colors** — every color token has a paired `-dark` token for dark-mode UITraitCollection. Authoring example:
+```yaml
+colors:
+  primary: "#1A1C1E"
+  primary-dark: "#F2F4F6"
+  surface: "#FFFFFF"
+  surface-dark: "#0B0B0C"
+  on-surface: "#1A1C1E"
+  on-surface-dark: "#F2F4F6"
+```
+The translator emits a single `Color("primary")` that resolves through Asset Catalog with both appearances. Authors who skip the `-dark` pair get a contrast warning at Step 3.7.
+
+**Typography** — name tokens after iOS Dynamic Type roles, not display sizes. The roles map directly to `Font.TextStyle`:
+```yaml
+typography:
+  largeTitle:    { fontFamily: SF Pro Display, fontSize: 34px, fontWeight: 700, lineHeight: 1.2 }
+  title:         { fontFamily: SF Pro Display, fontSize: 28px, fontWeight: 700, lineHeight: 1.2 }
+  title2:        { fontFamily: SF Pro Display, fontSize: 22px, fontWeight: 600, lineHeight: 1.2 }
+  title3:        { fontFamily: SF Pro Text,    fontSize: 20px, fontWeight: 600, lineHeight: 1.2 }
+  headline:      { fontFamily: SF Pro Text,    fontSize: 17px, fontWeight: 600, lineHeight: 1.3 }
+  body:          { fontFamily: SF Pro Text,    fontSize: 17px, fontWeight: 400, lineHeight: 1.4 }
+  callout:       { fontFamily: SF Pro Text,    fontSize: 16px, fontWeight: 400, lineHeight: 1.4 }
+  subheadline:   { fontFamily: SF Pro Text,    fontSize: 15px, fontWeight: 400, lineHeight: 1.4 }
+  footnote:      { fontFamily: SF Pro Text,    fontSize: 13px, fontWeight: 400, lineHeight: 1.3 }
+  caption:       { fontFamily: SF Pro Text,    fontSize: 12px, fontWeight: 400, lineHeight: 1.3 }
+  caption2:      { fontFamily: SF Pro Text,    fontSize: 11px, fontWeight: 400, lineHeight: 1.3 }
+```
+Token names that match a Dynamic Type role get a `Font.TextStyle` (which scales with the user's accessibility setting). Custom names that don't match emit a fixed-size Font, breaking accessibility — Step 3.7 will flag those.
+
+**Spacing** — iOS uses HIG's 4 / 8 / 16 / 20 / 24 progression (`xs: 4 / sm: 8 / md: 16 / lg: 20 / xl: 24 / xxl: 32`). The translator emits these as `CGFloat` constants. Use `safeArea`, `gutter`, and `margin` named tokens for layout anchors.
+
+**Rounded** — iOS prefers `continuous` corner curves on iOS 13+. The translator emits `RoundedRectangle(cornerRadius: X, style: .continuous)`. Token names follow the web convention (`sm / md / lg / xl / full`).
+
+### 9.3 Required iOS components vocabulary
+
+The `components:` block MUST cover at minimum these slots (additional components are encouraged):
+
+```yaml
+components:
+  # Navigation
+  nav-tab-bar:             { backgroundColor: "{colors.surface}", textColor: "{colors.on-surface}" }
+  nav-stack-bar:           { backgroundColor: "{colors.surface}", textColor: "{colors.on-surface}" }
+  nav-large-title:         { textColor: "{colors.on-surface}", typography: "{typography.largeTitle}" }
+
+  # Lists / cards
+  list-row:                { backgroundColor: "{colors.surface}", textColor: "{colors.on-surface}", padding: "{spacing.md}" }
+  list-row-grouped:        { backgroundColor: "{colors.surface}", rounded: "{rounded.md}" }
+  list-row-inset:          { backgroundColor: "{colors.surface}", padding: "{spacing.lg}" }
+  card-elevated:           { backgroundColor: "{colors.surface}", rounded: "{rounded.lg}", padding: "{spacing.md}" }
+  card-bordered:           { backgroundColor: "{colors.surface}", rounded: "{rounded.md}", padding: "{spacing.md}" }
+  # iOS 26+ Liquid Glass — use only when DNA Material = Glassy AND build targets iOS 26+
+  card-glass:              { backgroundColor: "{colors.surface}", rounded: "{rounded.lg}" }
+
+  # Buttons (HIG primary / secondary / tertiary; iOS 26+ tinted)
+  button-primary:          { backgroundColor: "{colors.primary}", textColor: "{colors.surface}", typography: "{typography.headline}", padding: "{spacing.md}", rounded: "{rounded.md}" }
+  button-primary-pressed:  { backgroundColor: "{colors.primary}" }   # 90% opacity applied by translator
+  button-primary-disabled: { backgroundColor: "{colors.primary}" }   # 40% opacity applied by translator
+  button-secondary:        { backgroundColor: "{colors.surface}", textColor: "{colors.primary}", typography: "{typography.headline}", padding: "{spacing.md}", rounded: "{rounded.md}" }
+  button-tertiary:         { backgroundColor: "{colors.surface}", textColor: "{colors.primary}", typography: "{typography.headline}", padding: "{spacing.sm}" }
+  # iOS 26+ only
+  button-tinted:           { backgroundColor: "{colors.primary}", textColor: "{colors.primary}" }
+
+  # Inputs
+  input-text:              { backgroundColor: "{colors.surface}", textColor: "{colors.on-surface}", typography: "{typography.body}", padding: "{spacing.md}", rounded: "{rounded.md}" }
+  input-search:            { backgroundColor: "{colors.surface}", typography: "{typography.body}", padding: "{spacing.sm}" }
+  input-stepper:           { backgroundColor: "{colors.surface}", textColor: "{colors.on-surface}", typography: "{typography.body}" }
+  input-toggle:            { backgroundColor: "{colors.primary}" }   # tint color when on
+
+  # Containers
+  sheet-modal:             { backgroundColor: "{colors.surface}", rounded: "{rounded.lg}" }
+  sheet-presented:         { backgroundColor: "{colors.surface}" }
+  popover:                 { backgroundColor: "{colors.surface}", rounded: "{rounded.md}", padding: "{spacing.md}" }
+```
+
+The same `<base>-<state>` variant convention applies. State suffixes for iOS: `-pressed` (corresponds to SwiftUI `pressed` state via `.buttonStyle`), `-disabled`, `-selected`, `-focused`. Hover does NOT exist on touch — do not author `-hover` variants for iOS.
+
+### 9.4 SwiftUI translator (Phase 4 reference)
+
+Phase 4's iOS scaffold step (`Step 4.0.b`) reads `DESIGN.md` and emits a Swift file that exposes the tokens as Swift extensions. The translator is part of the implementer's prompt — it is NOT a separate generated artifact, and it is NOT vendored. Implementers reference this template:
+
+```swift
+// DesignTokens.swift — generated from DESIGN.md at <commit-sha>. Do not edit by hand.
+// Re-run the iOS design tokens setup task to regenerate after DESIGN.md changes.
+
+import SwiftUI
+
+extension Color {
+    // Asset Catalog colors with light + dark appearances per DESIGN.md `colors:` block.
+    // Each token requires a paired `-dark` entry in DESIGN.md to populate the dark appearance.
+    static let primary       = Color("primary")
+    static let surface       = Color("surface")
+    static let onSurface     = Color("on-surface")
+    static let neutral       = Color("neutral")
+    static let error         = Color("error")
+    // ... one per `colors:` token
+}
+
+extension Font {
+    // Dynamic Type roles map to SwiftUI Font.TextStyle.
+    // Tokens whose name matches a TextStyle scale with the user's text-size setting.
+    static let largeTitle  = Font.system(.largeTitle,  design: .default).weight(.bold)
+    static let title       = Font.system(.title,       design: .default).weight(.bold)
+    static let title2      = Font.system(.title2,      design: .default).weight(.semibold)
+    static let title3      = Font.system(.title3,      design: .default).weight(.semibold)
+    static let headline    = Font.system(.headline,    design: .default).weight(.semibold)
+    static let body        = Font.system(.body,        design: .default)
+    static let callout     = Font.system(.callout,     design: .default)
+    static let subheadline = Font.system(.subheadline, design: .default)
+    static let footnote    = Font.system(.footnote,    design: .default)
+    static let caption     = Font.system(.caption,     design: .default)
+    static let caption2    = Font.system(.caption2,    design: .default)
+    // Custom font tokens (those not matching a TextStyle role) emit fixed-size Fonts.
+    // These do NOT scale with Dynamic Type — Step 3.7 will flag accessibility risk.
+}
+
+enum Spacing {
+    // Spacing scale per DESIGN.md `spacing:` block. CGFloat constants.
+    static let xs: CGFloat = 4
+    static let sm: CGFloat = 8
+    static let md: CGFloat = 16
+    static let lg: CGFloat = 20
+    static let xl: CGFloat = 24
+    static let xxl: CGFloat = 32
+    static let gutter: CGFloat = 16
+    static let margin: CGFloat = 20
+}
+
+enum Radius {
+    // Use with RoundedRectangle(cornerRadius: Radius.md, style: .continuous).
+    static let sm: CGFloat = 4
+    static let md: CGFloat = 8
+    static let lg: CGFloat = 12
+    static let xl: CGFloat = 16
+    static let full: CGFloat = 9999
+}
+```
+
+The implementer also creates `Resources/Assets.xcassets` color set entries — one per `colors:` token, with the `-dark` variant populating the Dark appearance slot. Component tokens (`button-primary`, `card-elevated`, etc.) are NOT translated to Swift directly; they are applied via SwiftUI view modifiers (`.background(Color.primary)`, `.font(.headline)`, `.cornerRadius(Radius.md)`) inside per-screen views. The token YAML is the contract; the translator output is the toolkit; the views compose them.
+
+### 9.5 iOS lint behavior
+
+The vendored linter runs unchanged on iOS DESIGN.md. Three iOS-specific behaviors layer on top:
+
+1. **Dark-pair rule** (warn, advisory) — the orchestrator post-processes lint results and warns when a `colors:` token lacks a `-dark` pair. Not in the vendored linter; logged to `build-log.md` Step 3.8 alongside the lint output.
+2. **Dynamic Type role check** (warn, advisory) — same post-process step warns when a `typography:` token name does not match a known `Font.TextStyle` role. Custom names are allowed but accessibility-flagged.
+3. **iOS 26 gating** (info) — when the DNA Material axis is `Glassy` AND the build's `ios_features` include iOS 26 targets, the orchestrator confirms `card-glass` and `button-tinted` variants exist. When DNA Material is anything else, those variants must be absent.
+
+These post-process checks live in `hooks/design-md-lint.ts` (web codepath unaffected; iOS codepath gated on `project_type=ios` in `.build-state.json`).
 
 ## 10. Readers (downstream pipeline)
 

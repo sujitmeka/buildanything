@@ -28,8 +28,7 @@ Every shared artifact has ONE concurrent writer at any instant. Non-owning phase
 | `docs/plans/architecture.md` | Phase 2 | Phase 3-7 via refs |
 | `docs/plans/sprint-tasks.md` | Phase 2 | Phase 4-6 via refs |
 | `docs/plans/quality-targets.json` | Phase 2 | Phase 4, 5, 6 |
-| `DESIGN.md` (web) | Phase 3 (Step 3.0 = Pass 1 by `design-brand-guardian`; Step 3.4 = Pass 2 by `design-ui-designer`) | Phase 3-6 |
-| `docs/plans/ios-design-board.md` (iOS) | Phase 3 | Phase 4, 5, 6 |
+| `DESIGN.md` (web + iOS) | Phase 3 (Step 3.0 = Pass 1 by `design-brand-guardian`, both platforms; Pass 2 web = `design-ui-designer` at Step 3.4; Pass 2 iOS = `ios-swift-ui-design` at Step 3.2-ios) | Phase 3-6 |
 | `docs/plans/component-manifest.md` (web) | Phase 3 | Phase 4 (HARD-GATE import source) |
 | `docs/plans/refs.json` | Phase 2 writer, Phase 3 extender | Phase 4 Briefing Officer |
 | `docs/plans/feature-delegation-plan.json` | Product Owner (Step 4.1) | orchestrator, briefing-officer |
@@ -206,11 +205,13 @@ Structured representation. Every phase has: `id`, `name`, `kind`, `skip_conditio
 
 | Step | Name | Kind | Dispatches |
 |---|---|---|---|
+| 3.0 (shared with web) | DESIGN.md Pass 1 | dispatch-single | `design-brand-guardian` writes Pass 1 of `DESIGN.md` at repo root (Overview + 7-axis Brand DNA + Rationale + Locked At + References + Do's and Don'ts). Pass 2 sections placeholder. Same dispatch as web Step 3.0. iOS Material gating: Liquid Glass requires iOS 26+ target |
 | 3.1-ios | Visual research | dispatch-single | `visual-research` + agent-browser `-p desktop` to harvest from screenlane.com, App Store web listings, Apple HIG pages, SF Symbols browser (no paid sources) |
-| 3.2-ios | iOS Design Board | dispatch-single | `ios-swift-ui-design` writes `ios-design-board.md` grounded in HIG + Liquid Glass + SF Symbols |
-| 3.4-ios | Visual QA loop | loop (generator/critic) | generator: `ios-swift-ui-design` (Preview tweaks). critic: `design-critic`. Uses XcodeBuildMCP SwiftUI Preview captures. Max 3 iterations (tighter than web's 5) |
+| 3.2-ios | DESIGN.md Pass 2 (iOS) | dispatch-single | `ios-swift-ui-design` (writer invocation) Edits `DESIGN.md` to fill YAML front matter (colors with `-dark` pairs, typography named after Dynamic Type roles, rounded, spacing on HIG 4/8/16/20/24 scale, components covering the iOS vocabulary in `protocols/design-md-authoring.md` §9.3) AND writes Pass 2 prose for `## Colors`, `## Typography`, `## Layout`, `## Elevation & Depth`, `## Shapes`, `## Components`. Pass 1 sections read-only. Grounded in HIG + Liquid Glass (iOS 26+ when DNA Material = Glassy) + SF Symbols |
+| 3.4-ios | Visual QA loop | loop (generator/critic) | generator: `ios-swift-ui-design` (Preview tweaks AND DESIGN.md token re-tunes). critic: `design-critic`. Uses XcodeBuildMCP SwiftUI Preview captures. Max 3 iterations (tighter than web's 5) |
+| 3.8-ios | DESIGN.md lint gate | gate | `hooks/design-md-lint` runs vendored `npx @google/design.md lint DESIGN.md` plus iOS post-process checks (dark-pair rule, Dynamic Type role check, iOS 26 gating per `protocols/design-md-authoring.md` §9.5). Broken-refs hard-fails to Step 3.2-ios; warnings logged |
 
-**Phase 4 entry requirement (iOS):** `ios-design-board.md` must exist.
+**Phase 4 entry requirement (iOS):** `DESIGN.md` (Pass 1 + Pass 2 complete; broken-refs lint == 0) must exist.
 
 **Backward edge:** `LRR BLOCK decided_by=design-brand-guardian or Phase 3 writer → Phase 3` (re-entry to specific step by `decision_row.author`).
 
@@ -225,7 +226,7 @@ Structured representation. Every phase has: `id`, `name`, `kind`, `skip_conditio
 | Step | Name | Kind | Dispatches (web) | Dispatches (iOS) |
 |---|---|---|---|---|
 | 4.0.a | Project scaffolding | dispatch-single | `engineering-rapid-prototyper` — Next.js/Vite/etc. scaffolding | N/A (done by Phase -1) — instead: XcodeBuildMCP creates `Views/`, `Models/`, `Services/`, `Resources/` folders |
-| 4.0.b | Design system setup | dispatch-single | `engineering-frontend-developer` — CSS tokens from visual-design-spec | `engineering-senior-developer` — SwiftUI `Color`/`Font`/`ShapeStyle` tokens from `ios-design-board.md` |
+| 4.0.b | Design system setup | dispatch-single | `engineering-frontend-developer` — CSS tokens from `DESIGN.md` (YAML front matter) | `engineering-senior-developer` — `Sources/<target>/DesignTokens.swift` per `protocols/design-md-authoring.md` §9.4 (Color extensions Asset Catalog–backed with `-dark` pairs, Font extensions mapped to `Font.TextStyle` Dynamic Type roles, `Spacing` + `Radius` enums) plus `Resources/Assets.xcassets` color sets, all derived from `DESIGN.md` |
 | 4.0.c | Acceptance test scaffolding | dispatch-single (INTERNAL) | Playwright test stubs in `tests/e2e/acceptance/` (one per sprint-task Behavioral Test) | Maestro YAML stubs in `maestro/` (HARD-GATE: `find maestro -name '*.yaml' \| wc -l >= 2`) |
 | 4.0.d | Scaffold metric loop (iOS) | loop | — | builds clean via XcodeBuildMCP, `@Test`s pass. Max 3. Build-fix dispatch → `swift-build-resolver` |
 | 4.0.e | Verify gate | gate | Verify Protocol (7 checks) — must PASS before Step 4.1 | XcodeBuildMCP build + test |

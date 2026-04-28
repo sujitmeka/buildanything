@@ -52,7 +52,7 @@ Use the cheapest mechanism that preserves fidelity:
 
 | Source doc type | Structure | Extraction mechanism | Cost |
 |-----------------|-----------|---------------------|------|
-| Structured (named fields with explicit values) — e.g., `visual-dna.md` DNA card, `sprint-tasks.md` Behavioral Test field, `ios-design-board.md` named sections | YAML/markdown with named axes, fields, or sections | **Mechanical** — orchestrator parses and copies the values directly. No LLM reasoning. | ~0 tokens |
+| Structured (named fields with explicit values) — e.g., `DESIGN.md` YAML front matter (`colors`, `typography`, `components`) and `## Overview > ### Brand DNA` axes, `sprint-tasks.md` Behavioral Test field | YAML/markdown with named axes, fields, or sections | **Mechanical** — orchestrator parses and copies the values directly. No LLM reasoning. | ~0 tokens |
 | Semi-structured (values spread across prose sections) — e.g., `visual-design-spec.md`, Phase 5 audit findings | Long-form with explicit values in multiple sections | **One-shot extractor dispatch** — single agent call reads the full doc once and outputs the structured checklist. | ~20-25K one-time |
 | Unstructured (visual references, screenshots, mood boards) — e.g., `design-references.md` | Screenshot URLs, visual comps | **Not extracted.** Referenced by path in the checklist. Iteration 1 MAY read on-demand; iteration 2+ MUST NOT unless diagnosis explicitly flags a visual-reference gap. | 0 tokens |
 

@@ -41,7 +41,7 @@ If missing or older: fail with `"Install Xcode 26.3 from the Mac App Store, then
 
 ### 3. Create project directory structure
 From project root, create:
-- `docs/plans/` — holds `.build-state.md`, `ios-design-board.md`, task lists
+- `docs/plans/` — holds `.build-state.md`, task lists (note: `DESIGN.md` lives at the repo root, not under `docs/plans/`)
 - `maestro/` — canonical name for Maestro YAML flows
 
 ### 4. User-assisted Xcode New Project dialog
