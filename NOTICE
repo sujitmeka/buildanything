@@ -1,0 +1,23 @@
+oneshot-claude-plugin
+Copyright (c) 2026 Sujit Meka
+
+This project includes vendored content from third-party sources.
+
+----------------------------------------------------------------------
+DESIGN.md Format Specification
+----------------------------------------------------------------------
+
+The file `protocols/design-md-spec.md` is vendored from the
+google-labs-code/design.md project at commit
+8ecd4645b957e6a683a05fb9c79cd6c9028873d0.
+
+Source: https://github.com/google-labs-code/design.md
+License: Apache License, Version 2.0
+        http://www.apache.org/licenses/LICENSE-2.0
+
+Copyright 2025 Google LLC
+
+The DESIGN.md format specification is reproduced under the terms of the
+Apache License 2.0. Modifications, if any, are limited to the prepended
+vendoring header that names the source repository, pinned commit, and
+license. The substantive content is unchanged from the upstream commit.

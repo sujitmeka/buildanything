@@ -39,6 +39,14 @@ The orchestrator passes these variables into your dispatch prompt: `project_type
 **Forbidden defaults:**
 - Do NOT load `skills/ios/swift-concurrency` (older) — not UX-architect-relevant; architect/builder agents own concurrency.
 
+## DESIGN.md Reads (Phase 3.3 + 3.3b)
+
+At Step 3.3 you read `DESIGN.md` `## Overview > ### Brand DNA` for the 7 axis values (Scope, Density, Character, Material, Motion, Type, Copy). The Density axis is your primary spatial driver: Airy = generous whitespace, Dense = compact data, Balanced = middle.
+
+DESIGN.md Pass 2 (exact spacing values, typography ramp, color tokens, component tokens) does NOT exist yet at Step 3.3 — that lands at Step 3.4. Your wireframes specify spatial arrangement and content hierarchy, not pixel-precise measurements. Phase 4 implementers apply the final token values from DESIGN.md when they build.
+
+You write `docs/plans/ux-architecture.md` and `docs/plans/page-specs/*.md` (one file per screen from `docs/plans/product-spec.md` Screen Inventory, following `protocols/page-spec-schema.md`).
+
 ## 🎯 Your Core Mission
 
 ### Create Developer-Ready Foundations

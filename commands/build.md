@@ -38,10 +38,9 @@ Live downstream docs (read across Phase 3+):
   - `docs/plans/quality-targets.json`   — P2 writer
   - `docs/plans/phase-2-contracts/*.md`  — P2 writer (per-architect post-debate contract files)
   - `docs/plans/visual-dna-preview.md`  — P2 writer, design-brand-guardian writer, ios-swift-ui-design writer (directional DNA preview at Gate 2)
-  - `docs/plans/visual-design-spec.md`  — P3 writer (web)
+  - `DESIGN.md`                         — P3 writers: design-brand-guardian (Pass 1 at Step 3.0), design-ui-designer (Pass 2 at Step 3.4). Web only. Replaces former visual-dna.md + visual-design-spec.md pair. Repo root.
   - `docs/plans/ios-design-board.md`    — P3 writer (iOS)
   - `docs/plans/component-manifest.md`  — P3 writer (web, HARD-GATE import source)
-  - `docs/plans/visual-dna.md`          — P3 writer (web)
   - `docs/plans/design-references.md`   — visual-research writer (web, Step 3.1)
   - `docs/plans/design-references/**`   — visual-research writer (web, screenshots harvested by visual-research subagents)
   - `docs/plans/dna-persona-check.md`   — design-ux-researcher writer (web, Step 3.2b)
@@ -83,7 +82,7 @@ Phase 4 implementers never reference Phase 1 raw research files. They are SPENT 
 <HARD-GATE>
 CONTEXT HEADER — RENDER ONCE, HOIST AS STABLE PREFIX.
 
-Every phase uses a CONTEXT header prepended to dispatch prompts. The orchestrator MUST render this header ONCE at the start of each phase by reading `.build-state.json` (and `visual-dna.md` for web, Phase 4+) and resolving all values into concrete strings. The rendered header is then reused verbatim for every dispatch in that phase.
+Every phase uses a CONTEXT header prepended to dispatch prompts. The orchestrator MUST render this header ONCE at the start of each phase by reading `.build-state.json` (and `DESIGN.md` `## Overview > ### Brand DNA` for web, Phase 4+) and resolving all values into concrete strings. The rendered header is then reused verbatim for every dispatch in that phase.
 
 DO NOT paste `{read from .build-state.json}` placeholders into dispatch prompts. DO NOT re-read state files per dispatch. The values do not change within a phase.
 
@@ -92,7 +91,7 @@ DO NOT paste `{read from .build-state.json}` placeholders into dispatch prompts.
 CONTEXT:
   project_type: <resolved value>
   phase: <current phase number>
-  dna: <resolved from docs/plans/visual-dna.md — INCLUDE only if project_type=web AND phase >= 4>
+  dna: <resolved from DESIGN.md `## Overview > ### Brand DNA` (7 axis values only, ~100 tokens) — INCLUDE only if project_type=web AND phase >= 4>
   ios_features: <resolved from .build-state.json — INCLUDE only if project_type=ios>
 
 TASK:
@@ -100,7 +99,7 @@ TASK:
 
 **Rendering procedure** (run once per phase boundary):
 1. Read `docs/plans/.build-state.json`. Extract `project_type`, `ios_features`.
-2. If `project_type=web` AND phase >= 4: read `docs/plans/visual-dna.md` and extract the DNA summary (first 5 lines or the `## Summary` section). Otherwise omit the `dna` field.
+2. If `project_type=web` AND phase >= 4: read `DESIGN.md` and extract the DNA summary (first 5 lines or the `## Summary` section). Otherwise omit the `dna` field.
 3. If `project_type=ios`: include `ios_features`. Otherwise omit.
 4. Substitute all values into the template above. Store the result as `rendered_context_header`.
 5. For every dispatch in this phase, prepend `rendered_context_header` — do NOT re-read or re-interpolate.
@@ -191,9 +190,9 @@ The 7-check verification gate is called by Phase 2 (architecture check), Phase 4
 
 ### Refs-Not-Pastes Rule
 
-For Phase 3+ agents, the orchestrator passes REFS to live downstream docs (`design-doc.md`, `architecture.md`, `visual-design-spec.md`, `sprint-tasks.md`, `quality-targets.json`, `decisions.jsonl`) — NOT pasted content. The orchestrator reads `docs/plans/refs.json` (produced by the Phase 2 Refs Indexer), resolves the task topic against the flat anchor index, and passes a short ref list to the agent. The agent uses the Read tool to pull refs it needs. This keeps orchestrator context lean and lets the agent widen its view on demand. Phase 1-2 agents still receive full documents because the architecture anchors don't exist yet.
+For Phase 3+ agents, the orchestrator passes REFS to live downstream docs (`design-doc.md`, `architecture.md`, `DESIGN.md`, `sprint-tasks.md`, `quality-targets.json`, `decisions.jsonl`) — NOT pasted content. The orchestrator reads `docs/plans/refs.json` (produced by the Phase 2 Refs Indexer), resolves the task topic against the flat anchor index, and passes a short ref list to the agent. The agent uses the Read tool to pull refs it needs. This keeps orchestrator context lean and lets the agent widen its view on demand. Phase 1-2 agents still receive full documents because the architecture anchors don't exist yet.
 
-**refs.json mutation invalidates sprint-context hash (Stage 6 / task 6.3.2).** Any orchestrator update to `docs/plans/refs.json` (Phase 2 Refs Indexer initial write, Phase 3 extension after `visual-design-spec.md` lands, or any subsequent correction) MUST be IMMEDIATELY followed by a `state_save` call that sets `.build-state.json.current_sprint_context_hash = null`. This invalidates the cached Phase 4 sprint-scoped shared-context block so the next subagent dispatch re-renders with fresh references. See `src/orchestrator/phase4-shared-context.ts#shouldInvalidate` for how the hash is consulted at render time. Skipping this invalidation causes Phase 4 implementers to read stale anchor indices — a silent correctness failure.
+**refs.json mutation invalidates sprint-context hash (Stage 6 / task 6.3.2).** Any orchestrator update to `docs/plans/refs.json` (Phase 2 Refs Indexer initial write, Phase 3 extension after `DESIGN.md` lands, or any subsequent correction) MUST be IMMEDIATELY followed by a `state_save` call that sets `.build-state.json.current_sprint_context_hash = null`. This invalidates the cached Phase 4 sprint-scoped shared-context block so the next subagent dispatch re-renders with fresh references. See `src/orchestrator/phase4-shared-context.ts#shouldInvalidate` for how the hash is consulted at render time. Skipping this invalidation causes Phase 4 implementers to read stale anchor indices — a silent correctness failure.
 
 ### Complexity Routing (Advisory)
 
@@ -244,7 +243,7 @@ Phase 0 is thin. No agent dispatch. No human input. Instant. The orchestrator re
 1. Read `docs/plans/.build-state.json` (source of truth) — verify it exists and has a `resume_point` field. Fall back to reading `docs/plans/.build-state.md` (rendered view) if the JSON file is missing but the markdown exists (graceful migration path from pre-W1-2 builds).
    If neither exists, OR neither has a Resume Point, warn the user: 'No previous build state found. Starting fresh.' Then proceed to Step 0.1 as a new build.
 2. Re-read this file and all protocol files in `protocols/`.
-3. Re-read live downstream docs: `docs/plans/sprint-tasks.md`, `docs/plans/architecture.md`, `docs/plans/design-doc.md`, `docs/plans/visual-design-spec.md` (if exists), `CLAUDE.md`.
+3. Re-read live downstream docs: `docs/plans/sprint-tasks.md`, `docs/plans/architecture.md`, `docs/plans/design-doc.md`, `DESIGN.md` (if exists), `CLAUDE.md`.
 4. Read `docs/plans/decisions.jsonl` if it exists (top 5 most recent rows, filtered to the current phase and upstream phases). Pass short row fields + `ref` anchors into Phase 0 rehydration context — not the full row prose. See `protocols/decision-log.md`.
 5. Rebuild TodoWrite from the state file (TodoWrite does NOT survive compaction or session breaks).
 6. Reset `dispatches_since_save` to 0 (fresh context window).
@@ -614,7 +613,7 @@ Report any violations. If clean, return PASS. If violations, return a list of fi
   - `docs/plans/architecture.md`
   - `docs/plans/sprint-tasks.md`
   - `docs/plans/quality-targets.json`
-  - `docs/plans/visual-design-spec.md` (if it exists yet — Phase 3 extends refs.json after it writes this file)
+  - `DESIGN.md` (if it exists yet — Phase 3 extends refs.json after it writes this file)
 
 For each doc, extract section anchors into a flat index. Schema: `[{\"anchor\": \"design-doc.md#persona\", \"topic\": \"user persona\", \"file_path\": \"docs/plans/design-doc.md\"}, ...]`. This index is consumed by the Phase 4 Briefing Officer for per-task context maps. Do NOT include Phase 1 scratch files — they are SPENT."
 
@@ -657,7 +656,7 @@ Update TodoWrite and `.build-state.json`.
 <HARD-GATE>
 UI/UX IS THE PRODUCT. This phase is a full peer to Architecture and Build — not a footnote, not an afterthought. Do NOT skip, compress, or rush this phase for any reason.
 
-Phase 4 WILL NOT START without `docs/plans/visual-design-spec.md` (web) or `docs/plans/ios-design-board.md` (iOS). If the artifact does not exist, return here.
+Phase 4 WILL NOT START without `DESIGN.md` (web) or `docs/plans/ios-design-board.md` (iOS). If the artifact does not exist, return here.
 </HARD-GATE>
 
 **Mode-specific branch files drive Phase 3 in detail:**
@@ -673,13 +672,13 @@ Phase 4 WILL NOT START without `docs/plans/visual-design-spec.md` (web) or `docs
 - Step 3.5 Inclusive Visuals Check: subagent_type: `design-inclusive-visuals-specialist` (web)
 - Step 3.2-ios iOS Design Board: subagent_type: `ios-swift-ui-design` (iOS)
 
-**Phase 3 write discipline:** Phase 3 is the writer for `docs/plans/visual-design-spec.md` (web) and extends `docs/plans/refs.json` to cover the visual spec anchors once it lands. Phase 3 does NOT write to `architecture.md` or `sprint-tasks.md` — those are Phase 2's.
+**Phase 3 write discipline:** Phase 3 is the writer for `DESIGN.md` (web) and extends `docs/plans/refs.json` to cover the visual spec anchors once it lands. Phase 3 does NOT write to `architecture.md` or `sprint-tasks.md` — those are Phase 2's.
 
 <HARD-GATE>
 LRR BLOCK backward edge: `LRR BLOCK authoring=Phase 3 → back to Phase 3`. The ⭐⭐ star rule routes BLOCK findings via Aggregator decisions.jsonl `decided_by` lookup; if `decided_by == design-brand-guardian` or any Phase 3 writer, the build re-opens Phase 3 with the finding as input.
 </HARD-GATE>
 
-**On re-entry from LRR backward routing:** When Phase 3 is re-opened via the re-entry dispatch template (Step 6.3), the orchestrator passes the re-entry payload (`{blocking_finding, prior_output: "docs/plans/visual-design-spec.md" or "docs/plans/visual-dna.md", decision_row}`) into the specific Phase 3 step named by `decision_row.author`. That step revises the prior output to address `blocking_finding` only — DNA lock, component manifest, or visual spec — and emits a new decision_row. Unaffected steps are NOT re-run. Mode-specific branch files (`protocols/web-phase-branches.md` / `protocols/ios-phase-branches.md`) define which step owns which `decided_by` value.
+**On re-entry from LRR backward routing:** When Phase 3 is re-opened via the re-entry dispatch template (Step 6.3), the orchestrator passes the re-entry payload (`{blocking_finding, prior_output: "DESIGN.md", decision_row}`) into the specific Phase 3 step named by `decision_row.author`. That step revises the prior output to address `blocking_finding` only — DESIGN.md Pass 1 (Step 3.0), component manifest (Step 3.2), or DESIGN.md Pass 2 (Step 3.4) — and emits a new decision_row. Unaffected steps are NOT re-run. Mode-specific branch files (`protocols/web-phase-branches.md` / `protocols/ios-phase-branches.md`) define which step owns which `decided_by` value.
 
 **Compaction checkpoint.** Update `.build-state.json` per the format above.
 
@@ -688,7 +687,7 @@ LRR BLOCK backward edge: `LRR BLOCK authoring=Phase 3 → back to Phase 3`. The 
 ## Phase 4: Build — THREE-TIER FEATURE-BASED EXECUTION
 
 <HARD-GATE>
-Before starting Phase 4: Phase 2 must be approved, Phase 3 must have produced the design artifact for this mode (`visual-design-spec.md` web / `ios-design-board.md` iOS), and `docs/plans/page-specs/` must contain at least one file (web). You MUST call the Agent tool for EVERY task. No exceptions.
+Before starting Phase 4: Phase 2 must be approved, Phase 3 must have produced the design artifact for this mode (`DESIGN.md` web / `ios-design-board.md` iOS), and `docs/plans/page-specs/` must contain at least one file (web). You MUST call the Agent tool for EVERY task. No exceptions.
 </HARD-GATE>
 
 **Goal**: Scaffold project, then execute sprint tasks organized by FEATURE with product adherence checked per-feature during build. Three tiers: Product Owner (product quality) → Briefing Officers (task planning per feature) → Execution Agents (code). The orchestrator drives all dispatches — PO and BO are planning agents that write artifacts to disk.
@@ -722,7 +721,7 @@ Scaffolding is project skeleton + design system + acceptance test stubs. Three s
 
 1. Description: "Project scaffolding" — subagent_type: `engineering-rapid-prototyper` — mode: "bypassPermissions" — prompt per branch file. [COMPLEXITY: M]
 
-2. Description: "Design system setup" — subagent_type: `engineering-frontend-developer` — mode: "bypassPermissions" — prompt per branch file. Implements design tokens from `visual-design-spec.md` or `ios-design-board.md`. [COMPLEXITY: M]
+2. Description: "Design system setup" — subagent_type: `engineering-frontend-developer` — mode: "bypassPermissions" — prompt per branch file. Implements design tokens from `DESIGN.md` or `ios-design-board.md`. [COMPLEXITY: M]
 
 3. Description: "Scaffold acceptance tests" — INTERNAL inline role-string — mode: "bypassPermissions" — prompt: "[CONTEXT header above] Scaffold acceptance tests from sprint-tasks.md. Use Page Object Model. For every task with a Behavioral Test field, create a Playwright test stub (web) or Maestro flow stub (iOS). Stubs must FAIL right now. Commit: 'test: scaffold acceptance tests from sprint tasks'."
 
@@ -895,7 +894,7 @@ Call the Agent tool 6 times in one message:
 
 5. Description: "UX quality audit" — subagent_type: `design-ux-researcher` — Prompt: "[CONTEXT header above] UX quality review of every user-facing page. First, screenshot the living style guide at /design-system (web) as your reference. Then review every product page: loading states (every async action shows a loading indicator), error states (every form and API call shows user-friendly feedback), empty states (lists/tables handle zero items), mobile responsiveness (test at 375px — touch targets >= 44px, no horizontal scroll), form validation (inline feedback, not alert()), transition smoothness, visual consistency vs style guide (buttons, inputs, cards, colors, spacing should match). Report issues with page, severity, and screenshot."
 
-6. Description: "Brand Guardian drift check" — subagent_type: `design-brand-guardian` — Prompt: "[CONTEXT header above] You are the Phase 5 drift check. Read docs/plans/visual-dna.md (the DNA card locked at Phase 3.0) + the actually-built pages via Playwright screenshots under docs/plans/evidence/. Score whether Phase 4 implementers stayed true to the DNA or drifted away from it. Specifically check: does the built Character axis match the DNA? Does Density match? Is Material consistent? Is Motion aligned? Report drift count and specific elements. Save findings to docs/plans/evidence/brand-drift.md. Note: this is a drift check only — the Phase 6 LRR Brand Guardian chapter does the verdict. You do NOT issue a pass/fail here, only surface findings."
+6. Description: "Brand Guardian drift check" — subagent_type: `design-brand-guardian` — Prompt: "[CONTEXT header above] You are the Phase 5 drift check. Read DESIGN.md (the DNA card locked at Phase 3.0) + the actually-built pages via Playwright screenshots under docs/plans/evidence/. Score whether Phase 4 implementers stayed true to the DNA or drifted away from it. Specifically check: does the built Character axis match the DNA? Does Density match? Is Material consistent? Is Motion aligned? Report drift count and specific elements. Save findings to docs/plans/evidence/brand-drift.md. Note: this is a drift check only — the Phase 6 LRR Brand Guardian chapter does the verdict. You do NOT issue a pass/fail here, only surface findings."
 
 ### Step 5.2 — Sequence: Eval Harness → Metric Loop
 
@@ -1029,9 +1028,9 @@ Write verdict to `docs/plans/evidence/lrr/a11y.json` per schema. A11y CANNOT spa
 
 5. Description: "LRR Brand Guardian chapter" — subagent_type: `design-brand-guardian` — Prompt: "[CONTEXT header above] You are the Brand Guardian chapter of the LRR (REPLACES the old Design mechanical check — real taste judgment, not a 15-line mechanical gate). Your natural tendency is to be encouraging. Fight it. Default verdict: NEEDS WORK.
 
-Read: `docs/plans/visual-design-spec.md`, `docs/plans/visual-dna.md` (the 6-axis DNA card locked at Phase 3.0), `docs/plans/design-references.md`, Playwright screenshots under `docs/plans/evidence/` matching production pages, Phase 3.6 Design Critic final score from `.build-state.json`.
+Read: `DESIGN.md` (full file — `## Overview > ### Brand DNA` is the locked 7-axis card from Phase 3.0; YAML tokens are what Phase 4 was supposed to honor; `## Do's and Don'ts` are the explicit guardrails), `docs/plans/design-references.md`, Playwright screenshots under `docs/plans/evidence/` matching production pages, Phase 3.6 Design Critic final score from `.build-state.json`.
 
-Evaluate DRIFT: did the built product stay true to the DNA card locked at Phase 3.0? Score the gap on 6 DNA axes (Scope, Density, Character, Material, Motion, Type) + 5 craft dimensions (whitespace rhythm, visual hierarchy, motion coherence, color harmony, typographic refinement). Cite specific elements ('the hero padding at landing.tsx:42 is 32px but DNA calls for Airy density — should be 48px+') — never vague ('needs polish').
+Evaluate DRIFT: did the built product stay true to DESIGN.md (DNA + tokens + guardrails)? Score the gap on 7 DNA axes (Scope, Density, Character, Material, Motion, Type, Copy) + 5 craft dimensions (whitespace rhythm, visual hierarchy, motion coherence, color harmony, typographic refinement). Cite specific elements ('the hero padding at landing.tsx:42 is 32px but DNA calls for Airy density — should be 48px+') — never vague ('needs polish').
 
 Write verdict to `docs/plans/evidence/lrr/brand-guardian.json` per schema. Fields per protocol. Brand Guardian CANNOT spawn follow-ups."
 

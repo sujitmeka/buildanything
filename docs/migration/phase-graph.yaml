@@ -46,10 +46,22 @@ artifacts:
       enforcement fires alongside the phase-2 phase-match so only the two
       legitimate dispatching subagents can write this file. Discarded after
       Gate 2 — Phase 3.0 re-invokes to produce the locked card.
-  - path: docs/plans/visual-design-spec.md
+  - path: DESIGN.md
     platform: web
-    writer: phase-3
-    readers: [phase-4, phase-5, phase-6]
+    writers: [phase-3, design-brand-guardian, design-ui-designer]
+    readers: [phase-3, phase-4, phase-5, phase-6]
+    notes: |
+      Single design-system artifact at repo root. Replaces the prior
+      visual-dna.md + visual-design-spec.md pair. Authored in two passes:
+      Step 3.0 (design-brand-guardian) writes Pass 1 — Overview, Brand DNA,
+      Rationale, Locked At, References, Do's and Don'ts; Step 3.4
+      (design-ui-designer) writes Pass 2 — YAML tokens (colors, typography,
+      rounded, spacing, components) plus the prose for Colors, Typography,
+      Layout, Elevation & Depth, Shapes, Components. Format spec is vendored
+      at protocols/design-md-spec.md (Apache 2.0). Pipeline contract is in
+      protocols/design-md-authoring.md. Agent-role enforcement fires
+      alongside the phase-3 phase-match so only the two legitimate
+      authoring subagents can write this file.
   - path: docs/plans/ios-design-board.md
     platform: ios
     writer: phase-3
@@ -59,10 +71,6 @@ artifacts:
     writer: phase-3
     readers: [phase-4]
     notes: HARD-GATE import source
-  - path: docs/plans/visual-dna.md
-    platform: web
-    writer: phase-3
-    readers: [phase-3, phase-4, phase-5, phase-6]
   - path: docs/plans/design-references.md
     platform: web
     writer: visual-research
@@ -127,7 +135,7 @@ artifacts:
     readers: [phase-4-briefing-officer]
     notes: |
       Phase 2 Refs Indexer writes the initial anchor index after architecture.md
-      lands. Phase 3 extends it after visual-design-spec.md lands (see
+      lands. Phase 3 extends it after DESIGN.md lands (see
       commands/build.md:167). Both phases are legitimate writers.
   - path: docs/plans/feature-delegation-plan.json
     writer: product-owner
@@ -566,11 +574,18 @@ phases:
       source: protocols/web-phase-branches.md
       steps:
         - id: "3.0"
-          name: Visual DNA Selection
+          name: DESIGN.md Pass 1 — Brand DNA + Overview + Do's and Don'ts
           kind: dispatch-single
           subagent_type: design-brand-guardian
-          produces: 6-axis DNA card (Scope, Density, Character, Material, Motion, Type)
-          source: protocols/visual-dna.md
+          produces: |
+            DESIGN.md Pass 1 at repo root — Overview prose + ### Brand DNA
+            (7 axis values: Scope, Density, Character, Material, Motion, Type,
+            Copy) + Rationale + Locked At + References + Do's and Don'ts.
+            Pass 2 sections present as placeholder headings. YAML front
+            matter contains version + name only.
+          source: protocols/design-md-authoring.md
+          format_spec: protocols/design-md-spec.md
+          writes: [DESIGN.md]
         - id: "3.1"
           name: Visual Research (2 parallel, Playwright-driven)
           kind: dispatch-parallel
@@ -591,7 +606,7 @@ phases:
           name: UX Architecture + Page Layouts
           kind: dispatch-single
           subagent_type: design-ux-architect
-          reads: [product-spec.md, visual-dna.md, component-manifest.md, architecture.md, design-references/]
+          reads: [product-spec.md, DESIGN.md, component-manifest.md, architecture.md, design-references/]
           writes: [ux-architecture.md, docs/plans/page-specs/*.md]
           notes: |
             Merged Step 3.3 + former Step 3.9 (Option C). Produces both
@@ -603,18 +618,24 @@ phases:
           name: UX Flow Validation
           kind: dispatch-single
           dispatches: [design-ux-researcher]
-          reads: [docs/plans/ux-architecture.md, docs/plans/page-specs/, docs/plans/product-spec.md, docs/plans/design-doc.md, docs/plans/visual-dna.md]
+          reads: [docs/plans/ux-architecture.md, docs/plans/page-specs/, docs/plans/product-spec.md, docs/plans/design-doc.md, DESIGN.md]
           writes: [docs/plans/ux-flow-validation.md]
           backward_edges:
             - from: critical-flow-issues
               to: phase-3.step-3.3
         - id: "3.4"
-          name: Visual Design Spec
+          name: DESIGN.md Pass 2 — Tokens + remaining prose
           kind: dispatch-single
           subagent_type: design-ui-designer
           role: writer
-          writes: [visual-design-spec.md]
-          contains: [tokens, material, motion, typography, state-matrix]
+          writes: [DESIGN.md]
+          contains: [yaml-tokens, colors, typography, layout, elevation, shapes, components, motion-as-h3, component-state-matrix-via-variants]
+          source: protocols/design-md-authoring.md
+          gate: |
+            DESIGN.md lint runs at Step 3.8. broken-refs == 0 is hard-fail.
+            Warnings (missing-primary, contrast-ratio WCAG AA, orphaned-tokens,
+            missing-typography, section-order) are logged to build-log.md but
+            do not block.
         - id: "3.5"
           name: Inclusive Visuals Check
           kind: dispatch-single
@@ -626,8 +647,9 @@ phases:
           service: metric-loop
           generator: engineering-frontend-developer
           critic: design-critic
-          metric: 6-DNA-axes x 5-craft-dims = /220
-          target: 180
+          metric: 7-DNA-axes (140) + 5-craft-dims (100) = /240
+          target: 195
+          approaching_threshold: 163
           max_iterations: 5
         - id: "3.7"
           name: A11y Design Review
@@ -643,8 +665,7 @@ phases:
         - UI/UX IS THE PRODUCT — do NOT skip this phase.
         - Compositional not reconstructive — every element with a library variant MUST be mapped to that variant in component-manifest.md.
       phase_4_entry_requirements:
-        - visual-dna.md
-        - visual-design-spec.md
+        - DESIGN.md (Pass 1 + Pass 2 complete; broken-refs lint == 0)
         - component-manifest.md
         - page-specs/ (at least one file)
     ios_branch:
@@ -1225,7 +1246,7 @@ callable_services:
     context_map_shape:
       persona_jtbd: design-doc.md#persona
       product_scope: design-doc.md#scope
-      visual_tokens: visual-design-spec.md#tokens
+      visual_tokens: DESIGN.md#tokens
       component_variants: component-manifest.md#[category]
       auth_model: architecture.md#auth
       data_schema: architecture.md#data-model

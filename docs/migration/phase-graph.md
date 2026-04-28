@@ -28,10 +28,9 @@ Every shared artifact has ONE concurrent writer at any instant. Non-owning phase
 | `docs/plans/architecture.md` | Phase 2 | Phase 3-7 via refs |
 | `docs/plans/sprint-tasks.md` | Phase 2 | Phase 4-6 via refs |
 | `docs/plans/quality-targets.json` | Phase 2 | Phase 4, 5, 6 |
-| `docs/plans/visual-design-spec.md` (web) | Phase 3 | Phase 4, 5, 6 |
+| `DESIGN.md` (web) | Phase 3 (Step 3.0 = Pass 1 by `design-brand-guardian`; Step 3.4 = Pass 2 by `design-ui-designer`) | Phase 3-6 |
 | `docs/plans/ios-design-board.md` (iOS) | Phase 3 | Phase 4, 5, 6 |
 | `docs/plans/component-manifest.md` (web) | Phase 3 | Phase 4 (HARD-GATE import source) |
-| `docs/plans/visual-dna.md` (web) | Phase 3 | Phase 3-6 |
 | `docs/plans/refs.json` | Phase 2 writer, Phase 3 extender | Phase 4 Briefing Officer |
 | `docs/plans/feature-delegation-plan.json` | Product Owner (Step 4.1) | orchestrator, briefing-officer |
 | `docs/plans/feature-briefs/*.md` | Briefing Officer (Step 4.2) | orchestrator, Phase 4 execution agents |
@@ -185,13 +184,13 @@ Structured representation. Every phase has: `id`, `name`, `kind`, `skip_conditio
 
 | Step | Name | Kind | Dispatches |
 |---|---|---|---|
-| 3.0 | Visual DNA Selection (DNA owner) | dispatch-single | `design-brand-guardian` → locks 6-axis DNA card (Scope, Density, Character, Material, Motion, Type) per `protocols/visual-dna.md` |
-| 3.1 | Visual Research (2 parallel, Playwright-driven) | dispatch-parallel | `visual-research` mode=`competitive-audit`, `visual-research` mode=`inspiration-mining` |
-| 3.2 | Component Library Mapping (HARD-GATE source) | dispatch-single | `design-ui-designer` reads catalog + DNA, writes `component-manifest.md` |
-| 3.2b | DNA Persona Check | dispatch-single | `design-ux-researcher` validates DNA vs persona/JTBD; may route back to 3.0 |
-| 3.3 | UX Architecture + Page Layouts | dispatch-single | `design-ux-architect` reads product-spec.md (source of truth), visual-dna.md, component-manifest.md, architecture.md, design-references/. Produces BOTH `ux-architecture.md` (flows, navigation, IA) AND `page-specs/*.md` (per-screen ASCII wireframes + structured layout specs). Flows and layouts inform each other. Follows `protocols/page-spec-schema.md` |
+| 3.0 | DESIGN.md Pass 1 — Brand DNA + Overview + Do's and Don'ts | dispatch-single | `design-brand-guardian` → writes Pass 1 of `DESIGN.md` at repo root: Overview prose + `### Brand DNA` (7 axes: Scope, Density, Character, Material, Motion, Type, Copy) + Rationale + Locked At + References + Do's and Don'ts. Pass 2 placeholders for Colors/Typography/Layout/Elevation/Shapes/Components. Per `protocols/design-md-authoring.md`; format spec at `protocols/design-md-spec.md` (vendored Apache 2.0) |
+| 3.1 | Visual Research (2 parallel, Playwright-driven) | dispatch-parallel | `visual-research` mode=`competitive-audit`, `visual-research` mode=`inspiration-mining` (both read `DESIGN.md` `### Brand DNA` for axis-targeted queries) |
+| 3.2 | Component Library Mapping (HARD-GATE source) | dispatch-single | `design-ui-designer` reads catalog + DESIGN.md, writes `component-manifest.md` |
+| 3.2b | DNA Persona Check | dispatch-single | `design-ux-researcher` validates DESIGN.md DNA vs persona/JTBD; may route back to 3.0 (Pass 1 re-author) |
+| 3.3 | UX Architecture + Page Layouts | dispatch-single | `design-ux-architect` reads product-spec.md (source of truth), DESIGN.md `### Brand DNA`, component-manifest.md, architecture.md, design-references/. Produces BOTH `ux-architecture.md` (flows, navigation, IA) AND `page-specs/*.md` (per-screen ASCII wireframes + structured layout specs). Flows and layouts inform each other. Follows `protocols/page-spec-schema.md` |
 | 3.3b | UX Flow Validation | dispatch-single | `design-ux-researcher` walks each user flow as target persona using ux-architecture.md + page-specs/ + product-spec.md, flags friction points, checks JTBD alignment and spatial feasibility; critical issues → backward edge to Step 3.3. Writes `ux-flow-validation.md` |
-| 3.4 | Visual Design Spec | dispatch-single | `design-ui-designer` (writer invocation) writes `visual-design-spec.md` with tokens + material + motion + typography + state matrix |
+| 3.4 | DESIGN.md Pass 2 — Tokens + remaining prose | dispatch-single | `design-ui-designer` (writer invocation) Edits `DESIGN.md` to fill YAML front matter (colors, typography, rounded, spacing, components — per the vendored spec at `protocols/design-md-spec.md`) AND writes prose for `## Colors`, `## Typography`, `## Layout`, `## Elevation & Depth`, `## Shapes`, `## Components`. Pass 1 sections are read-only. Motion as h3 inside Components; component state matrix via `<base>-<state>` YAML variants |
 | 3.5 | Inclusive Visuals Check | dispatch-single | `design-inclusive-visuals-specialist` writes `inclusive-visuals-audit.md` |
 | 3.6 | Style Guide Implementation | loop (generator/critic, callable) | generator: `engineering-frontend-developer` builds `/design-system`. critic: `design-critic` scores 6 DNA axes × 5 craft dims = /220, target 180. Max 5 iters |
 | 3.7 | A11y Design Review | dispatch-single | `a11y-architect` runtime WCAG 2.2 AA check on `/design-system` + key pages |
@@ -201,7 +200,7 @@ Structured representation. Every phase has: `id`, `name`, `kind`, `skip_conditio
 1. UI/UX IS THE PRODUCT — do NOT skip this phase.
 2. Compositional not reconstructive — every element with a library variant MUST be mapped to that variant in `component-manifest.md`. Writing from scratch when the manifest covers the case is a HARD-GATE violation; cleanup agent reverts.
 
-**Phase 4 entry requirement (web):** `visual-dna.md` AND `visual-design-spec.md` AND `component-manifest.md` AND `page-specs/` (at least one file) must all exist.
+**Phase 4 entry requirement (web):** `DESIGN.md` (Pass 1 + Pass 2 complete; broken-refs lint == 0) AND `component-manifest.md` AND `page-specs/` (at least one file) must all exist.
 
 #### 3.b iOS branch (`protocols/ios-phase-branches.md`)
 
@@ -465,7 +464,7 @@ Phase 4 implementer dispatch reads `.active-learnings.md` (top 3 relevant filter
 CONTEXT MAP — [task-id] [task name]
   persona / JTBD     → design-doc.md#persona
   product scope      → design-doc.md#scope
-  visual tokens      → visual-design-spec.md#tokens
+  visual tokens      → DESIGN.md#tokens
   component variants → component-manifest.md#[category]
   auth model         → architecture.md#auth
   data schema        → architecture.md#data-model

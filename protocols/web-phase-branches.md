@@ -10,14 +10,14 @@ Every `subagent_type:` dispatch in this file prepends a CONTEXT header to its pr
 CONTEXT:
   project_type: web
   phase: <resolved: current phase number>
-  dna: <resolved: 6-axis DNA values extracted from docs/plans/visual-dna.md — NOT the full file content, just the axis values. Include only if phase >= 3 AND visual-dna.md exists>
+  dna: <resolved: 7-axis Brand DNA values extracted from `DESIGN.md` `## Overview > ### Brand DNA` block — NOT the full file content, just the axis values. Include only if phase >= 3 AND DESIGN.md exists>
 
 TASK:
 ```
 
 **Resolution rules:**
-- `dna` = the 6 axis values only (Scope, Density, Character, Material, Motion, Type) — NOT the full `visual-dna.md` content. ~100 tokens, not ~5K.
-- Phase 3 Step 3.0 (Visual DNA Selection) is the ONE exception — it runs BEFORE `visual-dna.md` exists, so its CONTEXT omits `dna`.
+- `dna` = the 7 axis values only (Scope, Density, Character, Material, Motion, Type, Copy) extracted from `DESIGN.md` `## Overview > ### Brand DNA` — NOT the full `DESIGN.md` content. ~100 tokens, not ~5K.
+- Phase 3 Step 3.0 (Visual DNA Selection) is the ONE exception — it runs BEFORE `DESIGN.md` exists, so its CONTEXT omits `dna`.
 - The rendered header is a stable prefix — it does not change between dispatches within a phase.
 
 Individual dispatches below reference `[CONTEXT header above]` and rely on this rendered template.
@@ -36,23 +36,41 @@ Output: `docs/plans/visual-dna-preview.md` — surfaced by the orchestrator in t
 
 ## Phase 3 — Design (web branch)
 
-**Goal:** Lock a 6-axis Visual DNA card, then compose — not reconstruct — the product's visual system from a vendored component library. Every downstream step reads the DNA. Compositional beats reconstructive for visual quality. Fully autonomous.
+**Goal:** Lock the 7-axis Brand DNA inside `DESIGN.md` Pass 1, then compose — not reconstruct — the product's visual system from a vendored component library, then complete `DESIGN.md` Pass 2 with full tokens + prose. Every downstream step reads `DESIGN.md`. Compositional beats reconstructive for visual quality. Fully autonomous.
 
 **Skip if** the project has no user-facing frontend (CLI tools, pure APIs, backend services).
 
-HARD-GATE: UI/UX IS THE PRODUCT. This phase is a full peer to Architecture and Build — not a footnote, not an afterthought, not a "nice to have." Do NOT skip, compress, or rush this phase for any reason. Brand Guardian MUST lock the Visual DNA at Step 3.0 before any other agent runs. Every downstream step reads `docs/plans/visual-dna.md`. The `/design-system` route must be rendered and iterated with Playwright-verified feedback from the Design Critic before a single line of product code is written. Phase 4 (Build) Step 4.0 Scaffold WILL NOT START without both `docs/plans/visual-dna.md` AND `docs/plans/visual-design-spec.md`. If either is missing, return here.
+HARD-GATE: UI/UX IS THE PRODUCT. This phase is a full peer to Architecture and Build — not a footnote, not an afterthought, not a "nice to have." Do NOT skip, compress, or rush this phase for any reason. Brand Guardian MUST author Pass 1 of `DESIGN.md` (Overview + Brand DNA + Do's and Don'ts) at Step 3.0 before any other agent runs. Every downstream step reads `DESIGN.md`. The `/design-system` route must be rendered and iterated with Playwright-verified feedback from the Design Critic before a single line of product code is written. Phase 4 (Build) Step 4.0 Scaffold WILL NOT START without `DESIGN.md` complete (Pass 2 finished). If missing or incomplete, return here.
 
 HARD-GATE: **Compositional not reconstructive.** From Step 3.2 onward, every visual element that has a library variant MUST be mapped to that variant in `docs/plans/component-manifest.md`. Writing components from scratch when the library covers the case is a HARD-GATE violation that the cleanup agent will revert.
 
-### Step 3.0 — Visual DNA Selection (DNA owner, single agent)
+### Step 3.0 — DESIGN.md Pass 1 — Brand DNA + Overview + Do's and Don'ts (single agent)
 
-Dispatch a single agent to lock the 6-axis Visual DNA card that governs every downstream step in this phase.
+Dispatch a single agent to author Pass 1 of `DESIGN.md` (repo root). Pass 1 locks the 7-axis Brand DNA, writes the Overview prose, and seeds the Do's and Don'ts. Pass 2 (token + remaining prose) lands at Step 3.4.
 
 Call the Agent tool once:
 
-1. Description: "Visual DNA selection" — subagent_type: `design-brand-guardian` — prompt: "[CONTEXT header above — phase: 3. NOTE: Step 3.0 omits `dna` because this step PRODUCES it.] You are the DNA Owner for this build. Read these inputs: `docs/plans/product-spec.md` (## App Overview for product identity, ## Screen Inventory for what screens exist, ## Permissions & Roles for complexity level — a dense admin panel needs different DNA than a simple consumer app), `docs/plans/design-doc.md` (product concept, user, voice), `docs/plans/phase1-scratch/findings-digest.md` (reference sites the user mentioned, competitor aesthetic landscape), `docs/plans/architecture.md` (stack constraints — e.g. server-rendered Rails can't ship Three.js), `docs/plans/quality-targets.json` (perf budget constrains motion and material choices), `docs/plans/phase1-scratch/user-decisions.md` (if the user said 'like Linear' or 'make it playful' during brainstorm). Lock a 6-axis Visual DNA card per the schema in `protocols/visual-dna.md`. The 6 axes: **Scope** (Marketing / Product / Dashboard / Internal Tool — gates library install), **Density** (Airy / Balanced / Dense), **Character** (Minimal / Editorial / Maximalist / Brutalist / Playful), **Material** (Flat / Glassy / Physical / Neumorphic), **Motion** (Still / Subtle / Expressive / Cinematic), **Type** (Neutral Sans / Humanist Sans / Serif-forward / Display-forward / Mono-accented). Consult the incompatibility matrix in `protocols/visual-dna.md` — you are FORBIDDEN from picking illegal combinations (e.g. Dashboard + Cinematic is contradictory). Write the locked DNA card to `docs/plans/visual-dna.md`."
+1. Description: "DESIGN.md Pass 1 — Brand DNA + Overview" — subagent_type: `design-brand-guardian` — prompt: "[CONTEXT header above — phase: 3. NOTE: Step 3.0 omits `dna` because this step PRODUCES it.] You are the Brand Guardian authoring Pass 1 of `DESIGN.md`. The format is specified by `protocols/design-md-spec.md` (vendored). The pipeline contract is in `protocols/design-md-authoring.md`. Read both before writing.
 
-Output: `docs/plans/visual-dna.md` — the locked DNA card. Every downstream Phase 3 step reads this file, and Phase 4 implementers read it via `refs.json`.
+Inputs (Read tool): `docs/plans/product-spec.md` (## App Overview for product identity, ## Screen Inventory for what screens exist, ## Permissions & Roles for complexity level — a dense admin panel needs different DNA than a simple consumer app), `docs/plans/design-doc.md` (product concept, user, voice), `docs/plans/phase1-scratch/findings-digest.md` (reference sites the user mentioned, competitor aesthetic landscape), `docs/plans/architecture.md` (stack constraints — e.g. server-rendered Rails can't ship Three.js), `docs/plans/quality-targets.json` (perf budget constrains motion and material choices), `docs/plans/phase1-scratch/user-decisions.md`.
+
+Lock the 7-axis Brand DNA per `protocols/design-md-authoring.md` §3 (incompatibility matrix). The 7 axes: **Scope** (Marketing / Product / Dashboard / Internal Tool), **Density** (Airy / Balanced / Dense), **Character** (Minimal / Editorial / Maximalist / Brutalist / Playful), **Material** (Flat / Glassy / Physical / Neumorphic), **Motion** (Still / Subtle / Expressive / Cinematic), **Type** (Neutral Sans / Humanist Sans / Serif-forward / Display-forward / Mono-accented), **Copy** (Functional / Narrative / Punchy / Technical). You are FORBIDDEN from picking illegal combinations from the §3 matrix.
+
+Write `DESIGN.md` at the **repository root** (NOT under `docs/plans/`) using the Pass 1 skeleton in `protocols/design-md-authoring.md` §5:
+- YAML front matter: `version: alpha`, `name: <Brand Name>`. Leave colors/typography/rounded/spacing/components empty for Pass 2.
+- `## Overview` with 2-4 paragraph brand description.
+- `### Brand DNA` h3 subsection listing all 7 axis values.
+- `### Rationale` h3 with 4-8 sentences citing design-doc.md sections + findings-digest signals.
+- `### Locked At` h3 with `locked_at` (ISO-8601, single-write), `locked_by: design-brand-guardian`, `build_session`.
+- `### References` h3 with at least 2 entries, each tied to specific axis pairs.
+- `## Colors`, `## Typography`, `## Layout`, `## Elevation & Depth`, `## Shapes`, `## Components` — present as headings with `<!-- Pass 2 — UI Designer at Step 3.4 -->` placeholder body. Section ORDER matters; the linter enforces it.
+- `## Do's and Don'ts` with at least 4 bullets (≥2 Do, ≥2 Don't), enforcing the anti-slop gates in §4 of the authoring protocol against the user's references.
+
+Apply the anti-slop gates from `protocols/design-md-authoring.md` §4 (font hard-ban, font overuse-ban, AI-slop pattern ban, Copy axis validation). When the user's references push toward a forbidden choice, reject it, pick the closest legal alternative, and emit a decision-log row naming the rejection.
+
+Output: `DESIGN.md` at repo root. Every downstream Phase 3 step reads this file."
+
+Output: `DESIGN.md` (repo root) — Pass 1. Step 3.4 completes Pass 2.
 
 ### Step 3.1 — Visual Research (2 agents, parallel, both Playwright-driven)
 
@@ -60,9 +78,9 @@ Research is now goal-directed — validate and enrich the locked DNA, not catalo
 
 Call the Agent tool 2 times in one message:
 
-1. Description: "Competitive visual audit" — subagent_type: `visual-research` — prompt: "[CONTEXT header above — phase: 3] Mode: `competitive-audit`. Read `docs/plans/visual-dna.md` to understand the locked DNA. Find 5-8 rival UIs that exemplify the chosen DNA axes (NOT all competitors — only ones that nail the axes we chose). Use Playwright to screenshot each at desktop 1920x1080 and mobile 375x812. For each site, analyze which DNA axes it nails and which it doesn't. Save screenshots to `docs/plans/design-references/competitors/`. Append findings to `docs/plans/design-references.md` grouped by DNA axis (motion refs, material refs, typography refs, character refs, density refs). Optional caller-supplied competitor URLs: [list or 'none']."
+1. Description: "Competitive visual audit" — subagent_type: `visual-research` — prompt: "[CONTEXT header above — phase: 3] Mode: `competitive-audit`. Read `DESIGN.md` (`## Overview > ### Brand DNA`) to understand the locked DNA. Find 5-8 rival UIs that exemplify the chosen DNA axes (NOT all competitors — only ones that nail the axes we chose). Use Playwright to screenshot each at desktop 1920x1080 and mobile 375x812. For each site, analyze which DNA axes it nails and which it doesn't. Save screenshots to `docs/plans/design-references/competitors/`. Append findings to `docs/plans/design-references.md` grouped by DNA axis (motion refs, material refs, typography refs, character refs, density refs). Optional caller-supplied competitor URLs: [list or 'none']."
 
-2. Description: "Design inspiration mining" — subagent_type: `visual-research` — prompt: "[CONTEXT header above — phase: 3] Mode: `inspiration-mining`. Read `docs/plans/visual-dna.md`. Search Awwwards.com, Godly.website, and SiteInspire for award-winning sites that match the DNA axes. Use Playwright to screenshot the top 5-8 results at desktop 1920x1080 and mobile 375x812. Save to `docs/plans/design-references/inspiration/`. Append findings to `docs/plans/design-references.md` grouped by DNA axis. Tag every reference with the specific axis (or axes) it validates."
+2. Description: "Design inspiration mining" — subagent_type: `visual-research` — prompt: "[CONTEXT header above — phase: 3] Mode: `inspiration-mining`. Read `DESIGN.md` (`## Overview > ### Brand DNA`). Search Awwwards.com, Godly.website, and SiteInspire for award-winning sites that match the DNA axes. Use Playwright to screenshot the top 5-8 results at desktop 1920x1080 and mobile 375x812. Save to `docs/plans/design-references/inspiration/`. Append findings to `docs/plans/design-references.md` grouped by DNA axis. Tag every reference with the specific axis (or axes) it validates."
 
 Output: `docs/plans/design-references.md` — reference paths grouped by DNA axis, ready to feed Step 3.2 component mapping and Step 3.6 critic scoring.
 
@@ -72,7 +90,7 @@ This is the compositional step. The Visual Designer picks specific library compo
 
 Call the Agent tool once:
 
-1. Description: "Component library mapping" — subagent_type: `design-ui-designer` — prompt: "[CONTEXT header above — phase: 3] Read `docs/plans/visual-dna.md`, `docs/plans/design-references.md`, `docs/plans/product-spec.md` (## Screen Inventory for what screens exist, per-feature States and Empty/Loading/Error States sections for what component states are needed — e.g. a feature with 7 states needs more component variants than one with 3), and `docs/library-refs/component-library-catalog.md` (the static reference mapping DNA-axis combinations to library component variants). Pick specific component variants for each slot the product needs: hero, cards, cta, nav, marquee, chart, 3D, form elements, modals. The catalog is authoritative — when the DNA matches a row, use the variants that row specifies; do not reinvent. Write `docs/plans/component-manifest.md` with the locked component picks, one row per slot, naming the library and the variant. For any slot the catalog doesn't cover, emit a row tagged 'manifest gap' with a short fallback plan (stock shadcn primitive plus notes)."
+1. Description: "Component library mapping" — subagent_type: `design-ui-designer` — prompt: "[CONTEXT header above — phase: 3] Read `DESIGN.md` (`## Overview > ### Brand DNA` for axis values; `### References` for reference paths), `docs/plans/design-references.md`, `docs/plans/product-spec.md` (## Screen Inventory for what screens exist, per-feature States and Empty/Loading/Error States sections for what component states are needed — e.g. a feature with 7 states needs more component variants than one with 3), and `docs/library-refs/component-library-catalog.md` (the static reference mapping DNA-axis combinations to library component variants). Pick specific component variants for each slot the product needs: hero, cards, cta, nav, marquee, chart, 3D, form elements, modals. The catalog is authoritative — when the DNA matches a row, use the variants that row specifies; do not reinvent. Write `docs/plans/component-manifest.md` with the locked component picks, one row per slot, naming the library and the variant. For any slot the catalog doesn't cover, emit a row tagged 'manifest gap' with a short fallback plan (stock shadcn primitive plus notes)."
 
 Output: `docs/plans/component-manifest.md` — locked component manifest.
 
@@ -80,7 +98,7 @@ Output: `docs/plans/component-manifest.md` — locked component manifest.
 
 ### Step 3.2b — DNA Persona Check
 
-Call the Agent tool — description: "DNA persona check" — subagent_type: design-ux-researcher — prompt: "[CONTEXT header above — phase: 3] Read docs/plans/visual-dna.md (the locked 6-axis DNA card) + docs/plans/design-doc.md (#persona and #jobs-to-be-done sections) + docs/plans/product-spec.md (## App Overview and per-feature Persona Constraints sections — these carry the specific behavioral patterns from research, e.g. 'user scans, doesn't read') + docs/plans/phase1-scratch/findings-digest.md. Validate: does the chosen Visual DNA actually serve this persona and these jobs-to-be-done? Cross-check each DNA axis against the persona's context (e.g., if persona is 'senior enterprise buyer on a tight schedule' but DNA chose Maximalist + Cinematic, that's wrong — Enterprise/Minimal/Subtle fits better). Report any DNA-persona mismatches. If mismatches found, the Brand Guardian may need to re-lock the DNA (backward edge to Step 3.0). Save findings to docs/plans/dna-persona-check.md."
+Call the Agent tool — description: "DNA persona check" — subagent_type: design-ux-researcher — prompt: "[CONTEXT header above — phase: 3] Read `DESIGN.md` (the full Pass 1 — `## Overview` including `### Brand DNA` is the locked 7-axis card and `### Rationale` explains why those axes were chosen) + docs/plans/design-doc.md (#persona and #jobs-to-be-done sections) + docs/plans/product-spec.md (## App Overview and per-feature Persona Constraints sections — these carry the specific behavioral patterns from research, e.g. 'user scans, doesn't read') + docs/plans/phase1-scratch/findings-digest.md. Validate: do the locked DNA axes actually serve this persona and these jobs-to-be-done? Cross-check each DNA axis against the persona's context (e.g., if persona is 'senior enterprise buyer on a tight schedule' but DNA chose Maximalist + Cinematic, that's wrong — Enterprise/Minimal/Subtle fits better). Report any DNA-persona mismatches. If mismatches found, the Brand Guardian may need to re-author DESIGN.md Pass 1 (backward edge to Step 3.0). Save findings to docs/plans/dna-persona-check.md."
 
 ### Step 3.3 — UX Architecture + Page Layouts (single agent)
 
@@ -90,7 +108,7 @@ Call the Agent tool once:
 
 1. Description: "UX architecture + page layouts" — subagent_type: `design-ux-architect` — mode: "bypassPermissions" — prompt: "[CONTEXT header above — phase: 3] Read the page spec schema at `protocols/page-spec-schema.md` before writing. Then read these inputs via your Read tool:
   - Product spec: `docs/plans/product-spec.md` (FULL document — this is your source of truth. Screen Inventory is your screen list. Per-feature sections define what each screen does, what data it shows, what states exist, what errors look like, persona constraints, business rules)
-  - Visual DNA: `docs/plans/visual-dna.md` (Density axis drives layout — Airy = generous whitespace, Dense = compact data. Character and Motion axes shape navigation transitions and interaction patterns)
+  - Visual DNA: `DESIGN.md` `## Overview > ### Brand DNA` (Density axis drives layout — Airy = generous whitespace, Dense = compact data. Character and Motion axes shape navigation transitions and interaction patterns)
   - Components: `docs/plans/component-manifest.md` (which library components for which slots — use these in your wireframes)
   - Frontend architecture: `docs/plans/architecture.md#frontend` (component hierarchy, routing, state management)
   - API contracts: `docs/plans/architecture.md#backend/api` (what data is available from each endpoint)
@@ -103,7 +121,7 @@ Produce TWO outputs:
 
 **Output 2: `docs/plans/page-specs/*.md`** — one file per screen from the Screen Inventory, following `protocols/page-spec-schema.md`. Each file includes: ASCII wireframe (desktop + mobile for web), content hierarchy with component refs from the manifest and data sources from the API contracts, key copy, responsive behavior, platform conventions, data loading strategy, and screen-specific states from the product spec.
 
-The Density axis from visual-dna.md is your primary layout driver. Airy = generous spacing, fewer items visible per viewport. Dense = compact rows, data tables, more items per viewport. Match the density to the persona constraints from the product spec.
+The Density axis from DESIGN.md is your primary layout driver. Airy = generous spacing, fewer items visible per viewport. Dense = compact rows, data tables, more items per viewport. Match the density to the persona constraints from the product spec.
 
 NOTE: The visual design spec (exact spacing values, typography ramp) does not exist yet at this step. Use the DNA Density axis for spatial decisions (airy vs dense) and the component manifest for component choices. Phase 4 implementers have specialized build skills and will apply the final token values from the visual design spec when they build — your layouts define the spatial arrangement and content hierarchy, not pixel-precise measurements."
 
@@ -115,7 +133,7 @@ Validate the UX architecture against the target persona's actual goals and jobs-
 
 Call the Agent tool once:
 
-1. Description: "UX flow validation" — subagent_type: `design-ux-researcher` — prompt: "[CONTEXT header above — phase: 3] Read `docs/plans/ux-architecture.md`, `docs/plans/page-specs/` (the ASCII wireframes — validate that layouts serve the persona), `docs/plans/product-spec.md` (per-feature Happy Path and Persona Constraints — these are the behavioral source of truth the flows must implement), `docs/plans/design-doc.md` (#persona, #jobs-to-be-done, #scope sections), and `docs/plans/visual-dna.md`. For each user flow in the UX architecture, walk through it as the target persona: narrate the steps, flag friction points, check if the flow serves the persona's jobs-to-be-done efficiently. Specifically check: (1) Are there screens or sections the persona doesn't need? (2) Are critical tasks reachable in the minimum number of steps? (3) Does the information hierarchy match what the persona cares about most? (4) Does the navigation pattern fit the persona's context (mobile-first for on-the-go users, sidebar for desktop power users, etc.)? (5) Does the responsive strategy degrade gracefully for the persona's primary device? Report findings to `docs/plans/ux-flow-validation.md` with pass/flag per flow. If critical flow issues are found, the UX Architect should revise `ux-architecture.md` before proceeding (backward edge to Step 3.3)."
+1. Description: "UX flow validation" — subagent_type: `design-ux-researcher` — prompt: "[CONTEXT header above — phase: 3] Read `docs/plans/ux-architecture.md`, `docs/plans/page-specs/` (the ASCII wireframes — validate that layouts serve the persona), `docs/plans/product-spec.md` (per-feature Happy Path and Persona Constraints — these are the behavioral source of truth the flows must implement), `docs/plans/design-doc.md` (#persona, #jobs-to-be-done, #scope sections), and `DESIGN.md`. For each user flow in the UX architecture, walk through it as the target persona: narrate the steps, flag friction points, check if the flow serves the persona's jobs-to-be-done efficiently. Specifically check: (1) Are there screens or sections the persona doesn't need? (2) Are critical tasks reachable in the minimum number of steps? (3) Does the information hierarchy match what the persona cares about most? (4) Does the navigation pattern fit the persona's context (mobile-first for on-the-go users, sidebar for desktop power users, etc.)? (5) Does the responsive strategy degrade gracefully for the persona's primary device? Report findings to `docs/plans/ux-flow-validation.md` with pass/flag per flow. If critical flow issues are found, the UX Architect should revise `ux-architecture.md` before proceeding (backward edge to Step 3.3)."
 
 Output: `docs/plans/ux-flow-validation.md`.
 
@@ -125,7 +143,7 @@ The Visual Designer re-invokes as writer this time, producing the much richer Vi
 
 Call the Agent tool once:
 
-1. Description: "Visual design spec" — subagent_type: `design-ui-designer` — prompt: "[CONTEXT header above — phase: 3] Second invocation as writer. Read `docs/plans/visual-dna.md`, `docs/plans/component-manifest.md`, `docs/plans/ux-architecture.md`, `docs/plans/design-references.md`, `docs/plans/product-spec.md` (per-feature States and Empty/Loading/Error States — the state matrix must cover every state the product spec defines, not just generic defaults), and `docs/plans/page-specs/` (the ASCII wireframes — the typography ramp and spacing scale must work for the actual page layouts, not just in isolation). Write `docs/plans/visual-design-spec.md` with ALL the following layers:
+1. Description: "Visual design spec" — subagent_type: `design-ui-designer` — prompt: "[CONTEXT header above — phase: 3] Second invocation as writer. Read `DESIGN.md`, `docs/plans/component-manifest.md`, `docs/plans/ux-architecture.md`, `docs/plans/design-references.md`, `docs/plans/product-spec.md` (per-feature States and Empty/Loading/Error States — the state matrix must cover every state the product spec defines, not just generic defaults), and `docs/plans/page-specs/` (the ASCII wireframes — the typography ramp and spacing scale must work for the actual page layouts, not just in isolation). Write `DESIGN.md` with ALL the following layers:
 
 **TOKENS** (existing): color system (hex, light + dark), typography scale, spacing (8px base), shadows, radius.
 
@@ -139,13 +157,13 @@ Call the Agent tool once:
 
 Every token, parameter, and rule must be derivable from the DNA card plus the design references. Cite the reference path for every non-obvious choice."
 
-Output: `docs/plans/visual-design-spec.md` — substantially richer than the prior one-layer spec.
+Output: `DESIGN.md` — substantially richer than the prior one-layer spec.
 
 ### Step 3.5 — Inclusive Visuals Check (single agent)
 
 Call the Agent tool once:
 
-1. Description: "Inclusive visuals check" — subagent_type: `design-inclusive-visuals-specialist` — prompt: "[CONTEXT header above — phase: 3] Read `docs/plans/visual-dna.md`, `docs/plans/component-manifest.md`, and `docs/plans/visual-design-spec.md`. Audit for representation gaps, imagery bias, color choices that exclude colorblind users, contrast failures, and culturally-specific iconography that doesn't translate. Write findings to `docs/plans/inclusive-visuals-audit.md`."
+1. Description: "Inclusive visuals check" — subagent_type: `design-inclusive-visuals-specialist` — prompt: "[CONTEXT header above — phase: 3] Read `DESIGN.md`, `docs/plans/component-manifest.md`, and `DESIGN.md`. Audit for representation gaps, imagery bias, color choices that exclude colorblind users, contrast failures, and culturally-specific iconography that doesn't translate. Write findings to `docs/plans/inclusive-visuals-audit.md`."
 
 Output: `docs/plans/inclusive-visuals-audit.md`.
 
@@ -157,7 +175,7 @@ This is the only Phase 3 step that writes code. Wrapped in a generator/critic me
 
 Call the Agent tool once:
 
-1. Description: "Build living style guide" — subagent_type: `engineering-frontend-developer` — mode: "bypassPermissions" — prompt: "[CONTEXT header above — phase: 3] [COMPLEXITY: L] Read `docs/plans/component-manifest.md` and `docs/plans/visual-design-spec.md`. Build a `/design-system` route with rendered, interactive examples of every chosen variant from the manifest. **HARD-GATE: Import from the installed libraries. Do NOT write components from scratch when the manifest names one.** Every component must be interactive (hover, focus, transitions all work). Mobile-responsive. This ships with the product. Commit: 'feat: living style guide'."
+1. Description: "Build living style guide" — subagent_type: `engineering-frontend-developer` — mode: "bypassPermissions" — prompt: "[CONTEXT header above — phase: 3] [COMPLEXITY: L] Read `docs/plans/component-manifest.md` and `DESIGN.md`. Build a `/design-system` route with rendered, interactive examples of every chosen variant from the manifest. **HARD-GATE: Import from the installed libraries. Do NOT write components from scratch when the manifest names one.** Every component must be interactive (hover, focus, transitions all work). Mobile-responsive. This ships with the product. Commit: 'feat: living style guide'."
 
 **Metric loop wrapper** (per `protocols/metric-loop.md`):
 
@@ -181,9 +199,11 @@ Output: `docs/plans/a11y-design-review.md`.
 
 ### Step 3.8 — Autonomous Quality Gate
 
-Log to `docs/plans/build-log.md`: final screenshot paths, Design Critic score history (per-round totals plus per-axis subscores), a11y findings count by severity, and a DNA compliance score derived from the critic's 6 DNA-axis subscores. No user pause.
+Log to `docs/plans/build-log.md`: final screenshot paths, Design Critic score history (per-round totals plus per-axis subscores), a11y findings count by severity, a DNA compliance score derived from the critic's 7 DNA-axis subscores, and the DESIGN.md lint result (broken-refs count, warning count, hash). No user pause.
 
-Phase 4 HARD-GATE: web mode requires `docs/plans/visual-dna.md` AND `docs/plans/visual-design-spec.md` AND `docs/plans/component-manifest.md` AND `docs/plans/page-specs/` (at least one file) to exist before Phase 4 starts. If any is missing, return to Phase 3.
+DESIGN.md lint runs at this step via `hooks/design-md-lint`. Broken-refs is a hard fail and routes back to Step 3.4 with the broken ref as the focused finding. Warnings (missing-primary, contrast-ratio WCAG AA, orphaned-tokens, missing-typography, section-order) are logged to `build-log.md` and feed the Phase 3.7 a11y review's contrast escalation rules but do NOT block Phase 4.
+
+Phase 4 HARD-GATE: web mode requires `DESIGN.md` (Pass 1 + Pass 2 complete, lint broken-refs == 0) AND `docs/plans/component-manifest.md` AND `docs/plans/page-specs/` (at least one file) to exist before Phase 4 starts. If any is missing or DESIGN.md fails the broken-refs lint, return to Phase 3.
 
 ## Phase 4 — Build (web branch)
 
@@ -203,11 +223,11 @@ Step 4.0 is three sequential dispatches: project scaffolding, design system setu
 
 #### 4.0.a — Project scaffolding
 
-Call the Agent tool — description: "Project scaffolding" — subagent_type: `engineering-rapid-prototyper` — mode: "bypassPermissions" — prompt: "[CONTEXT header above — phase: 4] [COMPLEXITY: M] Set up the project from the architecture. Read `docs/plans/architecture.md` via your Read tool before starting. Create directory structure, dependencies, build tooling, linting config, test framework with one passing test, .gitignore, .env.example. Read `docs/plans/visual-dna.md` Scope axis and only install the component libraries the DNA needs — never ship Three.js for an internal admin panel. Commit: 'feat: initial scaffolding'."
+Call the Agent tool — description: "Project scaffolding" — subagent_type: `engineering-rapid-prototyper` — mode: "bypassPermissions" — prompt: "[CONTEXT header above — phase: 4] [COMPLEXITY: M] Set up the project from the architecture. Read `docs/plans/architecture.md` via your Read tool before starting. Create directory structure, dependencies, build tooling, linting config, test framework with one passing test, .gitignore, .env.example. Read `DESIGN.md` Scope axis and only install the component libraries the DNA needs — never ship Three.js for an internal admin panel. Commit: 'feat: initial scaffolding'."
 
 #### 4.0.b — Design system setup
 
-Call the Agent tool — description: "Design system setup" — subagent_type: `engineering-frontend-developer` — mode: "bypassPermissions" — prompt: "[CONTEXT header above — phase: 4] Implement the design system from the Visual Design Spec. Read `docs/plans/visual-design-spec.md` via your Read tool before starting. Create CSS tokens matching the spec's color system, typography scale, spacing system, shadow/elevation tokens, and base layout components. The living style guide from Phase 3 is the reference implementation — components must match. Commit: 'feat: design system'."
+Call the Agent tool — description: "Design system setup" — subagent_type: `engineering-frontend-developer` — mode: "bypassPermissions" — prompt: "[CONTEXT header above — phase: 4] Implement the design system from the Visual Design Spec. Read `DESIGN.md` via your Read tool before starting. Create CSS tokens matching the spec's color system, typography scale, spacing system, shadow/elevation tokens, and base layout components. The living style guide from Phase 3 is the reference implementation — components must match. Commit: 'feat: design system'."
 
 #### 4.0.c — Acceptance test scaffolding
 
@@ -289,7 +309,7 @@ Call the Agent tool 6 times in one message:
 
 2. Description: "Performance audit" — subagent_type: `testing-performance-benchmarker` — Prompt: "[CONTEXT header above — phase: 5] Measure response times, identify bottlenecks, flag performance issues. NFR targets: Read `docs/plans/quality-targets.json` via your Read tool for performance thresholds. Report benchmarks AGAINST these targets.
 
-**Bundle budget per Scope axis** (read `docs/plans/visual-dna.md` Scope field):
+**Bundle budget per Scope axis** (read `DESIGN.md` Scope field):
 - Marketing:     500KB gzipped (excluding images), LCP <= 2.5s
 - Product:       300KB gzipped, LCP <= 1.8s
 - Dashboard:     400KB gzipped, LCP <= 2.0s
@@ -303,7 +323,7 @@ Exceeding the budget by >25% auto-blocks the Phase 6 LRR SRE chapter. Budget vio
 
 5. Description: "UX quality audit" — subagent_type: `design-ux-researcher` — Prompt: "[CONTEXT header above — phase: 5] UX quality review of every user-facing page. NFR targets: Read `docs/plans/quality-targets.json` via your Read tool for accessibility and UX thresholds. First, screenshot the living style guide at /design-system as your reference for how components should look. Then review every product page and check: loading states (every async action must show a loading indicator), error states (every form and API call must show user-friendly error feedback), empty states (every list/table must handle zero items gracefully), mobile responsiveness (test at 375px viewport — touch targets >= 44px, no horizontal scroll, readable text), form validation (inline feedback, not just alert()), transition smoothness (no layout shifts, no janky animations), visual consistency (compare each page's components against the style guide — buttons, inputs, cards, colors, spacing should match). Report issues with page, severity, and screenshot."
 
-6. Description: "Brand Guardian drift check" — subagent_type: `design-brand-guardian` — Prompt: "[CONTEXT header above — phase: 5] You are the Phase 5 drift check (proposed state §5 re-invite). Read `docs/plans/visual-dna.md` (the DNA card locked at Phase 3.0) + the actually-built pages via Playwright screenshots under `docs/plans/evidence/`. Score whether Phase 4 implementers stayed true to the DNA or drifted away from it. Specifically check each of the 6 DNA axes (Scope / Density / Character / Material / Motion / Type) against what the built product actually renders. Report drift count and specific elements (file:line references). Save findings to `docs/plans/evidence/brand-drift.md`. This is a drift check only — the Phase 6 LRR Brand Guardian chapter does the verdict. You do NOT issue a pass/fail here, only surface findings for the LRR chapter to read."
+6. Description: "Brand Guardian drift check" — subagent_type: `design-brand-guardian` — Prompt: "[CONTEXT header above — phase: 5] You are the Phase 5 drift check (proposed state §5 re-invite). Read `DESIGN.md` (the DNA card locked at Phase 3.0) + the actually-built pages via Playwright screenshots under `docs/plans/evidence/`. Score whether Phase 4 implementers stayed true to the DNA or drifted away from it. Specifically check each of the 6 DNA axes (Scope / Density / Character / Material / Motion / Type) against what the built product actually renders. Report drift count and specific elements (file:line references). Save findings to `docs/plans/evidence/brand-drift.md`. This is a drift check only — the Phase 6 LRR Brand Guardian chapter does the verdict. You do NOT issue a pass/fail here, only surface findings for the LRR chapter to read."
 
 ### Step 5.2 — Eval Harness
 
@@ -338,7 +358,7 @@ Read these files via your Read tool before starting — do NOT expect pasted con
 - User Journeys: `docs/plans/sprint-tasks.md` (User Journeys section — each journey becomes one E2E test)
 - Architecture (API contracts): `docs/plans/architecture.md`
 - NFRs: `docs/plans/sprint-tasks.md` (NFR section — use performance thresholds as test assertions)
-- Visual Design Spec (component selectors): `docs/plans/visual-design-spec.md`
+- Visual Design Spec (component selectors): `DESIGN.md`
 
 REQUIREMENTS:
 1. One E2E test per User Journey from sprint-tasks.md (each journey = one test file covering the full flow)

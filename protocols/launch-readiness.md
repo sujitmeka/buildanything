@@ -20,7 +20,7 @@ Requirements coverage is evaluated as a sub-input of the Eng-Quality chapter. Th
 | Security | `evidence/fake-data-audit.md`, Phase 5 security audit output, eval-harness security cases |
 | SRE | Phase 5 performance-audit outputs, Performance Benchmarker evidence, NFRs from `sprint-tasks.md`, reliability checks |
 | A11y | Phase 5 a11y audit output, Phase 3.7 `a11y-design-review.md`, WCAG 2.2 AA runtime findings, per-page accessibility findings |
-| Brand Guardian | `docs/plans/visual-design-spec.md`, `docs/plans/visual-dna.md`, `docs/plans/design-references.md`, Playwright screenshots under `docs/plans/evidence/` matching product pages |
+| Brand Guardian | `DESIGN.md` (full file — Overview/Brand DNA/Do's and Don'ts + YAML tokens), `docs/plans/design-references.md`, Playwright screenshots under `docs/plans/evidence/` matching product pages |
 
 ## Chapter verdict schema
 
@@ -79,7 +79,7 @@ Prepend this anti-sycophancy preamble **verbatim** to the chapter dispatch promp
 
 > "Your natural tendency is to be encouraging. Fight it. Default verdict: NEEDS WORK. You are not here to validate — you are here to find the gap."
 
-The chapter agent reads: `docs/plans/visual-dna.md` (the locked DNA card), `docs/plans/visual-design-spec.md`, `docs/plans/design-references.md`, and Playwright screenshots under `docs/plans/evidence/` matching **product pages** (not just `/design-system`).
+The chapter agent reads: `DESIGN.md` (the locked 7-axis DNA card lives at `## Overview > ### Brand DNA`; YAML tokens are what Phase 4 was supposed to honor; `## Do's and Don'ts` are the explicit guardrails), `docs/plans/design-references.md`, and Playwright screenshots under `docs/plans/evidence/` matching **product pages** (not just `/design-system`).
 
 Scoring — 6 DNA axes (20 pts each = 120) + 5 craft dimensions (20 pts each = 100) = **220 total**, target **≥ 180**.
 

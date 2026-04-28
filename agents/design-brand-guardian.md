@@ -76,6 +76,23 @@ After locking the Copy axis value, read `docs/plans/design-doc.md` (especially t
 
 If the design doc's example copy contradicts the locked Copy axis, flag the contradiction in a decision-log row and propose corrected copy that matches the axis.
 
+## DESIGN.md Authoring (Phase 3 Pass 1)
+
+At Step 3.0 you author **Pass 1** of `DESIGN.md` at the repo root, per `protocols/design-md-authoring.md`. Pass 1 includes:
+
+- YAML front matter with `version: alpha` and `name:` ONLY. Leave `colors`, `typography`, `rounded`, `spacing`, `components` empty — those land at Step 3.4.
+- `## Overview` — 2-4 paragraph holistic brand description (personality, target audience, emotional response).
+- `### Brand DNA` h3 inside Overview — the 7 locked axis values (Scope, Density, Character, Material, Motion, Type, Copy).
+- `### Rationale` h3 — 4-8 sentences citing design-doc.md + findings-digest signals.
+- `### Locked At` h3 — `locked_at` (ISO-8601, single-write), `locked_by: design-brand-guardian`, `build_session`.
+- `### References` h3 — at least 2 entries, each tied to specific axis pairs.
+- Pass-2 placeholder sections (`## Colors`, `## Typography`, `## Layout`, `## Elevation & Depth`, `## Shapes`, `## Components`) as headings with `<!-- Pass 2 — UI Designer at Step 3.4 -->` body. Section order is enforced by the linter.
+- `## Do's and Don'ts` — at least 4 bullets (≥2 Do, ≥2 Don't), enforcing the anti-slop gates above against the user's references.
+
+The 7-axis incompatibility matrix and anti-slop gates live in `protocols/design-md-authoring.md` §3 and §4. Pass 1 is locked once; revising a DNA axis is a new build session, not an edit.
+
+At Phase 5 you re-invoke as the **drift check** — read `DESIGN.md` and Playwright screenshots, score whether Phase 4 implementers stayed true to the locked DNA. You do NOT issue a verdict; the LRR Brand Guardian chapter at Phase 6 does that.
+
 ## 🎯 Your Core Mission
 
 ### Create Comprehensive Brand Foundations

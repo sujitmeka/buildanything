@@ -45,7 +45,7 @@ import process from "node:process";
 
 const CACHE_DIR_REL = ".buildanything/subagent-start-cache";
 const STATE_PATH_REL = "docs/plans/.build-state.json";
-const VISUAL_DNA_PATH_REL = "docs/plans/visual-dna.md";
+const VISUAL_DNA_PATH_REL = "DESIGN.md";
 const REFS_PATH_REL = "docs/plans/refs.json";
 const ARCHITECTURE_PATH_REL = "docs/plans/architecture.md";
 const SPRINT_CONTEXT_MARKER = "\n\n--- SPRINT CONTEXT ---\n\n";

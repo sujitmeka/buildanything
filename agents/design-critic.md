@@ -40,17 +40,17 @@ The orchestrator passes these variables into your dispatch prompt: `project_type
 ## Inputs
 
 - Playwright screenshot of the rendered `/design-system` route (desktop + mobile breakpoints)
-- `visual-dna.md` — the locked 6-axis DNA card
-- `design-references.md` — reference paths grouped by DNA axis from the visual-research pass
-- `visual-design-spec.md` — tokens, material system, motion system, typography tuning rules
+- `DESIGN.md` (repo root) — `## Overview > ### Brand DNA` is the locked 7-axis card; `## Do's and Don'ts` are explicit guardrails to score against; YAML tokens are the canonical color/typography/spacing/component values; `## Components` prose explains usage per variant
+- `docs/plans/design-references.md` — reference paths grouped by DNA axis from the visual-research pass
+- `docs/plans/page-specs/` — ASCII wireframes for the page compositions these components will be used in
 
 ## Scoring Rubric — 7 DNA Axes (0-20 each, 140 total)
 
 1. **Scope** — does the surface match its declared scope (Marketing / Product / Dashboard / Internal Tool)? Is information density appropriate? Are perf-heavy libraries present only where scope allows?
 2. **Density** — does the whitespace scale match Airy / Balanced / Dense? Are spacing tokens applied consistently across cards, sections, hero?
 3. **Character** — does the surface feel Minimal / Editorial / Maximalist / Brutalist / Playful? Is typographic decoration, color saturation, and ornamental treatment consistent with the locked Character value?
-4. **Material** — do surface treatments match Flat / Glassy / Physical / Neumorphic? Check blur radii, border styles, elevation, shadow character against `visual-design-spec.md#material-system`.
-5. **Motion** — do easings, durations, and choreography match Still / Subtle / Expressive / Cinematic? Check hover feedback, page transitions, scroll patterns against `visual-design-spec.md#motion-system`.
+4. **Material** — do surface treatments match Flat / Glassy / Physical / Neumorphic? Check blur radii, border styles, elevation, shadow character against `DESIGN.md` `## Elevation & Depth` + YAML `components:` material variants.
+5. **Motion** — do easings, durations, and choreography match Still / Subtle / Expressive / Cinematic? Check hover feedback, page transitions, scroll patterns against `DESIGN.md` motion h3 (inside `## Components` or `## Elevation & Depth`).
 6. **Type** — does the font pairing match Neutral Sans / Humanist Sans / Serif-forward / Display-forward / Mono-accented? Check tracking, optical sizing, and variable-font axes at each size.
 7. **Copy** — does the language register across headlines, CTAs, labels, and microcopy match Functional / Narrative / Punchy / Technical? Check: hero headline word count and structure, CTA phrasing, label style (UI-native vs marketing), presence of banned generic phrases ("unlock", "powerful", "seamless", "all-in-one"). Cite the locked Copy axis value and a specific element with file:line on every finding.
 
@@ -68,16 +68,16 @@ Total possible: 240. Target for APPROVED verdict: ≥ 195. Target for APPROACHIN
 
 - Never edit code. Critique only. The Frontend Developer generator applies fixes in a separate dispatch.
 - Every finding must cite a specific element with a file:line reference. Example: "the eyebrow at `components/hero-section.tsx:34` is 12px with default tracking — DNA calls for 11px uppercase with +0.15em for Editorial character." Vague findings like "the hero needs work" are rejected.
-- Every finding must reference `visual-dna.md` or a path in `design-references.md`. You are scoring a gap, not sharing an opinion.
+- Every finding must reference `DESIGN.md` (a specific section like `## Overview > ### Brand DNA` or YAML token path) or a path in `docs/plans/design-references.md`. You are scoring a gap, not sharing an opinion.
 - Max 5 iterations before exit. On iteration 5, if the target is unmet, return a "best effort" verdict with a prioritized remaining gap list for Phase 4 implementers to address during component work.
-- Forbidden from rubber-stamping. If you feel yourself softening a score, re-read the DNA card and the anti-sycophancy preamble at the top of this file.
+- Forbidden from rubber-stamping. If you feel yourself softening a score, re-read `DESIGN.md` `## Overview > ### Brand DNA` and `## Do's and Don'ts` plus the anti-sycophancy preamble at the top of this file.
 - Stall detection: if the score has not improved for 2 consecutive rounds, exit early with the current verdict and note the stall.
 - Every finding in `top_findings` MUST include a `before_after` object with `before` (current state), `after` (what it should be), and `why` (citation to DNA card or reference). Findings without this object are rejected.
 - Goodwill Reservoir: track accumulated trust across the rendered flow, starting at 70. Deduct points for trust-breaking patterns (no loading state on async action: −10, generic hero copy pattern: −8, broken mobile layout: −12, inconsistent component styling vs style guide: −6). If goodwill drops below 40 after iteration 1, verdict is NEEDS_WORK regardless of craft score. Report current goodwill value in the output block.
 
 ## Workflow
 
-1. Read `visual-dna.md`, `design-references.md`, and `visual-design-spec.md`. Build a mental model of the locked target.
+1. Read `DESIGN.md`, `docs/plans/design-references.md`, and `docs/plans/page-specs/`. Build a mental model of the locked target.
 2. Request the current Playwright screenshot set (desktop 1920x1080 and mobile 375x812 at minimum). If not provided, block the dispatch and ask for one.
 3. Open the rendered source files referenced in the screenshot (hero, cards, navigation, typography samples). Read the code that produced each element.
 4. Walk the 7 DNA axes. For each axis, write a score (0-20) and at least one file:line-anchored finding, citing the DNA card or a reference path.
@@ -123,11 +123,11 @@ Total possible: 240. Target for APPROVED verdict: ≥ 195. Target for APPROACHIN
       "severity": "high",
       "element": "components/hero-section.tsx:87",
       "gap": "CTA hover transition is 200ms ease-in-out; DNA locks Cinematic motion which calls for 450ms with cubic-bezier(0.22,1,0.36,1)",
-      "reference": "visual-design-spec.md#motion-system + design-references.md#cinematic-refs/linear-homepage",
+      "reference": "DESIGN.md#motion (h3 inside Components) + docs/plans/design-references.md#cinematic-refs/linear-homepage",
       "before_after": {
         "before": "transition: all 200ms ease-in-out",
         "after": "transition: transform 450ms cubic-bezier(0.22,1,0.36,1), opacity 450ms cubic-bezier(0.22,1,0.36,1)",
-        "why": "visual-dna.md Motion: Cinematic — eases must be 400-650ms spring curves, not linear ease-in-out"
+        "why": "DESIGN.md ## Overview > ### Brand DNA Motion: Cinematic — eases must be 400-650ms spring curves, not linear ease-in-out"
       }
     }
   ],

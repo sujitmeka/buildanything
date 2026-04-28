@@ -2,19 +2,19 @@
 
 ## Purpose
 
-Step 3.9's page spec writer (`design-ux-architect` in Phase 3.9 role) emits one file per screen to `docs/plans/page-specs/{screen-name}.md`. Each file is the spatial blueprint for a single screen — ASCII wireframe + structured metadata — so Phase 4 implementers know exactly what to build without interpreting prose. This protocol defines the required sections, wireframe format, platform conventions, and validation rules.
+Step 3.3's UX architect (`design-ux-architect`) produces page specs alongside `ux-architecture.md` — flows and layouts are created together because they inform each other. One file per screen is emitted to `docs/plans/page-specs/{screen-name}.md`. Each file is the spatial blueprint for a single screen — ASCII wireframe + structured metadata — so Phase 4 implementers know exactly what to build without interpreting prose. This protocol defines the required sections, wireframe format, platform conventions, and validation rules.
 
 ## Inputs
 
 The page spec writer reads these artifacts before producing any page spec:
 
-- `docs/plans/product-spec.md` — feature states, data requirements, persona constraints, screen inventory
+- `docs/plans/product-spec.md` — feature states, data requirements, persona constraints, screen inventory (SOURCE OF TRUTH for what each screen does)
 - `docs/plans/architecture.md` — frontend component hierarchy, routing, API contracts
-- `docs/plans/ux-architecture.md` — navigation model, user flows, information architecture
-- `docs/plans/visual-dna.md` — 6-axis DNA card (Density axis drives layout decisions)
-- `docs/plans/visual-design-spec.md` — tokens, spacing scale, typography ramp
+- `DESIGN.md` `## Overview > ### Brand DNA` — 7-axis DNA card (Density axis drives layout decisions)
 - `docs/plans/component-manifest.md` — library component picks per slot
 - `docs/plans/design-references/` — competitor/inspiration screenshots for layout reference
+
+NOTE: `visual-design-spec.md` does NOT exist yet when page specs are produced (it's created at Step 3.4, after Step 3.3). Page specs use the DNA Density axis for spatial decisions (Airy vs Dense) and the component manifest for component choices. Exact spacing values and typography ramp are applied by Phase 4 implementers when they build from the visual design spec.
 
 ## Questions Answered
 

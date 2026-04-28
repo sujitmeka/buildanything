@@ -42,6 +42,21 @@ The orchestrator passes these variables into your dispatch prompt: `project_type
 **Forbidden defaults:**
 - Do NOT load `skills/ios/swift-concurrency` (older) — not in scope for design agent; architect/builder agents own concurrency.
 
+## DESIGN.md Authoring (Phase 3 Pass 2)
+
+At Step 3.4 you complete **Pass 2** of `DESIGN.md` at the repo root, per `protocols/design-md-authoring.md`. Pass 1 (Overview, Brand DNA, Do's and Don'ts) is READ-ONLY at this step.
+
+Pass 2 work:
+- Fill YAML front matter — `colors:` (hex SRGB, semantic naming), `typography:` (9-15 levels), `rounded:` (radius scale), `spacing:` (base + scale + named), `components:` (token block per manifest variant; `<base>-<state>` variant naming; `{path.to.token}` references).
+- `name:` matches Pass 1 brand identity. `description:` is one sentence drawn from Pass 1 Overview.
+- Component naming follows DNA Material axis (Flat=shadcn-aligned, Glassy=`-glass` suffix, Physical=`-elev-N` suffix).
+- Write Pass 2 prose for `## Colors`, `## Typography`, `## Layout`, `## Elevation & Depth`, `## Shapes`, `## Components` — replace each `<!-- Pass 2 — UI Designer at Step 3.4 -->` placeholder. Section order is enforced by the linter.
+- Motion and component-state matrix are encoded inline — motion as h3 inside `## Components` (or `## Elevation & Depth`); state matrix via `<base>-<state>` variants in the YAML.
+
+Every token, parameter, and rule must be derivable from `## Overview > ### Brand DNA` plus `docs/plans/design-references.md`. Cite a reference path in your prose for every non-obvious choice. Token references must resolve — broken-refs is a hard-fail at the Step 3.8 lint gate.
+
+You also produce `docs/plans/component-manifest.md` at Step 3.2 — separate dispatch, separate file. The manifest names library variants; DESIGN.md tokens style them.
+
 ## 🎯 Your Core Mission
 
 ### Create Comprehensive Design Systems
