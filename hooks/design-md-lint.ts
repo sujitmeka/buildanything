@@ -2,9 +2,10 @@
 /*
  * buildanything: DESIGN.md lint runner (Phase 3 Step 3.8 gate).
  *
- * Runs `npx @google/design.md lint DESIGN.md` against the DESIGN.md at the
- * current working directory, classifies findings (broken-ref => error,
- * everything else => warning per protocols/design-md-authoring.md §8),
+ * Runs the pinned @google/design.md linter (devDependency in package.json) via
+ * `npx --no-install` against the DESIGN.md at the current working directory.
+ * Classifies findings (broken-ref => error, everything else => warning per
+ * protocols/design-md-authoring.md §8),
  * writes a JSON summary to docs/plans/evidence/design-md-lint.json, and
  * appends a one-line summary to docs/plans/build-log.md under
  * `## Phase 3 Step 3.8 — DESIGN.md Lint`.
@@ -85,7 +86,10 @@ function main(): number {
   const fileContent = readFileSync(designMd, "utf8");
   const fileHash = sha256(fileContent);
 
-  const lint = spawnSync("npx", ["--yes", "@google/design.md", "lint", "DESIGN.md"], {
+  // --no-install ensures we use the pinned version from package.json (devDependency).
+  // If the package isn't installed locally, this fails fast rather than silently
+  // fetching whatever's latest on npm — that's the entire point of pinning.
+  const lint = spawnSync("npx", ["--no-install", "@google/design.md", "lint", "DESIGN.md"], {
     cwd,
     encoding: "utf8",
   });
@@ -95,6 +99,7 @@ function main(): number {
 
   if (lint.error) {
     process.stderr.write(`design-md-lint: linter spawn failed: ${lint.error.message}\n`);
+    process.stderr.write(`design-md-lint: install pinned version with: npm install --save-dev @google/design.md\n`);
     process.stderr.write(stderr);
     return 2;
   }

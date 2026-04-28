@@ -187,3 +187,7 @@ A well-formed `.build-state.json` must satisfy:
 12. **Timestamps monotonic** — `session_last_saved >= session_started`.
 
 The Wave 2 `PreToolUse` schema lint hook (W2-2) validates every Write|Edit to `.build-state.json` against these rules and denies writes that fail.
+
+## Consumers — non-orchestrator readers of state
+
+- **Step 7.1.5 Completion Report** (`commands/build.md`) reads `backward_routing_count`, `backward_routing_count_by_target_phase`, and `mode_transitions[]` to surface end-of-build quality signals. See `commands/build.md` Step 7.1.5 for the report template.

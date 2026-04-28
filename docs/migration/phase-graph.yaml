@@ -695,6 +695,27 @@ phases:
           contains: [yaml-tokens, colors-with-dark-pairs, typography-as-DynamicType-roles, rounded, spacing, components-iOS-vocabulary, motion-as-h3, component-state-matrix-via-variants]
           source: protocols/design-md-authoring.md
           grounded_in: [HIG, Liquid Glass (iOS 26+), SF Symbols, design-references.md]
+        - id: "3.3-ios"
+          name: UX Architecture + Page Layouts (iOS)
+          kind: dispatch-single
+          subagent_type: design-ux-architect
+          reads: [product-spec.md, DESIGN.md, architecture.md, design-references/]
+          writes: [ux-architecture.md, docs/plans/page-specs/*.md]
+          notes: |
+            iOS page-specs use single mobile-first ASCII wireframes (iPhone 16 Pro
+            393x852), HIG navigation annotations, DESIGN.md component token refs,
+            Dynamic Type role declarations, and safe-area handling per screen.
+            Same agent as web Step 3.3 — design-ux-architect platform-gates via
+            skill bundle.
+        - id: "3.3b-ios"
+          name: UX Flow Validation (iOS)
+          kind: dispatch-single
+          dispatches: [design-ux-researcher]
+          reads: [docs/plans/ux-architecture.md, docs/plans/page-specs/, docs/plans/product-spec.md, docs/plans/design-doc.md, DESIGN.md]
+          writes: [docs/plans/ux-flow-validation.md]
+          backward_edges:
+            - from: critical-flow-issues
+              to: phase-3.step-3.3-ios
         - id: "3.4-ios"
           name: Visual QA loop
           kind: loop
@@ -714,6 +735,7 @@ phases:
             per protocols/design-md-authoring.md §9.5.
       phase_4_entry_requirements:
         - DESIGN.md (Pass 1 + Pass 2 complete; broken-refs lint == 0)
+        - page-specs/ (at least one file from Step 3.3-ios)
 
   - id: "4"
     name: Build

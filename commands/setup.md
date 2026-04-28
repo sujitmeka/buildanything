@@ -6,7 +6,7 @@ description: "Install buildanything's external dependencies — tsx, companion p
 
 You are installing buildanything's external dependencies. The plugin itself is already installed (that's how this command is running), but the companion plugins, CLI tools, and skills it depends on are not — they need to be installed separately. This command does that in one shot.
 
-**iOS project?** If the user's intent is to build an iOS app, also run Steps 7–9 below. Skip them otherwise.
+**iOS project?** If the user's intent is to build an iOS app, also run Steps 8–10 below. Skip them otherwise.
 
 Run every step below. Each step is idempotent: check first, install only if missing, continue on failure. Collect results as you go and report them all at the end.
 
@@ -50,9 +50,18 @@ Run `npx skills add vercel-labs/agent-browser`. Record `installed` or `failed`.
 
 Run `npx skills add vercel-labs/agent-browser --skill dogfood`. Record `installed` or `failed`.
 
+### Step 7 — Install design.md linter (web/iOS Phase 3 lint gate)
+
+`@google/design.md` is the linter that runs at Phase 3 Step 3.8 to validate `DESIGN.md`. It is pinned as a devDependency in `package.json` so lint behavior is reproducible across runs.
+
+1. Check if installed: `npm ls @google/design.md` from the plugin root. If listed, record `already installed` and continue.
+2. Otherwise run `npm install --save-dev @google/design.md` from the plugin root. Record `installed` or `failed` based on exit status.
+
+A missing linter does NOT block Phase 0/1/2 — it only fails Phase 3.8 with a "linter spawn failed" stderr that names the install command. The plugin keeps working without it.
+
 ---
 
-## Step 7: Install iOS MCP servers _(iOS only)_
+## Step 8: Install iOS MCP servers _(iOS only)_
 
 For each MCP server below, run `claude mcp list` first. If the name already appears, record `already configured`. Otherwise run the install command and record `configured` or `failed`.
 
@@ -63,7 +72,7 @@ For each MCP server below, run `claude mcp list` first. If the name already appe
 
 If either fails: record the failure with the exact manual-install command.
 
-## Step 8: Install Maestro _(iOS only)_
+## Step 9: Install Maestro _(iOS only)_
 
 Maestro runs E2E flow YAML tests against a booted iOS simulator.
 
@@ -71,7 +80,7 @@ Maestro runs E2E flow YAML tests against a booted iOS simulator.
 2. Otherwise run `brew install maestro`. Record `installed` or `failed`.
 3. If `brew` is missing, record `skipped — install Homebrew first (brew.sh), then: brew install maestro`.
 
-## Step 9: Verify iOS toolchain _(iOS only)_
+## Step 10: Verify iOS toolchain _(iOS only)_
 
 Run `xcodebuild -version`. Record the version string. If not found, warn: "Xcode 26.3+ required — install from the Mac App Store."
 

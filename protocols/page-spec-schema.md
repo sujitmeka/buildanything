@@ -82,13 +82,24 @@ Reference to product-spec feature states, plus screen-specific visual states: sk
 
 **Web SaaS:** Sidebar + main content area. Header with nav. Sidebar collapses to hamburger on mobile.
 
-**iOS:** Navigation bar at top (title, back button if applicable), content area, tab bar at bottom. Standard HIG layout patterns.
+**iOS:** Navigation bar at top (title, back button if applicable), content area, tab bar at bottom. Standard HIG layout patterns. See iOS-specific conventions section below for full requirements.
 
 **Dashboard/Analytics:** Filter bar, card grid, chart placement. Dense layout with data tables.
 
 **CLI:** No wireframe. Show command output format with example terminal session instead.
 
 **Mobile (React Native/Expo):** Follow target platform conventions — iOS patterns if iOS, Material if Android, cross-platform neutral if both.
+
+### iOS-specific wireframe conventions
+
+When `project_type=ios`, page-specs follow these conventions:
+
+- **Single viewport:** iPhone 16 Pro (393×852 logical) as the primary; iPad layout deltas captured as a Notes section. No second mobile/desktop view.
+- **Navigation annotation:** name the parent NavigationStack / TabView / sheet and the back/dismiss gesture per screen.
+- **Component refs:** every interactive element references a DESIGN.md `components:` token name (e.g., `button-primary`, `list-row-grouped`, `card-elevated`) — these are SwiftUI view modifiers at Phase 4.
+- **Dynamic Type:** declare which typography role tokens the screen uses; flag any layout that breaks at xxxLarge.
+- **Safe-area handling:** name top/bottom safe-area treatments (large title vs nav bar; tab bar inset).
+- **Data loading strategy:** async/await + `.task` modifier vs `ObservableObject` reference; loading/error/empty states sourced from product-spec.md per-feature sections.
 
 ## Validation Checklist
 
