@@ -72,6 +72,16 @@ Output: `DESIGN.md` at repo root. Every downstream Phase 3 step reads this file.
 
 Output: `DESIGN.md` (repo root) — Pass 1. Step 3.4 completes Pass 2.
 
+#### Step 3.0.idx — DESIGN.md Pass 1 graph index
+
+After `design-brand-guardian` returns and `DESIGN.md` is on disk, index it into the build graph. Slice 2 graph index — best-effort, BO falls back to file reads on failure.
+
+Run via the Bash tool:
+
+- Command: `node ${CLAUDE_PLUGIN_ROOT}/bin/graph-index.js DESIGN.md`
+- On exit 0: log success to `docs/plans/build-log.md` and continue.
+- On non-zero exit: log a warning line to `docs/plans/build-log.md` (`graph-index DESIGN.md failed — continuing with file-read fallback`) and continue. The graph never blocks builds.
+
 ### Step 3.1 — Visual Research (2 agents, parallel, both Playwright-driven)
 
 Research is now goal-directed — validate and enrich the locked DNA, not catalogue the landscape. Only surface references that exemplify one or more of the chosen DNA axes.
@@ -95,6 +105,16 @@ Call the Agent tool once:
 Output: `docs/plans/component-manifest.md` — locked component manifest.
 
 **HARD-GATE:** Phase 4 implementers MUST import from this manifest. Writing components from scratch when the manifest names one is a HARD-GATE violation. The cleanup agent will flag and revert custom-written components that have a manifest entry. See the Phase 4 HARD-GATE block below.
+
+#### Step 3.2.idx — Component manifest graph index
+
+After `design-ui-designer` returns and `docs/plans/component-manifest.md` is on disk, index it into the build graph. Slice 2 graph index — best-effort.
+
+Run via the Bash tool:
+
+- Command: `node ${CLAUDE_PLUGIN_ROOT}/bin/graph-index.js docs/plans/component-manifest.md`
+- On exit 0: log success to `docs/plans/build-log.md` and continue.
+- On non-zero exit: log a warning line to `docs/plans/build-log.md` (`graph-index component-manifest.md failed — continuing with file-read fallback`) and continue.
 
 ### Step 3.2b — DNA Persona Check
 

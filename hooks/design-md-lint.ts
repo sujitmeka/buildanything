@@ -9,8 +9,9 @@
  * `npm install` (no args) so package.json is not mutated. Classifies findings
  * (broken-ref => error, everything else => warning per
  * protocols/design-md-authoring.md §8),
- * writes a JSON summary to docs/plans/evidence/design-md-lint.json, and
- * appends a one-line summary to docs/plans/build-log.md under
+ * writes a JSON summary to .buildanything/graph/lint-status.json (consumed by
+ * src/graph/storage/index.ts queryDna lint_status field), and appends a
+ * one-line summary to docs/plans/build-log.md under
  * `## Phase 3 Step 3.8 — DESIGN.md Lint`.
  *
  * Exit codes:
@@ -25,7 +26,7 @@
 
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, appendFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, appendFileSync, writeFileSync, renameSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import process from "node:process";
 
@@ -56,6 +57,15 @@ function sha256(content: string): string {
 function ensureDir(filePath: string): void {
   const dir = dirname(filePath);
   if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+}
+
+// Atomic write — tmp + rename so a crash mid-write never leaves a partial
+// JSON that graph/storage queryDna would fail to parse.
+function atomicWrite(path: string, content: string): void {
+  ensureDir(path);
+  const tmp = `${path}.tmp`;
+  writeFileSync(tmp, content);
+  renameSync(tmp, path);
 }
 
 function parseFindings(stdout: string): LintFinding[] {
@@ -170,20 +180,30 @@ function main(): number {
   const brokenRefs = errors.length;
   const exitCode = brokenRefs > 0 ? 2 : 0;
 
-  const summary: LintSummary = {
+  const ranAt = new Date().toISOString();
+  const status: "pass" | "warn" | "fail" =
+    brokenRefs > 0 ? "fail" : warnings.length > 0 ? "warn" : "pass";
+
+  // Storage layer (src/graph/storage/index.ts queryDna) reads
+  // .buildanything/graph/lint-status.json and only consumes the `status`
+  // field. Extra diagnostic fields (broken_refs, warnings, errors, raw_*)
+  // are preserved here for human/tool inspection and are ignored by storage.
+  const summary: LintSummary & { status: "pass" | "warn" | "fail"; at: string; source: string } = {
+    status,
+    at: ranAt,
+    source: "DESIGN.md",
     file_hash: fileHash,
     broken_refs: brokenRefs,
     warnings,
     errors,
-    ran_at: new Date().toISOString(),
+    ran_at: ranAt,
     exit_code: exitCode,
     raw_stdout: stdout.slice(0, 8000),
     raw_stderr: stderr.slice(0, 2000),
   };
 
-  const summaryPath = resolve(cwd, "docs/plans/evidence/design-md-lint.json");
-  ensureDir(summaryPath);
-  writeFileSync(summaryPath, JSON.stringify(summary, null, 2));
+  const summaryPath = resolve(cwd, ".buildanything/graph/lint-status.json");
+  atomicWrite(summaryPath, JSON.stringify(summary, null, 2));
 
   const buildLogPath = resolve(cwd, "docs/plans/build-log.md");
   if (existsSync(buildLogPath)) {
