@@ -4,7 +4,10 @@
  *
  * Runs the pinned @google/design.md linter (devDependency in package.json) via
  * `npx --no-install` against the DESIGN.md at the current working directory.
- * Classifies findings (broken-ref => error, everything else => warning per
+ * Auto-installs the pinned version on first use if the package is listed in
+ * package.json devDependencies but not yet in node_modules — runs plain
+ * `npm install` (no args) so package.json is not mutated. Classifies findings
+ * (broken-ref => error, everything else => warning per
  * protocols/design-md-authoring.md §8),
  * writes a JSON summary to docs/plans/evidence/design-md-lint.json, and
  * appends a one-line summary to docs/plans/build-log.md under
@@ -75,6 +78,38 @@ function parseFindings(stdout: string): LintFinding[] {
   return findings;
 }
 
+interface PackageJson {
+  devDependencies?: Record<string, string>;
+  dependencies?: Record<string, string>;
+}
+
+/**
+ * Returns true if @google/design.md is pinned in package.json devDependencies
+ * (or dependencies) but is NOT installed under node_modules. This is the
+ * narrow window where auto-install is safe — the package is "ours" to install.
+ * Returns false in any other state (missing package.json, missing pin,
+ * already installed, parse error) so the caller falls through to existing
+ * behavior.
+ */
+function shouldAutoInstall(cwd: string): boolean {
+  const pkgPath = resolve(cwd, "package.json");
+  if (!existsSync(pkgPath)) return false;
+  let pkg: PackageJson;
+  try {
+    pkg = JSON.parse(readFileSync(pkgPath, "utf8")) as PackageJson;
+  } catch {
+    return false;
+  }
+  const pinned =
+    pkg.devDependencies?.["@google/design.md"] ??
+    pkg.dependencies?.["@google/design.md"];
+  if (!pinned) return false;
+  // Installed if the package directory exists. We don't validate the
+  // version range here — npm install will reconcile against package-lock.
+  const installedPath = resolve(cwd, "node_modules", "@google", "design.md");
+  return !existsSync(installedPath);
+}
+
 function main(): number {
   const cwd = process.cwd();
   const designMd = resolve(cwd, "DESIGN.md");
@@ -86,13 +121,38 @@ function main(): number {
   const fileContent = readFileSync(designMd, "utf8");
   const fileHash = sha256(fileContent);
 
-  // --no-install ensures we use the pinned version from package.json (devDependency).
-  // If the package isn't installed locally, this fails fast rather than silently
-  // fetching whatever's latest on npm — that's the entire point of pinning.
-  const lint = spawnSync("npx", ["--no-install", "@google/design.md", "lint", "DESIGN.md"], {
-    cwd,
-    encoding: "utf8",
-  });
+  // First attempt: --no-install ensures we use the pinned version from
+  // package.json (devDependency). If the package isn't installed locally,
+  // we auto-install once below rather than silently fetching latest from
+  // npm — that's the whole point of pinning.
+  const runLint = () =>
+    spawnSync("npx", ["--no-install", "@google/design.md", "lint", "DESIGN.md"], {
+      cwd,
+      encoding: "utf8",
+    });
+
+  let lint = runLint();
+
+  // Auto-install fallback: only fires when the package is pinned in
+  // package.json but missing from node_modules. We run plain `npm install`
+  // (no args, no --save-dev) — that installs from the existing devDeps
+  // block and does NOT mutate package.json or package-lock.json beyond
+  // what npm already does for normal install resolution.
+  const linterNotInstalled = lint.error || (lint.status !== null && lint.status !== 0 && /could not determine|could not find/i.test(lint.stderr ?? ""));
+  if (linterNotInstalled && shouldAutoInstall(cwd)) {
+    process.stdout.write("design-md-lint: pinned linter not installed; running 'npm install' once (~5-15s)...\n");
+    const install = spawnSync("npm", ["install", "--silent"], {
+      cwd,
+      encoding: "utf8",
+    });
+    if (install.status === 0) {
+      lint = runLint();
+    } else {
+      process.stderr.write(`design-md-lint: auto-install failed (exit ${install.status}). Run 'npm install' from the plugin root manually.\n`);
+      if (install.stderr) process.stderr.write(install.stderr);
+      return 2;
+    }
+  }
 
   const stdout = lint.stdout ?? "";
   const stderr = lint.stderr ?? "";

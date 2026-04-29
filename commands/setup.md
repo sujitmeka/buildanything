@@ -59,6 +59,8 @@ Run `npx skills add vercel-labs/agent-browser --skill dogfood`. Record `installe
 
 A missing linter does NOT block Phase 0/1/2 — it only fails Phase 3.8 with a "linter spawn failed" stderr that names the install command. The plugin keeps working without it.
 
+Note: the lint hook (`hooks/design-md-lint.ts`) auto-installs the pinned version on first use if it's listed in `package.json` devDependencies but missing from `node_modules`. This means setup is technically optional for design.md — the first Phase 3.8 will install on demand (~5-15s, one-time). Setup pre-installs to avoid that delay during a build.
+
 ---
 
 ## Step 8: Install iOS MCP servers _(iOS only)_
