@@ -18,7 +18,29 @@ Then, one `## Feature: {Name}` section per feature in the PRD scope.
 
 ### App Overview
 
-One paragraph: what this app is, who it's for (persona name + one-line description), core value proposition. Not a restatement of the PRD — a grounding paragraph that any engineer can read in 10 seconds to understand the product.
+Two parts, both required.
+
+**Part 1 — Grounding paragraph.** One paragraph: what this app is and core value proposition. Not a restatement of the PRD — a grounding paragraph that any engineer can read in 10 seconds to understand the product.
+
+**Part 2 — Persona Table.** A table listing every persona the product serves. One row flagged `(primary)` next to its name. Required columns: `Persona`, `Role`, `Primary JTBD`, `Relationship to Other Personas`.
+
+Format:
+
+```
+| Persona | Role | Primary JTBD | Relationship to Other Personas |
+|---------|------|--------------|--------------------------------|
+| Buyer (primary) | End consumer placing orders | Find a trusted seller and complete a purchase fast | Buys from Seller; rates Seller post-transaction |
+| Seller | Independent merchant fulfilling orders | Receive, fulfill, and get paid for orders without manual chasing | Sells to Buyer; notified by Buyer order events |
+| Admin | Platform operator handling disputes | Resolve disputes between Buyer and Seller without losing trust on either side | Mediates Buyer ↔ Seller |
+```
+
+Rules:
+- ≥ 1 row required. A single-persona product still uses the table — name the one persona explicitly.
+- Exactly one row carries `(primary)` after the name.
+- Persona names defined here are the canonical identifiers used in every per-feature `Persona Constraints` block. Do not introduce a persona name in a feature that does not appear in this table.
+- Pull persona enumeration directly from `ux-research.md` (Persona Enumeration section). If `ux-research.md` lists N personas, this table has N rows.
+
+Anchors: `product-spec.md#app-overview` (top-level grounding paragraph + table), `product-spec.md#app-overview/personas` (the table specifically, for refs.json indexing).
 
 ### Screen Inventory
 
@@ -52,16 +74,21 @@ If the product has no roles beyond "authenticated user," say so explicitly: "Sin
 
 ### Cross-Feature Interactions
 
-A dependency map showing how features connect. Format:
+A dependency map showing how features connect. Where an interaction crosses a persona boundary (one persona's action triggers another persona's experience), call this out explicitly with `(Persona) → (Persona)` notation. This is critical for marketplaces and other multi-sided products — without it, the seller-side and buyer-side experiences diverge silently.
+
+Format:
 
 ```
 - Auth → Checkout: user must be authenticated to check out
+- Order Placement (Buyer) → Order Notification (Seller): seller notified within 60s when buyer submits order
+- Order Fulfillment (Seller) → Order Status (Buyer): buyer sees status update when seller marks shipped
+- Dispute (Buyer or Seller) → Mediation (Admin): admin queue receives dispute when either party files
 - Checkout → Inventory: stock check at cart review and at submit
 - Dashboard → Settings: display preferences read from user settings
 - Notifications → Auth, Checkout, Dashboard: triggered by events in each
 ```
 
-Every dependency must be bidirectional — if A depends on B, B's feature section must mention A under its own interactions.
+Every dependency must be bidirectional — if A depends on B, B's feature section must mention A under its own interactions. Persona-crossing interactions must appear in BOTH personas' feature sections.
 
 ## Required Per-Feature Sections
 
@@ -113,13 +140,22 @@ Bullet list with concrete values. Every rule has a number or a `[DECISION NEEDED
 Numbered steps. Each step: what the user sees, what they can do, what happens.
 
 ### Persona Constraints
-Which persona(s) this feature serves and what research findings shaped its design. Cite specific findings from `ux-research.md` and `feature-intel.md`.
+Which personas this feature serves and what research findings shaped its design for each. Every constraint MUST attribute to a specific persona named in the App Overview persona table. Cite specific findings from `ux-research.md` and `feature-intel.md`.
 
-Format:
+Rules:
+- One constraint block per persona that uses this feature.
+- Persona names must match the App Overview table verbatim (including `(primary)` flag where applicable).
+- If a feature serves multiple personas, list a constraint block per persona — even if some constraints overlap, attribute each to the persona it shapes the design for.
+- If a feature serves only one persona, name it explicitly. Do not leave persona attribution implicit.
+
+Format (multi-persona example — marketplace order placement):
 ```
-- Persona: time-poor ops manager who scans, doesn't read (ux-research.md)
-- Constraint: keep checkout to 3 steps max — competitors average 5+ (feature-intel.md)
-- Constraint: show progress indicator — persona abandons flows without visible progress (ux-research.md)
+- Persona: Buyer (primary) — time-poor, scans, doesn't read [ux-research.md]
+  Constraint: keep checkout to 3 steps max — competitors average 5+ [feature-intel.md]
+  Constraint: show progress indicator at top of each step — persona abandons flows without visible progress [ux-research.md]
+- Persona: Seller — needs visibility into pending orders to plan fulfillment [ux-research.md]
+  Constraint: notification within 60s of order placed — sellers report losing time-sensitive orders to slower competitors [ux-research.md]
+  Constraint: order detail must include buyer-supplied notes verbatim — fulfillment errors traced to truncated notes in v0 [ux-research.md]
 ```
 
 ### Empty/Loading/Error States
@@ -191,15 +227,20 @@ Step 1.7 runs these checks. Failure sends the spec back to the product-spec-writ
 8. Cross-Feature Interactions section exists and is non-empty
 9. Screen Inventory section exists and is non-empty
 10. Every acceptance criterion starts with "Verify that"
+11. App Overview persona table has ≥ 1 row, each persona has a role and JTBD, exactly one persona is flagged `(primary)`, and the `Relationship to Other Personas` column is filled for each row
+12. Every feature's Persona Constraints attributes each constraint to a named persona that appears in the App Overview persona table (no orphan persona names, no implicit attribution)
+13. For multi-persona products: every Cross-Feature Interactions entry that crosses a persona boundary uses the `(Persona) → (Persona)` annotation
 
 **State machine checks (mechanical, ~0 tokens):**
-11. Every state in a States list appears in at least one Transitions row (no orphan states)
-12. Every Transitions row references states that exist in the States list
-13. No transition has empty preconditions (every transition requires something to be true, even if it's just "user clicks button")
-14. Error states have at least one outgoing transition (recovery path) OR are marked terminal
-15. The initial state is explicitly identified in the States list (first entry or marked with "(initial)")
+14. Every state in a States list appears in at least one Transitions row (no orphan states)
+15. Every Transitions row references states that exist in the States list
+16. No transition has empty preconditions (every transition requires something to be true, even if it's just "user clicks button")
+17. Error states have at least one outgoing transition (recovery path) OR are marked terminal
+18. The initial state is explicitly identified in the States list (first entry or marked with "(initial)")
 
-## Worked Example: Checkout Feature
+## Worked Example: Marketplace Order Placement (Buyer + Seller)
+
+This example illustrates the multi-persona pattern. App Overview persona table for this hypothetical product would include at minimum `Buyer (primary)` and `Seller`. The feature below is order placement, which originates with the Buyer but has direct downstream effects on the Seller (notification, fulfillment queue) — so its `Persona Constraints` block has entries for both personas, and the top-level `Cross-Feature Interactions` map records the persona-crossing edge.
 
 ```markdown
 ## Feature: Checkout
@@ -274,10 +315,13 @@ States: empty-cart (initial), cart-review, entering-shipping, confirming, proces
 5. Order succeeds. Sees: confirmation page with order ID, estimated delivery date, "A confirmation email has been sent to {email}." Can: click "Continue Shopping" or view order in account.
 
 ### Persona Constraints
-- Persona: time-poor buyer who scans, doesn't read (ux-research.md)
-- Constraint: checkout must complete in 3 steps — competitors average 5+ steps, research shows each additional step loses ~10% of users (feature-intel.md)
-- Constraint: show progress indicator at top of each step — persona abandons flows without visible progress (ux-research.md)
-- Constraint: real-time discount validation — competitors require page reload, this is a key differentiator (feature-intel.md)
+- Persona: Buyer (primary) — time-poor, scans, doesn't read [ux-research.md]
+  Constraint: checkout must complete in 3 steps — competitors average 5+ steps; research shows each additional step loses ~10% of users [feature-intel.md]
+  Constraint: show progress indicator at top of each step — persona abandons flows without visible progress [ux-research.md]
+  Constraint: real-time discount validation — competitors require page reload, this is a key differentiator [feature-intel.md]
+- Persona: Seller — needs immediate visibility into incoming orders to plan fulfillment [ux-research.md]
+  Constraint: order notification fires within 60s of buyer's `processing → completed` transition — sellers in interviews reported losing time-sensitive orders to faster-notifying competitors [ux-research.md]
+  Constraint: order payload to seller includes buyer-supplied notes verbatim (no truncation) — fulfillment errors traced to truncated notes in v0 research [ux-research.md]
 
 ### Empty/Loading/Error States
 - Empty cart: "Your cart is empty. Browse our products to find something you'll love." CTA: "Start Shopping" button linking to product catalog.

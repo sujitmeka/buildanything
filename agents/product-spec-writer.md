@@ -19,7 +19,7 @@ This agent requires no external skills. It operates from its system prompt + the
 
 Before writing, read ALL of these via your Read tool:
 
-1. `docs/plans/design-doc.md` — feature list, persona, JTBD, value prop, scope, tech stack, data model shape
+1. `docs/plans/design-doc.md` — feature list, personas (plural — expect a table from `ux-research.md`), JTBD per persona, value prop, scope, tech stack, data model shape
 2. `docs/plans/phase1-scratch/findings-digest.md` — research synthesis
 3. `docs/plans/phase1-scratch/ux-research.md` — behavioral patterns, pain points
 4. `docs/plans/phase1-scratch/feature-intel.md` — competitive matrix, table-stakes vs differentiators
@@ -59,7 +59,15 @@ Why fifth: Business rules constrain the happy path. You need to know the rules b
 
 **6. HAPPY PATH** — Numbered steps. Each step states: what the user sees, what they can do, what happens when they act. This comes after states, transitions, data, failures, AND business rules — because the happy path only makes sense in the context of the full state space and the rules that govern it.
 
-**7. PERSONA CONSTRAINTS** — Which persona(s) this feature serves and what research findings shaped its design. Cite specific findings from `ux-research.md` and `feature-intel.md`. This grounds the spec in the research — without it, the feature is generic.
+**7. PERSONA CONSTRAINTS** — Which personas this feature serves and what research findings shaped its design for each. Cite specific findings from `ux-research.md` and `feature-intel.md`. This grounds the spec in the research — without it, the feature is generic.
+
+Multi-persona discipline:
+- Read the Persona Enumeration section of `ux-research.md` — it lists every persona with name, role, JTBD, relationship, and `is_primary` flag.
+- Reproduce ALL personas in the App Overview persona table (Part 2 of `## App Overview`). One row per persona. Flag the primary.
+- For every feature, attribute every persona constraint to a specific persona by name. Persona names in feature blocks must match the App Overview table verbatim.
+- For features that visibly involve multiple user types (e.g. order placement in a marketplace touches both Buyer and Seller; messaging touches sender and recipient; admin moderation touches reporter, reported user, and admin), write a constraint block per persona.
+- Drift detection — fail loud: if `ux-research.md` lists multiple personas but `design-doc.md` only mentions one, STOP. Do not silently collapse the personas. Either flag with `[DECISION NEEDED: design-doc.md mentions only persona X but ux-research.md lists [Y, Z] — should the spec serve all three or scope down?]`, or surface it directly to the user. This is a high-signal drift indicator that earlier phases lost personas.
+- Self-check: if you find yourself listing only one persona for a feature that visibly involves multiple user types, STOP and re-read `ux-research.md`. You are probably missing a persona.
 
 **8. EMPTY/ZERO STATES** — What the user sees when there's no data yet. Specific copy. Specific call-to-action guiding toward the first action.
 

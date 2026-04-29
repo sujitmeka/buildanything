@@ -87,9 +87,34 @@ Otherwise this agent operates from its system prompt alone. UX research methodol
 **Analysis Plan**: [How we'll process and synthesize findings]
 ```
 
-### User Persona Template
+### User Personas Template (Multi-Persona Required)
+
+**Default expectation: 2-4 personas for any non-trivial product.** Real apps almost always serve multiple distinct user types (marketplace = buyer + seller, B2B SaaS = end-user + admin + approver, consumer apps = power user + casual user). Producing a single persona is allowed only for genuinely single-user products (e.g. a solo developer CLI tool) and must be justified inline.
+
+**If you find yourself writing only one persona, you are probably wrong.** Ask: who else interacts with this product? Who configures it? Who approves? Who reviews output? Who pays? Who administers it? Who consumes what it produces? These are often distinct personas. List them.
+
+Enumerate every distinct user type. For each, fill out the structured fields below. Exactly one persona must be flagged `is_primary: true` -- the persona whose flow most defines the product. The others are secondary but **NOT optional**.
+
 ```markdown
-# User Persona: [Persona Name]
+# User Personas
+
+## Persona Enumeration
+1. [Persona A name] -- role: [buyer | seller | end-user | admin | approver | viewer | ...] -- is_primary: true
+2. [Persona B name] -- role: [...] -- is_primary: false
+3. [Persona C name] -- role: [...] -- is_primary: false
+(... add every distinct user type ...)
+
+> If only one persona is listed, justify here why this product genuinely has no other user type (no admin, no approver, no counterparty, no consumer of output).
+
+---
+
+# Persona: [Persona Name]
+**role**: [buyer | seller | end-user | admin | approver | viewer | ...]
+**is_primary**: [true | false]
+**relationship_to_other_personas**: [e.g. "buyer transacts with seller", "admin manages end-users", "approver reviews submissions from end-user"]
+**primary_jobs_to_be_done**: [Core jobs this persona hires the product for]
+**behavioral_barriers**: [What stops them from succeeding -- habits, fears, friction]
+**current_alternatives**: [What they use today instead -- competitors, spreadsheets, manual workflows]
 
 ## Demographics & Context
 **Age Range**: [Age demographics]
@@ -123,6 +148,68 @@ Otherwise this agent operates from its system prompt alone. UX research methodol
 > "[Quote expressing goals or needs]"
 
 **Research Evidence**: Based on [X] interviews, [Y] survey responses, [Z] behavioral data points
+
+---
+(Repeat the Persona block above for every persona in the enumeration.)
+```
+
+### Worked Examples -- Multi-Persona Output
+
+**Example 1: Marketplace product (buyer + seller)**
+
+```markdown
+## Persona Enumeration
+1. Maya the Buyer -- role: buyer -- is_primary: true
+2. Sam the Seller -- role: seller -- is_primary: false
+
+# Persona: Maya the Buyer
+**role**: buyer
+**is_primary**: true
+**relationship_to_other_personas**: Transacts with sellers; depends on seller-supplied listings and reviews to decide.
+**primary_jobs_to_be_done**: Find a trustworthy item at a fair price quickly; avoid getting scammed.
+**behavioral_barriers**: Distrust of unknown sellers; fear of payment fraud; decision fatigue from too many similar listings.
+**current_alternatives**: Amazon, Facebook Marketplace, asking friends.
+
+# Persona: Sam the Seller
+**role**: seller
+**is_primary**: false
+**relationship_to_other_personas**: Supplies inventory consumed by buyers; reputation depends on buyer reviews.
+**primary_jobs_to_be_done**: List inventory in under 2 minutes; reach buyers without paying for ads; get paid reliably.
+**behavioral_barriers**: Hates writing listing copy; suspicious of platform fees; worries about chargebacks.
+**current_alternatives**: eBay, Shopify, Instagram DMs.
+```
+
+**Example 2: B2B SaaS expense tool (end-user + admin + approver)**
+
+```markdown
+## Persona Enumeration
+1. Elena the Employee -- role: end-user -- is_primary: true
+2. Aaron the Admin -- role: admin -- is_primary: false
+3. Priya the Approver -- role: approver -- is_primary: false
+
+# Persona: Elena the Employee
+**role**: end-user
+**is_primary**: true
+**relationship_to_other_personas**: Submits expenses to approver; subject to policies set by admin.
+**primary_jobs_to_be_done**: Submit a receipt in under 30 seconds and get reimbursed without follow-up emails.
+**behavioral_barriers**: Forgets to file expenses promptly; loses paper receipts; doesn't read policy docs.
+**current_alternatives**: Concur, emailing receipts to finance, expense spreadsheets.
+
+# Persona: Aaron the Admin
+**role**: admin
+**is_primary**: false
+**relationship_to_other_personas**: Configures policies that constrain end-users; defines approval routing for approvers.
+**primary_jobs_to_be_done**: Set per-team budgets and policies; audit spend; integrate with the accounting system.
+**behavioral_barriers**: Fears misconfiguring policy and breaking employee workflows; needs a clear audit trail.
+**current_alternatives**: Concur admin console, Excel + accounting export scripts.
+
+# Persona: Priya the Approver
+**role**: approver
+**is_primary**: false
+**relationship_to_other_personas**: Reviews submissions from end-users; bound by policies authored by admin.
+**primary_jobs_to_be_done**: Approve or reject 20+ expenses per week in batch with confidence; flag anomalies fast.
+**behavioral_barriers**: Approves blindly under time pressure; can't tell which items violate policy without clicking each.
+**current_alternatives**: Concur approver inbox, Slack DMs from team, manual policy lookup.
 ```
 
 ### Usability Testing Protocol
@@ -217,11 +304,17 @@ Otherwise this agent operates from its system prompt alone. UX research methodol
 ## 👥 User Insights
 
 ### User Personas
-**Primary Persona**: [Name and key characteristics]
-- Demographics: [Age, role, context]
-- Goals: [Primary and secondary objectives]
-- Pain Points: [Major frustrations and barriers]
-- Behaviors: [Usage patterns and preferences]
+**Persona Enumeration**: numbered list of every distinct user type (default 2-4; if only one, justify inline why no other persona exists).
+
+For each persona, output the full structured block per the User Personas Template above:
+- `name`, `role` (buyer | seller | end-user | admin | approver | viewer | ...), `is_primary` (exactly one persona = true)
+- `relationship_to_other_personas` -- how this persona connects to the others (transacts with, manages, approves for, etc.)
+- `primary_jobs_to_be_done`
+- `behavioral_barriers`
+- `current_alternatives`
+- Plus demographics, behavioral patterns, goals, context of use, and quotes.
+
+Secondary personas are NOT optional. A marketplace must enumerate buyer AND seller. A B2B tool must enumerate end-user AND admin AND (where applicable) approver.
 
 ### User Journey Mapping
 **Current State**: [How users currently accomplish goals]
