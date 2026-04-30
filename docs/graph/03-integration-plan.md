@@ -275,7 +275,7 @@ Recommended: **scoped extraction**, not all images. Graphify already ships nativ
 
 ### Cost
 
-≈100-150 images/build × ~1.5K tokens vision extraction = **~200K tokens/build**. ~5% of post-graph total. Worth it for the four query patterns it unlocks (brand drift, reference retrieval, evidence routing, did-we-ship-the-design).
+≈100-150 images/build × ~1.5K tokens per multimodal subagent dispatch = **~200K tokens/build**. ~5% of post-graph total. Worth it for the four query patterns it unlocks (brand drift, reference retrieval, evidence routing, did-we-ship-the-design). Inside Claude Code the subagent inherits the user's Claude OAuth via the Agent tool — no separate API integration needed; subagent token usage bills the user's Claude credits the same as a direct API call.
 
 ### Cache
 

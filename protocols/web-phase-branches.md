@@ -94,6 +94,16 @@ Call the Agent tool 2 times in one message:
 
 Output: `docs/plans/design-references.md` — reference paths grouped by DNA axis, ready to feed Step 3.2 component mapping and Step 3.6 critic scoring.
 
+#### Step 3.1.idx — Design references graph index
+
+After both `visual-research` agents return and `docs/plans/design-references/` is populated with screenshots, index the directory into the build graph as Slice 5 reference fragments. Best-effort, BO falls back to file reads on failure.
+
+Run via the Bash tool:
+
+- Command: `node ${CLAUDE_PLUGIN_ROOT}/bin/graph-index.js docs/plans/design-references/`
+- On exit 0: log success to `docs/plans/build-log.md` and continue.
+- On non-zero exit: log a warning line to `docs/plans/build-log.md` (`graph-index design-references/ failed — continuing with file-read fallback`) and continue. The graph never blocks builds.
+
 ### Step 3.2 — Component Library Mapping (single agent, HARD-GATE source)
 
 This is the compositional step. The Visual Designer picks specific library component variants for every slot the product needs, using the static DNA→variant catalog as its source of truth. The output is a locked manifest that Phase 4 implementers MUST import from.
@@ -147,6 +157,16 @@ NOTE: The visual design spec (exact spacing values, typography ramp) does not ex
 
 Output: `docs/plans/ux-architecture.md` + `docs/plans/page-specs/*.md`.
 
+#### Step 3.3.idx — Page-specs graph index
+
+After `design-ux-architect` returns and `docs/plans/page-specs/` is populated with one .md file per screen, index the directory into the build graph. Slice 3 graph index — best-effort, BO falls back to file reads on failure.
+
+Run via the Bash tool:
+
+- Command: `node ${CLAUDE_PLUGIN_ROOT}/bin/graph-index.js docs/plans/page-specs/`
+- On exit 0: log success to `docs/plans/build-log.md` and continue.
+- On non-zero exit: log a warning line to `docs/plans/build-log.md` (`graph-index page-specs/ failed — continuing with file-read fallback`) and continue. The graph never blocks builds.
+
 ### Step 3.3b — UX Flow Validation
 
 Validate the UX architecture against the target persona's actual goals and jobs-to-be-done before the Visual Design Spec is built on top of it.
@@ -178,6 +198,16 @@ Call the Agent tool once:
 Every token, parameter, and rule must be derivable from the DNA card plus the design references. Cite the reference path for every non-obvious choice."
 
 Output: `DESIGN.md` — substantially richer than the prior one-layer spec.
+
+#### Step 3.4.idx — DESIGN.md Pass 2 token re-index
+
+After `design-ui-designer` completes Pass 2 of `DESIGN.md` (YAML front matter + Pass 2 prose sections populated), re-run the indexer on DESIGN.md. The CLI dispatch detects Pass 2 content and writes `slice-3-tokens.json` alongside the existing `slice-2-dna.json` (which is also overwritten with the latest Pass 1 state for consistency).
+
+Run via the Bash tool:
+
+- Command: `node ${CLAUDE_PLUGIN_ROOT}/bin/graph-index.js DESIGN.md`
+- On exit 0: log success to `docs/plans/build-log.md` and continue.
+- On non-zero exit: log a warning line to `docs/plans/build-log.md` (`graph-index DESIGN.md (Pass 2) failed — continuing with file-read fallback`) and continue.
 
 ### Step 3.5 — Inclusive Visuals Check (single agent)
 
@@ -343,7 +373,17 @@ Exceeding the budget by >25% auto-blocks the Phase 6 LRR SRE chapter. Budget vio
 
 5. Description: "UX quality audit" — subagent_type: `design-ux-researcher` — Prompt: "[CONTEXT header above — phase: 5] UX quality review of every user-facing page. NFR targets: Read `docs/plans/quality-targets.json` via your Read tool for accessibility and UX thresholds. First, screenshot the living style guide at /design-system as your reference for how components should look. Then review every product page and check: loading states (every async action must show a loading indicator), error states (every form and API call must show user-friendly error feedback), empty states (every list/table must handle zero items gracefully), mobile responsiveness (test at 375px viewport — touch targets >= 44px, no horizontal scroll, readable text), form validation (inline feedback, not just alert()), transition smoothness (no layout shifts, no janky animations), visual consistency (compare each page's components against the style guide — buttons, inputs, cards, colors, spacing should match). Report issues with page, severity, and screenshot."
 
-6. Description: "Brand Guardian drift check" — subagent_type: `design-brand-guardian` — Prompt: "[CONTEXT header above — phase: 5] You are the Phase 5 drift check (proposed state §5 re-invite). Read `DESIGN.md` (the DNA card locked at Phase 3.0) + the actually-built pages via Playwright screenshots under `docs/plans/evidence/`. Score whether Phase 4 implementers stayed true to the DNA or drifted away from it. Specifically check each of the 6 DNA axes (Scope / Density / Character / Material / Motion / Type) against what the built product actually renders. Report drift count and specific elements (file:line references). Save findings to `docs/plans/evidence/brand-drift.md`. This is a drift check only — the Phase 6 LRR Brand Guardian chapter does the verdict. You do NOT issue a pass/fail here, only surface findings for the LRR chapter to read."
+6. Description: "Brand Guardian drift check" — subagent_type: `design-brand-guardian` — Prompt: "[CONTEXT header above — phase: 5] You are the Phase 5 drift check (proposed state §5 re-invite). Read `DESIGN.md` (the DNA card locked at Phase 3.0) + the actually-built pages via Playwright screenshots under `docs/plans/evidence/brand-drift/` (write production screenshots there as PNG/JPG files, one per page audited, named `<screen-id>.png`). Score whether Phase 4 implementers stayed true to the DNA or drifted away from it. Specifically check each of the 6 DNA axes (Scope / Density / Character / Material / Motion / Type) against what the built product actually renders. Report drift count and specific elements (file:line references). Save findings to `docs/plans/evidence/brand-drift.md`. This is a drift check only — the Phase 6 LRR Brand Guardian chapter does the verdict. You do NOT issue a pass/fail here, only surface findings for the LRR chapter to read."
+
+#### Step 5.1.idx — Brand drift screenshots graph index
+
+After `design-brand-guardian` returns and `docs/plans/evidence/brand-drift/` is populated with production screenshots, index the directory into the build graph as Slice 5 brand-drift fragments. Best-effort, the LRR Brand chapter falls back to direct file reads on failure.
+
+Run via the Bash tool:
+
+- Command: `node ${CLAUDE_PLUGIN_ROOT}/bin/graph-index.js docs/plans/evidence/brand-drift/`
+- On exit 0: log success to `docs/plans/build-log.md` and continue.
+- On non-zero exit: log a warning line to `docs/plans/build-log.md` (`graph-index evidence/brand-drift/ failed — continuing with file-read fallback`) and continue. The graph never blocks builds.
 
 ### Step 5.2 — Eval Harness
 
@@ -422,9 +462,19 @@ Run the agent-browser dogfood skill against the running app. Unlike the per-task
 
 Start the dev server if not running. Then invoke the dogfood skill:
 
-Call the Agent tool — description: "Dogfood the app" — subagent_type: `testing-evidence-collector` — mode: "bypassPermissions" — prompt: "[CONTEXT header above — phase: 5] Run the agent-browser dogfood skill against the running app at http://localhost:[port]. Explore every reachable page. Click every button. Fill every form. Check console for errors. Report a structured list of issues with severity ratings (critical/high/medium/low), screenshots, and repro steps. If dogfood skill is not available, use agent-browser manually: snapshot each page, click all interactive elements, check errors and network requests. Also evaluate UX quality: missing loading states, poor error messages, broken mobile layouts (resize to 375px), visual inconsistencies, missing empty states, form validation gaps. Report UX issues separately from functional issues."
+Call the Agent tool — description: "Dogfood the app" — subagent_type: `testing-evidence-collector` — mode: "bypassPermissions" — prompt: "[CONTEXT header above — phase: 5] Run the agent-browser dogfood skill against the running app at http://localhost:[port]. Explore every reachable page. Click every button. Fill every form. Check console for errors. Report a structured list of issues with severity ratings (critical/high/medium/low), screenshots, and repro steps. Save screenshots under `docs/plans/evidence/dogfood/` (one PNG/JPG per finding, named after the finding_id), and emit `docs/plans/evidence/dogfood/findings.json` (machine-readable mirror of findings.md — schema: `[{finding_id, severity, description, screenshot_path, affected_screen_id}, ...]` per agents/testing-evidence-collector.md "Dogfood Evidence Outputs") so the Slice 5 indexer can wire `screenshot_evidences_finding` edges. If dogfood skill is not available, use agent-browser manually: snapshot each page, click all interactive elements, check errors and network requests. Also evaluate UX quality: missing loading states, poor error messages, broken mobile layouts (resize to 375px), visual inconsistencies, missing empty states, form validation gaps. Report UX issues separately from functional issues."
 
 Classification and fix-routing of Dogfood findings is handled by the Feedback Synthesizer at `commands/build.md` Phase 5 Step 5.4 — do NOT self-classify or spawn fix agents from this step.
+
+#### Step 5.5.idx — Dogfood evidence graph index
+
+After `testing-evidence-collector` returns and `docs/plans/evidence/dogfood/` is populated with finding screenshots, index the directory into the build graph as Slice 5 dogfood fragments. Best-effort, the feedback synthesizer falls back to file reads on failure. The indexer reads BOTH the screenshots in `evidence/dogfood/` AND the `findings.json` side-channel to wire `screenshot_evidences_finding` edges. Note: schema doc 11-slice5-schema.md §7 names this trigger "Step 5.3.idx" because the dogfood agent ran at Step 5.3 in the schema-time orchestration; in this file it follows Step 5.5.
+
+Run via the Bash tool:
+
+- Command: `node ${CLAUDE_PLUGIN_ROOT}/bin/graph-index.js docs/plans/evidence/dogfood/`
+- On exit 0: log success to `docs/plans/build-log.md` and continue.
+- On non-zero exit: log a warning line to `docs/plans/build-log.md` (`graph-index evidence/dogfood/ failed — continuing with file-read fallback`) and continue. The graph never blocks builds.
 
 ### Step 5.6 — Fake Data Detector
 

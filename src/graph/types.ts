@@ -28,7 +28,18 @@ export type EntityType =
   | "wireframe_section"
   | "screen_state_slot"
   | "screen_component_use"
-  | "key_copy";
+  | "key_copy"
+  // Slice 4 additions. Source of truth: docs/graph/09-slice4-schema.md.
+  | "architecture_module"
+  | "api_contract"
+  | "data_model"
+  | "task"
+  | "decision"
+  // Slice 5 additions. Source of truth: docs/graph/11-slice5-schema.md.
+  | "screenshot"
+  | "image_component_detection"
+  | "dogfood_finding"
+  | "brand_drift_observation";
 
 export type Relation =
   | "has_screen"
@@ -57,7 +68,26 @@ export type Relation =
   | "slot_used_on_screen"
   | "screen_uses_token"
   | "token_derived_from"
-  | "key_copy_on_screen";
+  | "key_copy_on_screen"
+  // Slice 4 additions. Source of truth: docs/graph/09-slice4-schema.md.
+  | "module_has_contract"
+  | "module_has_data_model"
+  | "task_implements_feature"
+  | "task_touches_screen"
+  | "task_depends_on"
+  | "feature_provides_endpoint"
+  | "feature_consumes_endpoint"
+  | "decision_supersedes"
+  | "decision_relates_to"
+  | "decision_drove"
+  // Slice 5 additions. Source of truth: docs/graph/11-slice5-schema.md.
+  | "references_axis_image"
+  | "screenshot_depicts_screen"
+  | "screenshot_evidences_finding"
+  | "image_has_component_detection"
+  | "prod_drifts_from_reference_prod"
+  | "prod_drifts_from_reference_ref"
+  | "similar_to_image";
 
 export interface NodeBase {
   id: string;
@@ -232,6 +262,102 @@ export interface KeyCopyNode extends NodeBase {
   placement: string;
 }
 
+// Slice 4 additions. Source of truth: docs/graph/09-slice4-schema.md.
+
+export interface ArchitectureModuleNode extends NodeBase {
+  entity_type: "architecture_module";
+  name: string;
+  description: string;
+  responsibilities: string[];
+  tech_stack: string[];
+}
+
+export interface ApiContractNode extends NodeBase {
+  entity_type: "api_contract";
+  endpoint: string; // e.g. "POST /api/orders"
+  module_id: string; // FK
+  request_schema: string; // JSON-string blob
+  response_schema: string; // JSON-string blob
+  auth_required: boolean;
+  error_codes: string[];
+}
+
+export interface DataModelNode extends NodeBase {
+  entity_type: "data_model";
+  entity_name: string;
+  module_id: string;
+  fields: string[]; // "name:type" pairs
+  indexes: string[];
+}
+
+export interface TaskNode extends NodeBase {
+  entity_type: "task";
+  task_id: string; // e.g. "T-1"
+  title: string;
+  size: "S" | "M" | "L";
+  behavioral_test: string;
+  assigned_phase: string;
+  feature_id: string | null;
+  screen_ids: string[];
+  owns_files: string[];
+}
+
+export interface DecisionNode extends NodeBase {
+  entity_type: "decision";
+  decision_id: string;
+  summary: string;
+  decided_by: string; // verbatim from JSONL — could be "code-architect", "human", etc.
+  related_decision_id: string | null;
+  revisit_criterion: string | null;
+  status: "open" | "triggered" | "resolved";
+  phase: string;
+  step_id: string | null;
+}
+
+// Slice 5 additions. Source of truth: docs/graph/11-slice5-schema.md.
+
+export interface ScreenshotNode extends NodeBase {
+  entity_type: "screenshot";
+  image_path: string;
+  image_class: "reference" | "brand_drift" | "dogfood";
+  caption: string;
+  perceptual_hash: string; // 64-bit dHash as 16-char hex
+  dominant_palette: string[]; // up to 5 hex colors
+  image_dimensions: string; // e.g. "1280x720"
+  dna_axis_tags: string[]; // axes this image exemplifies
+  linked_screen_id: string | null;
+  linked_finding_id: string | null;
+}
+
+export interface ImageComponentDetectionNode extends NodeBase {
+  entity_type: "image_component_detection";
+  screenshot_id: string;
+  component_label: string;
+  bounding_box: string | null;
+  // Vision-model detection probability (0-1). Renamed from `confidence` to avoid collision
+  // with NodeBase.confidence (EXTRACTED/INFERRED/AMBIGUOUS extraction-confidence vocabulary).
+  detection_confidence: number | null;
+}
+
+export interface DogfoodFindingNode extends NodeBase {
+  entity_type: "dogfood_finding";
+  finding_id: string;
+  severity: "critical" | "major" | "minor";
+  description: string;
+  screenshot_id: string;
+  affected_screen_id: string | null;
+}
+
+export interface BrandDriftObservationNode extends NodeBase {
+  entity_type: "brand_drift_observation";
+  observation_id: string;
+  prod_screenshot_id: string;
+  reference_screenshot_id: string;
+  axis: "scope" | "density" | "character" | "material" | "motion" | "type" | "copy";
+  score: number;
+  verdict: "drift" | "ok" | "needs-review";
+}
+
 export type GraphNode =
   | PersonaNode
   | FeatureNode
@@ -253,7 +379,16 @@ export type GraphNode =
   | WireframeSectionNode
   | ScreenStateSlotNode
   | ScreenComponentUseNode
-  | KeyCopyNode;
+  | KeyCopyNode
+  | ArchitectureModuleNode
+  | ApiContractNode
+  | DataModelNode
+  | TaskNode
+  | DecisionNode
+  | ScreenshotNode
+  | ImageComponentDetectionNode
+  | DogfoodFindingNode
+  | BrandDriftObservationNode;
 
 export interface GraphEdge {
   source: string;
@@ -266,7 +401,12 @@ export interface GraphEdge {
   produced_at_step?: string; // forward-compat — Slice 1 sets "1.6"
 }
 
-export type Schema = "buildanything-slice-1" | "buildanything-slice-2" | "buildanything-slice-3";
+export type Schema =
+  | "buildanything-slice-1"
+  | "buildanything-slice-2"
+  | "buildanything-slice-3"
+  | "buildanything-slice-4"
+  | "buildanything-slice-5";
 
 export interface GraphFragment {
   version: 1;

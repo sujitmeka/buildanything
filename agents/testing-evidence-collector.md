@@ -109,3 +109,25 @@ Production Readiness: FAILED / NEEDS WORK / READY (default to FAILED)
 Status: FAILED (default unless overwhelming evidence otherwise)
 Re-test Required: YES
 ```
+
+## Dogfood Evidence Outputs (Step 5.5)
+
+When dispatched for autonomous dogfooding (Phase 5 Step 5.5), write three artifact groups under `docs/plans/evidence/dogfood/`:
+
+1. Screenshots — one PNG/JPG per finding, named after the `finding_id` (e.g. `DF-001.png`).
+2. `findings.md` — human-readable report with severity, description, repro steps, screenshot references.
+3. `findings.json` — machine-readable mirror of `findings.md` for graph indexing (Step 5.5.idx). Schema:
+
+```json
+[
+  {
+    "finding_id": "DF-001",
+    "severity": "critical" | "major" | "minor",
+    "description": "User cannot complete checkout — Submit button unresponsive on Safari iOS",
+    "screenshot_path": "evidence/dogfood/checkout-submit-broken.png",
+    "affected_screen_id": "screen__checkout"
+  }
+]
+```
+
+Each finding gets a stable `finding_id` (`DF-001`, `DF-002`, …). `screenshot_path` is relative to project root and must point to an existing file in `evidence/dogfood/`. `affected_screen_id` matches a screen ID from the Slice 1 graph (`screen__<kebab>`); set null if the finding is not screen-specific. Both `findings.md` and `findings.json` are required — the Slice 5 indexer reads `findings.json` to wire `screenshot_evidences_finding` edges.

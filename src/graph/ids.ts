@@ -70,4 +70,17 @@ export const ids = {
     `screen_component_use__${kebab(screenName)}__${kebab(slot)}__${kebab(position)}`,
   keyCopy: (screenName: string, text: string): string =>
     `key_copy__${kebab(screenName)}__${sha256_8(text)}`,
+  // Slice 4 additions. Source of truth: docs/graph/09-slice4-schema.md.
+  architectureModule: (name: string): string => `module__${kebab(name)}`,
+  apiContract: (endpoint: string): string => `api_contract__${kebab(endpoint)}`,
+  dataModel: (entityName: string): string => `data_model__${kebab(entityName)}`,
+  task: (taskId: string): string => `task__${kebab(taskId)}`,
+  decision: (decisionId: string): string => `decision__${kebab(decisionId)}`,
+  // Slice 5 additions. Source of truth: docs/graph/11-slice5-schema.md.
+  screenshot: (basenameKebab: string, contentSha256First8: string): string =>
+    `screenshot__${basenameKebab}__${contentSha256First8}`,
+  imageComponentDetection: (screenshotId: string, label: string, order: number): string =>
+    `image_component_detection__${screenshotId.replace(/^screenshot__/, "")}__${kebab(label)}__${order}`,
+  dogfoodFinding: (findingId: string): string => `dogfood_finding__${kebab(findingId)}`,
+  brandDriftObservation: (observationId: string): string => `brand_drift_observation__${kebab(observationId)}`,
 };

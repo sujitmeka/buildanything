@@ -628,6 +628,36 @@ For each doc, extract section anchors into a flat index. Schema: `[{\"anchor\": 
 
 **Architecture Metric Loop (callable service):** Run the Metric Loop Protocol (`protocols/metric-loop.md`) on `architecture.md`. Define a metric: coverage of PRD requirements, specificity, consistency across the 6 architects, and **simplicity** — is this the simplest architecture that meets the requirements? Could any service, abstraction, or dependency be eliminated? Penalize over-engineering. Max 3 iterations.
 
+#### Step 2.3.1.idx — Architecture graph index
+
+After `code-architect` returns from the Implementation Blueprint dispatch (#1 above) AND the Architecture Metric Loop exits with `architecture.md` on disk, index it into the build graph. Slice 4 graph index — best-effort, downstream consumers fall back to file reads on failure.
+
+Run via the Bash tool:
+
+- Command: `node ${CLAUDE_PLUGIN_ROOT}/bin/graph-index.js docs/plans/architecture.md`
+- On exit 0: log success to `docs/plans/build-log.md` and continue.
+- On non-zero exit: log a warning line to `docs/plans/build-log.md` (`graph-index architecture.md failed — continuing with file-read fallback`) and continue. The graph never blocks builds.
+
+#### Step 2.3.2.idx — Sprint tasks graph index
+
+After `planner` returns from the Sprint Breakdown dispatch (#2 above) AND the Task DAG Validator (#3 above) returns PASS, index `sprint-tasks.md` into the build graph. Slice 4 graph index — best-effort.
+
+Run via the Bash tool:
+
+- Command: `node ${CLAUDE_PLUGIN_ROOT}/bin/graph-index.js docs/plans/sprint-tasks.md`
+- On exit 0: log success to `docs/plans/build-log.md` and continue.
+- On non-zero exit: log a warning line to `docs/plans/build-log.md` (`graph-index sprint-tasks.md failed — continuing with file-read fallback`) and continue.
+
+#### Step 2.3.4.idx — Decisions re-index (end of Phase 2)
+
+After the four Step 2.3 dispatches complete and the orchestrator finishes routing the 4 Phase 2 `deviation_row` objects through `scribe_decision`, re-index `decisions.jsonl` so the Slice 4 fragment reflects every Phase 2 decision before the LRR aggregator or feedback synthesizer can read it. Skip silently if `docs/plans/decisions.jsonl` does not exist (no decisions written yet).
+
+Run via the Bash tool:
+
+- Command: `node ${CLAUDE_PLUGIN_ROOT}/bin/graph-index.js docs/plans/decisions.jsonl`
+- On exit 0: log success to `docs/plans/build-log.md` and continue.
+- On non-zero exit: log a warning line to `docs/plans/build-log.md` (`graph-index decisions.jsonl failed — continuing with file-read fallback`) and continue.
+
 **Architecture decisions:** The Implementation Blueprint synthesizer returns 4 `deviation_row` objects (or a `phase_2_decisions` array of row objects) in its structured result — one per cross-cutting Phase 2 decision (API contract, persistence layer, auth model, framework choice). The orchestrator forwards each row through the `scribe_decision` MCP tool (see Phase 4 "Orchestrator-scribe dispatch"); the MCP allocates `D-2-<seq>` IDs and atomically appends to `docs/plans/decisions.jsonl`. Author = `architect`. Each row carries a `ref` anchor pointing into `architecture.md` per `protocols/decision-log.md`. Total: 4 rows.
 
 **Writes:** `docs/plans/architecture.md`, `docs/plans/sprint-tasks.md`, `docs/plans/quality-targets.json`, `docs/plans/refs.json`. Decision rows (4) flow through the orchestrator's `scribe_decision` MCP calls.
@@ -848,6 +878,16 @@ After all features in the current wave are ACCEPTED:
 
 After all waves complete, Phase 4 is done.
 
+#### Step 4.4.idx — Decisions re-index (end of wave)
+
+After each wave's deviation rows have been routed through `scribe_decision` (per the Orchestrator-scribe dispatch below), re-index `decisions.jsonl` so the Slice 4 fragment reflects every wave-level decision before the next wave's BOs query open decisions. Skip silently if `docs/plans/decisions.jsonl` does not exist.
+
+Run via the Bash tool:
+
+- Command: `node ${CLAUDE_PLUGIN_ROOT}/bin/graph-index.js docs/plans/decisions.jsonl`
+- On exit 0: log success to `docs/plans/build-log.md` and continue.
+- On non-zero exit: log a warning line to `docs/plans/build-log.md` (`graph-index decisions.jsonl failed — continuing with file-read fallback`) and continue.
+
 **Writes:** source code, `docs/plans/.task-outputs/`, `docs/plans/feature-delegation-plan.json`, `docs/plans/feature-briefs/*.md`. Deviation rows flow through the orchestrator's `scribe_decision` MCP calls.
 
 <HARD-GATE>
@@ -919,7 +959,7 @@ Call the Agent tool 3 times in one message:
 
 1. Description: "E2E runner" — INTERNAL inline role-string — mode: "bypassPermissions" — Prompt: "Run Playwright E2E test generation, execution, and stability check per `protocols/web-phase-branches.md` Phase 5 E2E steps (generate and run E2E tests for User Journeys, 3 mandatory iterations for flakiness detection). Report results + artifact paths. Records results to `docs/plans/evidence/e2e/iter-3-results.json`."
 
-2. Description: "Dogfood the app" — INTERNAL inline role-string + agent-browser skill — mode: "bypassPermissions" — Prompt: "You are the Dogfood runner. Run the agent-browser dogfood skill against the running app at http://localhost:[port]. Explore every reachable page. Click every button. Fill every form. Check console for errors. Report a structured list of issues with severity ratings, screenshots, repro steps. Write findings to `docs/plans/evidence/dogfood/findings.md`. Do NOT classify or route findings — that's the Feedback Synthesizer's job at Step 5.4."
+2. Description: "Dogfood the app" — INTERNAL inline role-string + agent-browser skill — mode: "bypassPermissions" — Prompt: "You are the Dogfood runner. Run the agent-browser dogfood skill against the running app at http://localhost:[port]. Explore every reachable page. Click every button. Fill every form. Check console for errors. Report a structured list of issues with severity ratings, screenshots, repro steps. Write findings to `docs/plans/evidence/dogfood/findings.md` AND a machine-readable mirror at `docs/plans/evidence/dogfood/findings.json` (schema: `[{finding_id, severity, description, screenshot_path, affected_screen_id}, ...]` per agents/testing-evidence-collector.md "Dogfood Evidence Outputs"). Do NOT classify or route findings — that's the Feedback Synthesizer's job at Step 5.4."
 
 3. Description: "Fake-data detector" — subagent_type: `fake-data-detector` — INTERNAL inline role-string — mode: "bypassPermissions" — Prompt: "Run the Fake Data Detector Protocol (`protocols/fake-data-detector.md`). Static analysis: grep for Math.random() in business data paths, hardcoded API responses, setTimeout faking async, placeholder text. Dynamic analysis: inspect HAR files from `docs/plans/evidence/` for missing real API calls, static responses, absent WebSocket traffic. Write findings to `docs/plans/evidence/fake-data-audit.md` with file:line refs and severity."
 
@@ -947,6 +987,16 @@ Output: `docs/plans/evidence/dogfood/classified-findings.json` with shape `[{fin
 **Goal**: 5 independent chapter judges + mechanical aggregator with file-completeness checkpoint + author-aware backward routing on BLOCK.
 
 Split from old Phase 6. Old 6.4 (Reality Check) and 6.5 (LRR) merged and restructured. Reality Checker keeps its evidence sweep role only — the combined verdict authority moved to the LRR Aggregator.
+
+#### Step 6.0.idx — Decisions re-index (pre-LRR backfill)
+
+Before dispatching the Reality Checker (Step 6.0) and the LRR chapter judges (Step 6.1), re-index `decisions.jsonl` so the Slice 4 fragment reflects any decisions appended since the last Phase 4 wave transition. The aggregator's backward-routing walk at Step 6.2 (the ⭐⭐ star rule) reads the indexed fragment via `graph_query_decisions` — running this once here catches any drift from hand-edits or out-of-band scribe writes. Skip silently if `docs/plans/decisions.jsonl` does not exist.
+
+Run via the Bash tool:
+
+- Command: `node ${CLAUDE_PLUGIN_ROOT}/bin/graph-index.js docs/plans/decisions.jsonl`
+- On exit 0: log success to `docs/plans/build-log.md` and continue.
+- On non-zero exit: log a warning line to `docs/plans/build-log.md` (`graph-index decisions.jsonl failed — continuing with file-read fallback`) and continue.
 
 ### Step 6.0 — Reality Check (evidence sweep + dissent log revisit pass)
 
