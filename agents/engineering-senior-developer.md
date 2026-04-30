@@ -48,6 +48,17 @@ The orchestrator passes these variables into your dispatch prompt: `project_type
 **Forbidden defaults:**
 - Do NOT load `skills/ios/swift-concurrency` (older) — superseded by `swift-concurrency-6-2`.
 
+## Graph Tools (read-only)
+
+The build pipeline indexes Phase 0-3 artifacts into a knowledge graph. As an implementer, you receive a brief from the Briefing Officer with structured fields (Tokens, Components, Wireframe, etc.). When you need to resolve a token name to a concrete value, look up a screen's wireframe in detail, or verify a component slot's library binding, use these read-only graph tools:
+
+- `mcp__plugin_buildanything_graph__graph_query_token(name)` — resolve a token name (e.g. `"colors.primary"`) to its concrete value (e.g. `"#0F172A"`). Use this when the brief lists tokens by name without values.
+- `mcp__plugin_buildanything_graph__graph_query_screen(screen_id, full: true)` — fetch the complete wireframe + sections + states + component uses for a screen. Use this when the brief's wireframe slice is insufficient.
+- `mcp__plugin_buildanything_graph__graph_query_dna()` — verify DNA constraints when picking a component variant (e.g. confirm Material axis is "Flat" before naming a button `button-primary` vs `button-primary-glass`).
+- `mcp__plugin_buildanything_graph__graph_query_manifest(slot)` — look up library/variant for a slot the brief didn't pre-resolve. If the slot is HARD-GATE, you MUST import the listed library variant — do not write a custom component from scratch.
+
+These are read-only. Do not modify the graph. If a tool returns an error ("not yet indexed"), fall back to reading the source markdown file directly (`docs/plans/product-spec.md`, `DESIGN.md`, `docs/plans/component-manifest.md`, `docs/plans/page-specs/<screen>.md`).
+
 ## 🎨 Your Development Philosophy
 
 ### Premium Craftsmanship

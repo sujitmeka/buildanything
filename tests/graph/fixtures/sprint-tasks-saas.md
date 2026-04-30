@@ -1,0 +1,11 @@
+| Task ID | Title | Size | Dependencies | Behavioral Test | Owns Files | Implementing Phase | Feature | Screen |
+|---------|-------|------|--------------|-----------------|------------|-------------------|---------|--------|
+| T-1 | Setup Auth0 integration | M | — | Verify that user can authenticate via Auth0 Universal Login and session persists across page reloads | src/auth/*.ts | phase-4-backend | Auth | — |
+| T-2 | Receipt upload API with multipart | M | T-1 | Verify that POST /api/receipts/upload accepts PDF, JPG, PNG, and HEIC files up to 10MB and returns thumbnail URL | src/api/receipts.ts | phase-4-backend | Expense Submission | — |
+| T-3 | Submit expense form UI | L | T-2 | Verify that user can drag-drop receipt files and form draft autosaves to localStorage every 5 seconds | src/routes/submit.tsx | phase-4-frontend | Expense Submission | Submit Expense |
+| T-4 | Policy validation engine | M | T-3 | Verify that policy violations show plain-language errors with specific dollar amounts and block submit until justified | src/lib/policy.ts | phase-4-backend | Expense Submission | — |
+| T-5 | Submit report API | M | T-3, T-4 | Verify that POST /api/reports creates report with status pending_approval and notifies approver within 2 minutes | src/api/reports.ts | phase-4-backend | Expense Submission | — |
+| T-6 | Approval queue UI | M | T-5 | Verify that approver sees pending reports sorted by urgency with policy flag count visible at queue level | src/routes/approvals.tsx | phase-4-frontend | Approval Workflow | Approval Queue |
+| T-7 | Approve/reject/request-changes actions API | L | T-6 | Verify that approve, reject, and request-changes each write individual audit log entries with full context within 30 seconds | src/api/approvals.ts | phase-4-backend | Approval Workflow | — |
+| T-8 | Audit log viewer | M | T-7 | Verify that admin audit log shows all approve, reject, and override events with actor name, timestamp, and prior state | src/routes/audit.tsx | phase-4-frontend | Approval Workflow | Admin Audit Log |
+| T-9 | My reports list | S | T-5 | Verify that end-user can see submitted reports with status badges and changes-requested reports show red badge with approver comment preview | src/routes/my-reports.tsx | phase-4-frontend | Expense Submission | My Reports |

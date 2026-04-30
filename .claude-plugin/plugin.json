@@ -23,6 +23,9 @@
   "mcpServers": {
     "orchestrator": {
       "command": "${CLAUDE_PLUGIN_ROOT}/bin/mcp-servers/orchestrator-mcp.js"
+    },
+    "graph": {
+      "command": "${CLAUDE_PLUGIN_ROOT}/bin/mcp-servers/graph-mcp.js"
     }
   }
 }

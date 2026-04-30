@@ -713,6 +713,17 @@ function main(): number {
       );
     }
 
+    // Maintainer-mode exemption: when no build phase is active, writes to
+    // protected prefixes are plugin-source edits by the user (or an agent
+    // acting on their behalf), not phase-agent runaway. Phase agents during
+    // a real build still default-deny — currentPhase is set whenever
+    // .build-state.json reflects an in-flight build.
+    if (!currentPhase) {
+      return applyLeaseDecision(
+        evaluateLease(taskId, leases, toolName, filePath, relCandidates),
+      );
+    }
+
     const denyPath = [...relCandidates].find((c) => isProtectedPath(c)) ?? filePath;
     const msg = `buildanything: writer-owner hook denied ${toolName} on ${denyPath} — path not in writer-owner table. Please add an entry to docs/migration/phase-graph.yaml or route the write through the scribe_decision MCP.`;
 
