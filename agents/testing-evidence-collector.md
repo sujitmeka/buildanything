@@ -112,13 +112,13 @@ Status: FAILED (default unless overwhelming evidence otherwise)
 Re-test Required: YES
 ```
 
-## Dogfood Evidence Outputs (Step 5.5)
+## Dogfood Evidence Outputs (Step 5.3b)
 
-When dispatched for autonomous dogfooding (Phase 5 Step 5.5), write three artifact groups under `docs/plans/evidence/dogfood/`:
+When dispatched for autonomous dogfooding (Phase 5 Step 5.3b), write three artifact groups under `docs/plans/evidence/dogfood/`:
 
 1. Screenshots — one PNG/JPG per finding, named after the `finding_id` (e.g. `DF-001.png`).
 2. `findings.md` — human-readable report with severity, description, repro steps, screenshot references.
-3. `findings.json` — machine-readable mirror of `findings.md` for graph indexing (Step 5.5.idx). Schema:
+3. `findings.json` — machine-readable mirror of `findings.md` for graph indexing (Step 5.3b.idx). Schema:
 
 ```json
 [
