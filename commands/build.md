@@ -513,13 +513,13 @@ This is the LAST step that reads raw research files. Every actionable insight mu
 
 #### Step 1.6.idx — Slice 1 graph index
 
-After `product-spec-writer` returns and `docs/plans/product-spec.md` is on disk, index it into the build graph. Slice 1 graph index — best-effort, BO falls back to file reads on failure.
+After `product-spec-writer` returns and `docs/plans/product-spec.md` is on disk, index it into the build graph. Slice 1 graph index — required for downstream agents.
 
 Run via the Bash tool:
 
 - Command: `node ${CLAUDE_PLUGIN_ROOT}/bin/graph-index.js docs/plans/product-spec.md`
 - On exit 0: log success to `docs/plans/build-log.md` and continue.
-- On non-zero exit: log a warning line to `docs/plans/build-log.md` (`graph-index failed — continuing with file-read fallback`) and continue. The graph never blocks builds.
+- On non-zero exit: STOP. Log the error to `docs/plans/build-log.md` and report the failure. Downstream agents (BO, PO, implementers) require the graph — do not proceed without a successful index.
 
 **Compaction checkpoint.** Update `.build-state.json` per the format above.
 
@@ -612,9 +612,9 @@ Four sequential dispatches.
 
 **CONTEXT header:** Reuse `rendered_context_header` from phase 2 (already rendered above). Prepend to Step 2.3 synthesizer + sprint-breakdown prompts.
 
-1. Description: "Implementation blueprint" — subagent_type: `code-architect` — Prompt: "[CONTEXT header above] Implementation blueprint. Read the PRD via your Read tool: `docs/plans/design-doc.md`. Read the product spec: `docs/plans/product-spec.md` (Screen Inventory + per-feature behavioral sections — your blueprint's file-and-build-order list must cover every feature in the spec). Read all 6 post-debate architect positions via your own Read tool from `docs/plans/phase-2-contracts/`:\n  - `backend-architect.md`\n  - `frontend-architect.md`\n  - `data-engineer.md`\n  - `security-engineer.md`\n  - `accessibility-auditor.md`\n  - `performance-benchmarker.md`\n\nThese files are the authoritative team positions AFTER any SendMessage-driven revisions — the architects already cross-checked each other's contract boundaries, so you can stitch without re-debating. Your job is to assemble the 6 positions into a coherent architecture. Where positions conflict OUTSIDE the 5 mandatory cross-check pairings, flag the contradiction explicitly in `architecture.md` under a `### Unresolved Tensions` section and pick the safer default. Do not silently absorb contradictions. Include specific files to create/modify, build sequence, dependency order. Write `docs/plans/architecture.md` with stable section anchors per `protocols/architecture-schema.md`. Required top-level sections: Overview, Frontend, Backend, Data Model, Security, Infrastructure, Scope, Out of Scope. Scope to the boundary from the PRD."
+1. Description: "Implementation blueprint" — subagent_type: `code-architect` — Prompt: "[CONTEXT header above] Implementation blueprint. Read the PRD via your Read tool: `docs/plans/design-doc.md`. Read the product spec: `docs/plans/product-spec.md` (Screen Inventory + per-feature behavioral sections — your blueprint's file-and-build-order list must cover every feature in the spec). Read all 6 post-debate architect positions via your own Read tool from `docs/plans/phase-2-contracts/`:\n  - `backend-architect.md`\n  - `frontend-architect.md`\n  - `data-engineer.md`\n  - `security-engineer.md`\n  - `accessibility-auditor.md`\n  - `performance-benchmarker.md`\n\nThese files are the authoritative team positions AFTER any SendMessage-driven revisions — the architects already cross-checked each other's contract boundaries, so you can stitch without re-debating. Your job is to assemble the 6 positions into a coherent architecture. Where positions conflict OUTSIDE the 5 mandatory cross-check pairings, flag the contradiction explicitly in `architecture.md` under a `### Unresolved Tensions` section and pick the safer default. Do not silently absorb contradictions. Include specific files to create/modify, build sequence, dependency order. Write `docs/plans/architecture.md` with stable section anchors per `protocols/architecture-schema.md`. Required top-level sections: Overview, Frontend, Backend, Data Model, Security, Infrastructure, Scope, Out of Scope. Scope to the boundary from the PRD. Every API endpoint heading in the Backend section MUST include feature attribution annotations — e.g. `**POST /api/orders** (provides: order-placement)` — using the feature kebab names from `product-spec.md`. These annotations are required for the graph indexer to emit cross-feature dependency edges."
 
-2. Description: "Sprint breakdown" — subagent_type: `planner` — Prompt: "[CONTEXT header above] Break this architecture into ordered, atomic tasks. Each task needs: description, acceptance criteria, **dependencies** (list of task IDs this depends on), size (S/M/L), **Behavioral Test** field for every UI task (concrete interaction: 'Navigate to [page], click [element], verify [outcome]') or curl-based acceptance test for API tasks. Read these files via your Read tool before starting:\n  - ARCHITECTURE: `docs/plans/architecture.md`\n  - PRODUCT SPEC: `docs/plans/product-spec.md` (per-feature behavioral sections — every feature in the spec must have at least one task, and per-feature acceptance criteria become Behavioral Test field values)\n  - PRD: `docs/plans/design-doc.md`\nSave to `docs/plans/sprint-tasks.md`. Dependencies field is load-bearing — Phase 4 uses it to batch independent tasks in parallel. Each task's Behavioral Test field SHOULD reference a specific feature acceptance criterion from the product spec (e.g., \"User can submit form with valid email; submitted form appears in admin dashboard within 5s\" — derived from product-spec.md's Happy Path or per-state criteria)."
+2. Description: "Sprint breakdown" — subagent_type: `planner` — Prompt: "[CONTEXT header above] Break this architecture into ordered, atomic tasks. Each task needs: description, acceptance criteria, **dependencies** (list of task IDs this depends on), size (S/M/L), **Behavioral Test** field for every UI task (concrete interaction: 'Navigate to [page], click [element], verify [outcome]') or curl-based acceptance test for API tasks, **Feature** — the exact feature name from product-spec.md (e.g. 'Order Placement', 'Auth') that must match a `## Feature: X` heading in product-spec.md (use '—' for infrastructure tasks that don't belong to a specific feature), **Screens** — comma-separated screen names from the product-spec Screen Inventory (e.g. 'Catalog, Product Detail') that must match screen names in product-spec.md (use '—' for backend-only tasks). Read these files via your Read tool before starting:\n  - ARCHITECTURE: `docs/plans/architecture.md`\n  - PRODUCT SPEC: `docs/plans/product-spec.md` (per-feature behavioral sections — every feature in the spec must have at least one task, and per-feature acceptance criteria become Behavioral Test field values)\n  - PRD: `docs/plans/design-doc.md`\nSave to `docs/plans/sprint-tasks.md`. The table must have these columns in order: Task ID, Title, Size, Dependencies, Behavioral Test, Owns Files, Implementing Phase, Feature, Screens. Dependencies field is load-bearing — Phase 4 uses it to batch independent tasks in parallel. Each task's Behavioral Test field SHOULD reference a specific feature acceptance criterion from the product spec (e.g., \"User can submit form with valid email; submitted form appears in admin dashboard within 5s\" — derived from product-spec.md's Happy Path or per-state criteria)."
 
 3. Description: "Task DAG validator" — INTERNAL inline role-string — Prompt: "You are the Task DAG Validator. Read `docs/plans/sprint-tasks.md`. Validate for DAG correctness:
   - No circular dependencies
@@ -637,13 +637,13 @@ For each doc, extract section anchors into a flat index. Schema: `[{\"anchor\": 
 
 #### Step 2.3.1.idx — Architecture graph index
 
-After `code-architect` returns from the Implementation Blueprint dispatch (#1 above) AND the Architecture Metric Loop exits with `architecture.md` on disk, index it into the build graph. Slice 4 graph index — best-effort, downstream consumers fall back to file reads on failure.
+After `code-architect` returns from the Implementation Blueprint dispatch (#1 above) AND the Architecture Metric Loop exits with `architecture.md` on disk, index it into the build graph. Slice 4 graph index — required for downstream agents.
 
 Run via the Bash tool:
 
 - Command: `node ${CLAUDE_PLUGIN_ROOT}/bin/graph-index.js docs/plans/architecture.md`
 - On exit 0: log success to `docs/plans/build-log.md` and continue.
-- On non-zero exit: log a warning line to `docs/plans/build-log.md` (`graph-index architecture.md failed — continuing with file-read fallback`) and continue. The graph never blocks builds.
+- On non-zero exit: STOP. Log the error to `docs/plans/build-log.md` and report the failure. Downstream agents require the graph — do not proceed without a successful index.
 
 #### Step 2.3.2.idx — Sprint tasks graph index
 
@@ -653,7 +653,7 @@ Run via the Bash tool:
 
 - Command: `node ${CLAUDE_PLUGIN_ROOT}/bin/graph-index.js docs/plans/sprint-tasks.md`
 - On exit 0: log success to `docs/plans/build-log.md` and continue.
-- On non-zero exit: log a warning line to `docs/plans/build-log.md` (`graph-index sprint-tasks.md failed — continuing with file-read fallback`) and continue.
+- On non-zero exit: STOP. Log the error to `docs/plans/build-log.md` and report the failure. Downstream agents require the graph — do not proceed without a successful index.
 
 #### Step 2.3.4.idx — Decisions re-index (end of Phase 2)
 
@@ -663,7 +663,7 @@ Run via the Bash tool:
 
 - Command: `node ${CLAUDE_PLUGIN_ROOT}/bin/graph-index.js docs/plans/decisions.jsonl`
 - On exit 0: log success to `docs/plans/build-log.md` and continue.
-- On non-zero exit: log a warning line to `docs/plans/build-log.md` (`graph-index decisions.jsonl failed — continuing with file-read fallback`) and continue.
+- On non-zero exit: STOP. Log the error to `docs/plans/build-log.md` and report the failure. The decisions graph fragment must be current before downstream consumers query it.
 
 **Architecture decisions:** The Implementation Blueprint synthesizer returns 4 `deviation_row` objects (or a `phase_2_decisions` array of row objects) in its structured result — one per cross-cutting Phase 2 decision (API contract, persistence layer, auth model, framework choice). The orchestrator forwards each row through the `scribe_decision` MCP tool (see Phase 4 "Orchestrator-scribe dispatch"); the MCP allocates `D-2-<seq>` IDs and atomically appends to `docs/plans/decisions.jsonl`. Author = `architect`. Each row carries a `ref` anchor pointing into `architecture.md` per `protocols/decision-log.md`. Total: 4 rows.
 
@@ -775,11 +775,11 @@ Scaffolding is project skeleton + design system + acceptance test stubs. Three s
 
 ### Step 4.1 — Product Owner: Feature Planning
 
-Dispatch the Product Owner in planning mode. It reads the full artifact set (via graph queries when available, raw doc reads as fallback), groups tasks by feature, sequences features into dependency-ordered waves, and writes a delegation plan.
+Dispatch the Product Owner in planning mode. It reads the full artifact set via graph queries, groups tasks by feature, sequences features into dependency-ordered waves, and writes a delegation plan.
 
 Call the Agent tool — description: "Product Owner: feature planning" — subagent_type: `product-owner` — prompt: "[CONTEXT header above] MODE: planning.
 
-Read these artifacts (use graph queries if available, otherwise Read tool):
+Read these artifacts via graph queries:
 - `docs/plans/product-spec.md` — feature list, cross-feature interactions, screen inventory
 - `docs/plans/sprint-tasks.md` — task breakdown with dependencies
 - `docs/plans/architecture.md` — cross-feature API contracts, shared data entities
@@ -806,7 +806,7 @@ Cross-feature contracts: [paste contracts from delegation plan]
 Assigned tasks: [paste task IDs]
 Page spec refs: [paste page_spec_refs from delegation plan]
 
-Read the full feature spec via graph query or `docs/plans/product-spec.md#[feature]`. Read task rows from `docs/plans/sprint-tasks.md`. Read page specs, architecture, component manifest, visual design spec for this feature's screens.
+Read the full feature spec via graph query. Read task rows from `docs/plans/sprint-tasks.md`. Read page specs, architecture, component manifest, visual design spec for this feature's screens.
 
 Write `docs/plans/feature-briefs/[feature].md` per the schema in `agents/briefing-officer.md`. For each task: specify agent type, skills, structured context payload (layout, components, API contract, error states, business rules, persona constraints), and acceptance criteria."
 
@@ -864,7 +864,7 @@ After all tasks for a feature complete, dispatch the Product Owner in acceptance
 
 Call the Agent tool — description: "Product Owner: accept [feature name]" — subagent_type: `product-owner` — prompt: "[CONTEXT header above] MODE: acceptance. FEATURE: [feature name].
 
-Read the feature's acceptance criteria and business rules via graph query or `docs/plans/product-spec.md#[feature]`. Read the feature's page spec(s) from `docs/plans/page-specs/`. Use agent-browser (web) or XcodeBuildMCP + Maestro (iOS) to verify the built feature.
+Read the feature's acceptance criteria and business rules via graph query. Read the feature's page spec(s) from `docs/plans/page-specs/`. Use agent-browser (web) or XcodeBuildMCP + Maestro (iOS) to verify the built feature.
 
 Check: (1) Does the feature implement the product spec's happy path? (2) Are business rules correct? (3) Are error states from the product spec handled? (4) Does the layout match the page spec? (5) Does component usage match the manifest?
 
@@ -893,7 +893,7 @@ Run via the Bash tool:
 
 - Command: `node ${CLAUDE_PLUGIN_ROOT}/bin/graph-index.js docs/plans/decisions.jsonl`
 - On exit 0: log success to `docs/plans/build-log.md` and continue.
-- On non-zero exit: log a warning line to `docs/plans/build-log.md` (`graph-index decisions.jsonl failed — continuing with file-read fallback`) and continue.
+- On non-zero exit: STOP. Log the error to `docs/plans/build-log.md` and report the failure. The next wave's BOs require current decision data.
 
 **Writes:** source code, `docs/plans/.task-outputs/`, `docs/plans/feature-delegation-plan.json`, `docs/plans/feature-briefs/*.md`. Deviation rows flow through the orchestrator's `scribe_decision` MCP calls.
 
@@ -920,25 +920,25 @@ LRR NEEDS_WORK backward edge: `LRR NEEDS_WORK (code-level) → back to Phase 4 t
 
 ---
 
-## Phase 5: Audit — TEAM of 6 + eval harness + 3 parallel + feedback synth
+## Phase 5: Audit — Track A (engineering reality) + Track B (product reality) + cross-cutting
 
 <HARD-GATE>
 Before starting Phase 5: run the Verify Protocol (7 checks) one more time. All checks must pass before expensive audit agents fire.
 </HARD-GATE>
 
-**Goal**: Surface quality issues before Launch Review. Split from old Phase 6 — old 6.1-6.3 (5-agent audit, eval harness, E2E + dogfood + fake-data) live here. Old 6.4-6.5 (Reality Check + LRR) move to Phase 6.
+**Goal**: Surface quality issues before Launch Review. Phase 5 runs in three layers: Track A audits the engineering envelope (API / perf / a11y / security / brand drift), Track B audits the built product against `product-spec.md` per-feature (states, transitions, business rules, happy path, persona constraints, wiring, manifest coverage), and Cross-cutting checks (E2E user journeys, autonomous dogfood, fake-data detector) catch what neither track anticipates. Findings from all three layers route through one Feedback Synthesizer (Step 5.4) and one Fix loop (Step 5.5).
 
 **Mode-specific branch:**
 - `project_type=ios`: follow `protocols/ios-phase-branches.md` §Phase 5 (iOS twin commands: `/buildanything:verify` → `/buildanything:ux-review` → `/buildanything:fix` in sequence; Maestro smoke tests). Skip the web TEAM below and jump to Step 5.4 Feedback Synthesizer with iOS evidence.
 - `project_type=web`: continue below.
 
-### Step 5.1 — TEAM of 6 parallel auditors (ONE message)
+### Step 5.1 — Track A: Engineering Reality (5 parallel auditors, ONE message)
 
 Read the NFRs from `docs/plans/quality-targets.json`. Pass the relevant targets to each audit agent so they have concrete thresholds, not generic checks.
 
-**CONTEXT header:** Render `rendered_context_header` for phase 5 per the canonical template (see CONTEXT HEADER HARD-GATE above). Prepend to every Phase 5 prompt below.
+**CONTEXT header:** Render `rendered_context_header` for phase 5 Track A per the canonical template (see CONTEXT HEADER HARD-GATE above). Prepend to every Phase 5 prompt below.
 
-Call the Agent tool 6 times in one message:
+Call the Agent tool 5 times in one message:
 
 1. Description: "API testing" — subagent_type: `testing-api-tester` — Prompt: "[CONTEXT header above] Comprehensive API validation: all endpoints, edge cases, error responses, auth flows. NFR targets: Read `docs/plans/quality-targets.json` via your Read tool for performance and reliability thresholds. Report findings with severity counts."
 
@@ -948,23 +948,34 @@ Call the Agent tool 6 times in one message:
 
 4. Description: "Security audit" — subagent_type: `engineering-security-engineer` — Prompt: "[CONTEXT header above] Security review at app level: auth, input validation, data exposure, dependency vulnerabilities. NFR targets: Read `docs/plans/quality-targets.json` via your Read tool for security thresholds. Report findings with severity."
 
-5. Description: "UX quality audit" — subagent_type: `design-ux-researcher` — Prompt: "[CONTEXT header above] UX quality review of every user-facing page. First, screenshot the living style guide at /design-system (web) as your reference. Then review every product page: loading states (every async action shows a loading indicator), error states (every form and API call shows user-friendly feedback), empty states (lists/tables handle zero items), mobile responsiveness (test at 375px — touch targets >= 44px, no horizontal scroll), form validation (inline feedback, not alert()), transition smoothness, visual consistency vs style guide (buttons, inputs, cards, colors, spacing should match). Report issues with page, severity, and screenshot."
+5. Description: "Brand Guardian drift check" — subagent_type: `design-brand-guardian` — Prompt: "[CONTEXT header above] You are the Phase 5 drift check. Read DESIGN.md (the DNA card locked at Phase 3.0) + the actually-built pages via Playwright screenshots under docs/plans/evidence/. Score whether Phase 4 implementers stayed true to the DNA or drifted away from it. Specifically check: does the built Character axis match the DNA? Does Density match? Is Material consistent? Is Motion aligned? Report drift count and specific elements. Save findings to docs/plans/evidence/brand-drift.md. Note: this is a drift check only — the Phase 6 LRR Brand Guardian chapter does the verdict. You do NOT issue a pass/fail here, only surface findings."
 
-6. Description: "Brand Guardian drift check" — subagent_type: `design-brand-guardian` — Prompt: "[CONTEXT header above] You are the Phase 5 drift check. Read DESIGN.md (the DNA card locked at Phase 3.0) + the actually-built pages via Playwright screenshots under docs/plans/evidence/. Score whether Phase 4 implementers stayed true to the DNA or drifted away from it. Specifically check: does the built Character axis match the DNA? Does Density match? Is Material consistent? Is Motion aligned? Report drift count and specific elements. Save findings to docs/plans/evidence/brand-drift.md. Note: this is a drift check only — the Phase 6 LRR Brand Guardian chapter does the verdict. You do NOT issue a pass/fail here, only surface findings."
+### Step 5.2 — Track B: Product Reality (parallel per-feature, ONE message)
 
-### Step 5.2 — Sequence: Eval Harness → Metric Loop
+Track B audits the built app against `product-spec.md` on a per-feature basis. Each feature gets its own auditor; all auditors run in parallel.
 
-Run the Eval Harness Protocol (`protocols/eval-harness.md`). Define 8-15 concrete, executable eval cases from the audit findings and architecture doc. Run the eval agent. Record baseline pass rate. CRITICAL and HIGH failures feed into the Metric Loop as specific issues to fix.
+**CONTEXT header:** Render `rendered_context_header` for phase 5 Track B per the canonical template. Prepend to every Track B prompt.
 
-Run the Metric Loop Protocol (callable service) on the full codebase using audit findings as initial input. Define a composite metric based on what this project needs. Max 4 iterations. When fixing, dispatch to the RIGHT specialist — security → `security-reviewer`, a11y → `a11y-architect`, perf → `engineering-backend-architect`. Don't send everything to one agent.
+**Feature enumeration:** Before dispatch, query the graph for the full feature inventory:
 
-Re-run the Eval Harness after the metric loop exits. All CRITICAL eval cases must now pass. If any CRITICAL case still fails, include it as evidence for Phase 6.
+- Call `mcp__plugin_buildanything_graph__graph_query_feature` with no argument (or per-feature in a loop) to enumerate every `feature_id` in the indexed product-spec. The orchestrator OWNS this enumeration — auditors never enumerate themselves.
+- If the graph layer is unavailable for this build, fall back to parsing `## Feature: {Name}` headings in `docs/plans/product-spec.md` and emit `feature_id = feature__{kebab-case-name}` for each. Pass `graph_used: false` in the auditor prompt so it knows to use file-based reads.
 
-### Step 5.3 — TEAM of 3 parallel (ONE message)
+**Dispatch:** Call the Agent tool N times in ONE message — one per `feature_id`:
+
+- Description: `"Product Reality Audit: {feature_label}"`
+- subagent_type: `product-reality-auditor`
+- Prompt: `"[CONTEXT header above] Audit feature_id: {feature_id}. Follow your Cognitive Protocol (ABSORB → QUERY → SYNTHESIZE → EXECUTE → CLASSIFY → SCORE → WRITE). Write evidence to docs/plans/evidence/product-reality/{feature_id}/. Report manifest of evidence paths back. graph_used: {true|false}."`
+
+**Post-dispatch verification:** After all Track B auditors return, verify each feature has the four evidence files (`tests-generated.md`, `results.json`, `findings.json`, `coverage.json`). If any feature is missing files, log `TRACK B EVIDENCE MISSING: {feature_id}` to `docs/plans/build-log.md` and re-dispatch that feature's auditor once. If still missing after retry, route to Step 5.5 fix loop with `target_phase: 5.2` (re-run that auditor with explicit guidance).
+
+**Note on the metric loop:** The Metric Loop callable service is no longer wired as a primary Phase 5 step. It can still be invoked ad-hoc by Track A audit fixes via Step 5.5 if a single check class needs iterative tightening, but the structured per-feature audit replaces the orchestrator-improvised eval cases that 5.2 used to drive.
+
+### Step 5.3 — Cross-cutting (3 parallel, ONE message)
 
 Call the Agent tool 3 times in one message:
 
-1. Description: "E2E runner" — INTERNAL inline role-string — mode: "bypassPermissions" — Prompt: "Run Playwright E2E test generation, execution, and stability check per `protocols/web-phase-branches.md` Phase 5 E2E steps (generate and run E2E tests for User Journeys, 3 mandatory iterations for flakiness detection). Report results + artifact paths. Records results to `docs/plans/evidence/e2e/iter-3-results.json`."
+1. Description: "E2E runner" — INTERNAL inline role-string — mode: "bypassPermissions" — Prompt: "Run Playwright E2E test generation, execution, and stability check per `protocols/web-phase-branches.md` Phase 5 E2E steps (generate and run E2E tests for User Journeys, 3 mandatory iterations for flakiness detection). Report results + artifact paths. Records results to `docs/plans/evidence/e2e/iter-3-results.json`. Scope: multi-feature User Journeys ONLY (login → browse → buy, signup → onboarding → first-action). Single-feature happy paths are covered by Track B per-feature auditors at Step 5.2 — do NOT duplicate."
 
 2. Description: "Dogfood the app" — INTERNAL inline role-string + agent-browser skill — mode: "bypassPermissions" — Prompt: "You are the Dogfood runner. Run the agent-browser dogfood skill against the running app at http://localhost:[port]. Explore every reachable page. Click every button. Fill every form. Check console for errors. Report a structured list of issues with severity ratings, screenshots, repro steps. Write findings to `docs/plans/evidence/dogfood/findings.md` AND a machine-readable mirror at `docs/plans/evidence/dogfood/findings.json` (schema: `[{finding_id, severity, description, screenshot_path, affected_screen_id}, ...]` per agents/testing-evidence-collector.md "Dogfood Evidence Outputs"). Do NOT classify or route findings — that's the Feedback Synthesizer's job at Step 5.4."
 
@@ -974,16 +985,24 @@ Call the Agent tool 3 times in one message:
 
 The Dogfood findings used to dead-end. Now route them to fix loops.
 
-Call the Agent tool — description: "Synthesize dogfood findings" — subagent_type: `product-feedback-synthesizer` — Prompt: "[CONTEXT header above] Interpret Dogfood output. Input: `docs/plans/evidence/dogfood/findings.md`. For each finding, classify it and assign a target phase for the fix:
+Call the Agent tool — description: "Synthesize dogfood findings" — subagent_type: `product-feedback-synthesizer` — Prompt: "[CONTEXT header above] Interpret findings from Track B (per-feature product-reality audits) AND Dogfood (autonomous exploration). Inputs:
+
+- `docs/plans/evidence/dogfood/findings.md` — autonomous exploration findings, each requires classification + routing
+- `docs/plans/evidence/product-reality/*/findings.json` — one per feature, each finding ALREADY CARRIES `target_phase` and `target_task_or_step` set by the product-reality-auditor. VALIDATE these against the graph (same `graph_query_dependencies` walk used for dogfood findings) and pass through if valid; only re-route if validation fails (e.g., the targeted task no longer exists in the task DAG).
+
+For each finding, ensure it ends up classified with:
   - Code-level bug (broken feature, failing logic, fake data) → `target_phase: 4`, assign to the specific task that owns the affected file
   - Visual/design issue (styling drift, missing state, a11y gap) → `target_phase: 3`, assign to the Phase 3 step that owns the relevant artifact
   - Structural/architecture issue (missing feature, wrong data flow, API mismatch) → `target_phase: 2`, assign to the architecture section
+  - Spec-gap (acceptance criteria too vague, persona constraint not measurable) → `target_phase: 1, target_step: 1.6`
 
-Output: `docs/plans/evidence/dogfood/classified-findings.json` with shape `[{finding_id, severity, target_phase, target_task_or_step, description, evidence_ref}, ...]`. This file is read by the Phase 5 fix loop and by the Phase 6 LRR Aggregator for backward routing."
+Output: `docs/plans/evidence/dogfood/classified-findings.json` with shape `[{finding_id, source: \"dogfood\" | \"product-reality\", severity, target_phase, target_task_or_step, description, evidence_ref, related_decision_id?: string}, ...]`. The `source` field distinguishes the two input streams. This file is read by the Phase 5 fix loop and by the Phase 6 LRR Aggregator for backward routing."
 
-**Phase 5 fix loop:** For each CRITICAL/HIGH classified finding, dispatch the appropriate fix agent based on `target_phase`. Max 2 fix cycles.
+### Step 5.5 — Fix loop
 
-**Writes:** `docs/plans/evidence/*.json`, `docs/plans/evidence/fake-data-audit.md`, `docs/plans/evidence/dogfood/classified-findings.json`, `docs/plans/learnings.jsonl` (reality sweep writes PITFALL/PATTERN rows — see `protocols/decision-log.md` for the Dissent Log Revisit Pass path).
+For each CRITICAL/HIGH classified finding, dispatch the appropriate fix agent based on `target_phase`. Max 2 fix cycles. Routing template at the bottom of this file ("Re-entry dispatch template"). Findings with `target_phase: 1, target_step: 1.6` route back to `product-spec-writer` to tighten the spec, which re-triggers Track B for the affected feature on the next loop.
+
+**Writes:** `docs/plans/evidence/*.json`, `docs/plans/evidence/fake-data-audit.md`, `docs/plans/evidence/dogfood/classified-findings.json`, `docs/plans/evidence/product-reality/*/{tests-generated.md, results.json, findings.json, coverage.json, screenshots/}`, `docs/plans/learnings.jsonl` (reality sweep writes PITFALL/PATTERN rows — see `protocols/decision-log.md` for the Dissent Log Revisit Pass path).
 
 **Compaction checkpoint.** Update `.build-state.json` per the format above.
 
@@ -1003,7 +1022,7 @@ Run via the Bash tool:
 
 - Command: `node ${CLAUDE_PLUGIN_ROOT}/bin/graph-index.js docs/plans/decisions.jsonl`
 - On exit 0: log success to `docs/plans/build-log.md` and continue.
-- On non-zero exit: log a warning line to `docs/plans/build-log.md` (`graph-index decisions.jsonl failed — continuing with file-read fallback`) and continue.
+- On non-zero exit: STOP. Log the error to `docs/plans/build-log.md` and report the failure. The LRR aggregator's backward-routing walk requires current decision data.
 
 ### Step 6.0 — Reality Check (evidence sweep + dissent log revisit pass)
 
@@ -1016,12 +1035,12 @@ REQUIRED EVIDENCE FOR ALL PROJECTS:
   - `docs/plans/.build-state.json` exists, contains current build session id, contains a recent `VERIFY: PASS` line from this session.
 
 REQUIRED EVIDENCE FOR `project_type=web`:
-  - `docs/plans/evidence/eval-harness/baseline.json` (non-empty)
-  - `docs/plans/evidence/eval-harness/final.json` (non-empty)
   - `docs/plans/evidence/e2e/iter-3-results.json` (non-empty)
   - `docs/plans/evidence/dogfood/findings.md` (non-empty)
   - `docs/plans/evidence/dogfood/classified-findings.json` (non-empty)
   - `docs/plans/evidence/fake-data-audit.md` (non-empty)
+  - `docs/plans/evidence/product-reality/*/coverage.json` — at least one per feature in product-spec.md (non-empty); a missing file for any feature listed in product-spec.md is itself a BLOCK
+  - `docs/plans/evidence/product-reality/*/findings.json` (one per feature; may be an empty array `[]` if no failures)
   - `docs/plans/evidence/manifest.json`
 
 REQUIRED EVIDENCE FOR `project_type=ios`:
@@ -1061,9 +1080,9 @@ Call the Agent tool 5 times in ONE message. Note: the Eng-Quality chapter dispat
 
 1. Description: "LRR Eng-Quality chapter" — subagent_type: `code-reviewer` — Prompt: "[CONTEXT header above] You are the Eng-Quality chapter of the Launch Readiness Review. Your natural tendency is to be encouraging. Fight it. Default verdict: NEEDS WORK.
 
-Read: `docs/plans/architecture.md`, `docs/plans/design-doc.md` (PRD — needed for requirements coverage evaluation), `docs/plans/sprint-tasks.md`, `docs/plans/.task-outputs/`, `protocols/verify.md` check outputs from `.build-state.json`, test results from Phase 4 and 5, eval-harness results from `docs/plans/evidence/eval-harness/`. Also read `docs/plans/decisions.jsonl` for cross-chapter context.
+Read: `docs/plans/architecture.md`, `docs/plans/design-doc.md` (PRD), `docs/plans/sprint-tasks.md`, `docs/plans/.task-outputs/`, `protocols/verify.md` check outputs from `.build-state.json`, test results from Phase 4 and 5, `docs/plans/evidence/product-reality/*/coverage.json` (Track B per-feature coverage). Also read `docs/plans/decisions.jsonl` for cross-chapter context.
 
-Requirements coverage is folded into this chapter — not a separate dispatch. For EVERY feature listed in the scope of `design-doc.md`, evaluate: (1) does it have a corresponding implemented task in sprint-tasks.md, (2) does it have a passing test or behavioral verification in evidence, (3) is it reachable and functional per the task-outputs. Emit a `requirements_coverage` field in your verdict JSON with shape `[{feature: \"<name>\", status: \"COVERED\" | \"PARTIAL\" | \"MISSING\"}, ...]`. Any MISSING feature is a BLOCK finding. Any PARTIAL feature is a CONCERNS finding at minimum.
+Requirements coverage is sourced from Phase 5 Track B evidence — do NOT recompute. Read every `docs/plans/evidence/product-reality/*/coverage.json` (one per feature). Aggregate the per-feature `coverage_pct` and `status` fields into a single `requirements_coverage[]` array on your verdict, one entry per feature with `{feature_id, feature_label, status, coverage_pct, blocker_summary}` where `blocker_summary` is a short string distilling `missing_states + broken_transitions + unenforced_rules + persona_constraint_violations` from coverage.json. Any `MISSING` status is a BLOCK finding. Any `PARTIAL` is CONCERNS at minimum. If a `coverage.json` file is missing for a feature listed in product-spec.md, that itself is a BLOCK finding (Track B did not run for that feature — pipeline integrity issue).
 
 Before writing the final verdict, spawn a parallel subagent dispatch: description: 'LRR test coverage adequacy' — subagent_type: `pr-test-analyzer` — prompt: 'You are a test-coverage auditor for the Eng-Quality LRR chapter. Read the test files under tests/, task-outputs/, and behavioral-test stub detector output. Evaluate: (1) do declared behavioral tests have non-stub bodies, (2) does coverage match the PR diff scope, (3) are edge cases covered, (4) are any tests flaky markers set. Return a JSON summary with test_coverage_score (0-100), stub_flagged_count, edge_case_gap_count, recommendations[]. Save to docs/plans/evidence/lrr/eng-quality-coverage.json.' Read the resulting eng-quality-coverage.json and fold its findings into your verdict.
 
@@ -1071,13 +1090,13 @@ Evaluate code quality + test coverage adequacy + architecture conformance + requ
 
 Write verdict to `docs/plans/evidence/lrr/eng-quality.json` per `protocols/launch-readiness.md` schema. Fields: `chapter=eng-quality`, `verdict` (PASS|CONCERNS|BLOCK), `override_blocks_launch` (false unless BLOCK), `evidence_files_read` (non-empty, MUST include eng-quality-coverage.json), `findings[]` (each with `severity`, `description`, `evidence_ref`, `related_decision_id` if blocker ties to a decisions.jsonl row), `requirements_coverage[]` (one entry per feature with `{feature, status}`), `follow_up_spawned=false`, `follow_up_findings=null`. Eng-Quality CANNOT spawn follow-ups."
 
-2. Description: "LRR Security chapter" — subagent_type: `security-reviewer` — Prompt: "[CONTEXT header above] You are the Security chapter of the LRR. Read: `docs/plans/evidence/fake-data-audit.md`, Phase 5 security audit output (from Step 5.1), eval-harness security cases. Also read `docs/plans/decisions.jsonl` for context.
+2. Description: "LRR Security chapter" — subagent_type: `security-reviewer` — Prompt: "[CONTEXT header above] You are the Security chapter of the LRR. Read: `docs/plans/evidence/fake-data-audit.md`, Phase 5 security audit output (from Step 5.1). Also read `docs/plans/decisions.jsonl` for context.
 
 Evaluate auth model, input validation, secrets management, dependency vulnerabilities. Write verdict to `docs/plans/evidence/lrr/security.json` per schema. Fields: `chapter=security`, `verdict`, `override_blocks_launch`, `evidence_files_read` (non-empty), `findings[]` (with `related_decision_id` when applicable), `follow_up_spawned` (boolean), `follow_up_findings` (null or typed object).
 
 Security MAY spawn ONE read-only follow-up investigation, but ONLY if verdict would be BLOCK — NOT on suspicion. This is tightened from current behavior. Follow-up: read-only, Read/Grep/Glob only, max 15 tool calls, self-report tool_calls_used. See `protocols/launch-readiness.md` for follow-up flow."
 
-3. Description: "LRR SRE chapter" — subagent_type: `engineering-sre` — Prompt: "[CONTEXT header above] You are the SRE chapter of the LRR. Read: performance-audit outputs from Phase 5 (Step 5.1 performance auditor + Step 5.2 eval-harness perf cases), Performance Benchmarker evidence, NFRs from `docs/plans/quality-targets.json` and `docs/plans/sprint-tasks.md`, reliability checks. Also read `docs/plans/decisions.jsonl` for context.
+3. Description: "LRR SRE chapter" — subagent_type: `engineering-sre` — Prompt: "[CONTEXT header above] You are the SRE chapter of the LRR. Read: performance-audit outputs from Phase 5 (Step 5.1 performance auditor), Performance Benchmarker evidence, NFRs from `docs/plans/quality-targets.json` and `docs/plans/sprint-tasks.md`, reliability checks. Also read `docs/plans/decisions.jsonl` for context.
 
 Evaluate whether the build meets NFR targets (response time, load handling, error rates) and is production-ready under load. Bundle-size budget violations (>25% over Scope budget) auto-block. Write verdict to `docs/plans/evidence/lrr/sre.json` per schema.
 
