@@ -40,7 +40,7 @@ The user's framing for this session was "hypothetical environment — give me th
 
 ### Indexer triggers in protocols
 - `commands/build.md`: Step 1.6.idx, 2.3.1.idx, 2.3.2.idx, 2.3.4.idx, 4.4.idx, 6.0.idx (Slice 1 + 4 — Phase 1 product-spec, Phase 2 architecture/sprint-tasks/decisions, Phase 4 wave-end re-index, Phase 6 LRR re-index).
-- `protocols/web-phase-branches.md`: Step 3.0.idx (DESIGN.md Pass 1), 3.1.idx (design references — Slice 5), 3.2.idx (component manifest), 3.3.idx (page-specs), 3.4.idx (DESIGN.md Pass 2 tokens), 5.1.idx (brand drift — Slice 5), 5.5.idx (dogfood — Slice 5). Naming reconciliation note at `:471` explains the schema-doc/protocol mismatch (5.5.idx vs schema's 5.3.idx).
+- `protocols/web-phase-branches.md`: Step 3.0.idx (DESIGN.md Pass 1), 3.1.idx (design references — Slice 5), 3.2.idx (component manifest), 3.3.idx (page-specs), 3.4.idx (DESIGN.md Pass 2 tokens), 5.1.idx (brand drift — Slice 5), 5.2.idx (Track B evidence — best-effort, not Slice-5-aware), 5.3b.idx (dogfood — Slice 5). The earlier 5.5.idx vs schema-doc 5.3.idx mismatch was resolved by the 2026-05-01 Phase 5 Track A/B restructure — dogfood-evidence-index now lives at 5.3b.idx, matching the schema doc's intent.
 - `protocols/ios-phase-branches.md`: Step 3.0.idx-ios. iOS Phase B intentionally defers Slice 5 brand-drift indexing (per Slice 5 schema §10 redline 4).
 
 ### End-to-end smoke (this session)
@@ -84,8 +84,8 @@ Stale "CRITICAL" claims in `docs/graph/12-slice5-logical-eval.md` were corrected
    - Owner: immediate fix — add a `## Graph tools` block to each implementer agent's prompt naming `graph_query_token`, `graph_query_screen(screen_id, {full: true})`, and how to fall back when the graph isn't loaded. Pattern is in `briefing-officer.md:31-36`.
 
 2. **[Slice 5, Bug #2] Dogfood agent does not emit `findings.json` side-channel.**
-   - Read: `commands/build.md:962-975`. Dogfood writes `findings.md` (prose) only. Slice 5 schema §7.3 expects `evidence/dogfood/findings.json` with `[{finding_id, screenshot_path, affected_screen_id}, ...]` BEFORE Step 5.5.idx fires.
-   - Result: Step 5.5.idx successfully writes `slice-5-dogfood.json` with screenshot nodes, but `screenshot_evidences_finding` edges never emit because `bin/graph-index.ts` has no mechanism to read the side-channel. Phase 5.4 routing walk works structurally but `linked_finding_id` is always null.
+   - Read: `commands/build.md:962-975`. Dogfood writes `findings.md` (prose) only. Slice 5 schema §7.3 expects `evidence/dogfood/findings.json` with `[{finding_id, screenshot_path, affected_screen_id}, ...]` BEFORE Step 5.3b.idx fires.
+   - Result: Step 5.3b.idx successfully writes `slice-5-dogfood.json` with screenshot nodes, but `screenshot_evidences_finding` edges never emit because `bin/graph-index.ts` has no mechanism to read the side-channel. Phase 5.4 routing walk works structurally but `linked_finding_id` is always null.
    - Owner: production-mode wiring — bundle into the Slice 5 production-vision PR. Half-day prompt edit + ~15 LOC indexer change.
 
 3. **[Slice 4, Bug #5] Cycle detection in decisions warns rather than fails.**
@@ -136,7 +136,7 @@ Hypothetical run of `/build` against a new web project today, with no production
 - **Phase 3** — `design-brand-guardian` produces `DESIGN.md` Pass 1 (DNA card, references). Step 3.0.idx fires → `slice-2-dna.json`. `visual-research` writes inspiration screenshots to `design-references/`. Step 3.1.idx fires → `slice-5-references.json` with stub captions (canned text, not real Vision). `design-ui-designer` produces `component-manifest.md`. Step 3.2.idx fires → `slice-2-manifest.json`. `design-ux-architect` produces `page-specs/*.md`. Step 3.3.idx fires → `slice-3-pages.json`. `design-brand-guardian` Pass 2 lands tokens in DESIGN.md. Step 3.4.idx fires → `slice-3-tokens.json`. End of Phase 3, BO has full structured access to product spec + DNA + manifest + wireframes + tokens.
 - **Phase 4** — Product Owner spawns Briefing Officers per feature. Each BO calls `graph_query_feature(feature_id)`, `graph_query_screen(screen_id, {full: true})` per assigned screen, `graph_query_acceptance(feature_id)`, `graph_query_dna()`, `graph_query_manifest(slot)` per slot. BO writes per-task brief with verbatim wireframe text, persona constraints, acceptance criteria, token names. Implementer receives brief. **GAP:** implementer does not call `graph_query_token` to resolve token names → inlines `colors.primary` literally into code (Bug #1 above). Build still completes; visual fidelity to DNA card degrades.
 - **Phase 5.1** — `design-brand-guardian` runs drift-check, writes prod screenshots to `evidence/brand-drift/`. Step 5.1.idx fires → `slice-5-brand-drift.json` with stub captions. Brand Guardian calls `graph_query_similar(prod_id)` → returns matches based on byte-distribution stub hash → results are spurious (Bug #5 above). Drift observation emission is a follow-up indexer pass that doesn't exist yet.
-- **Phase 5.4** — dogfood agent writes `findings.md`. **GAP:** no `findings.json` side-channel produced (Bug #2). Step 5.5.idx fires, writes screenshot nodes with `linked_finding_id: null`. Synthesizer walks Slice 4 task DAG to route findings — works because the structural lineage (screen → feature → task) is intact via Slice 1+4. Just no automatic finding-to-screenshot linkage.
+- **Phase 5.4** — dogfood agent writes `findings.md`. **GAP:** no `findings.json` side-channel produced (Bug #2). Step 5.3b.idx fires, writes screenshot nodes with `linked_finding_id: null`. Synthesizer walks Slice 4 task DAG to route findings — works because the structural lineage (screen → feature → task) is intact via Slice 1+4. Just no automatic finding-to-screenshot linkage.
 - **Phase 6** — LRR Brand chapter calls `graph_query_brand_drift()` → returns `{observations: []}` because Brand Guardian's follow-up indexer pass isn't wired yet. Falls back gracefully to existing prose-grep.
 
 **Honest read:** lineage walks succeed across all 5 slices. Semantic content (brand-drift scoring, perceptual similarity ranking, dogfood-finding-to-screenshot linkage) is gated on production-mode work that explicitly hasn't shipped. The graph layer's stated quality thesis — "product context reaches the agents that write code" — is delivered by Slices 1-4. Slice 5 is the visual-context extension and ships as scaffold.
@@ -210,7 +210,7 @@ Re-reading each slice eval's per-slice claim, with the caveat that all numbers a
 15 test files, 3,647 LOC total. 188 tests passing.
 
 ### Protocols / commands edits across the slices
-- `protocols/web-phase-branches.md` — Step 3.0.idx, 3.1.idx, 3.2.idx, 3.3.idx, 3.4.idx, 5.1.idx, 5.5.idx blocks.
+- `protocols/web-phase-branches.md` — Step 3.0.idx, 3.1.idx, 3.2.idx, 3.3.idx, 3.4.idx, 5.1.idx, 5.2.idx (Track B evidence, best-effort), 5.3b.idx blocks.
 - `protocols/ios-phase-branches.md` — Step 3.0.idx-ios block.
 - `commands/build.md` — Step 1.6.idx, 2.3.1.idx, 2.3.2.idx, 2.3.4.idx, 4.4.idx, 6.0.idx blocks.
 - `agents/briefing-officer.md` — full graph-tool integration (12 tool refs).
