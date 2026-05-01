@@ -394,24 +394,29 @@ Track B audits the built app against `product-spec.md` on a per-feature basis. T
 - agent-browser is the primary execution surface; Playwright loaded via the Skill tool is the fallback (one retry total).
 - Screenshots and per-case evidence land under `docs/plans/evidence/product-reality/{feature_id}/screenshots/`. Each case_id maps 1:1 to a PNG file (or `screenshot: null` for non-visual checks like manifest-slot-empty).
 - The four evidence files per feature (`tests-generated.md`, `results.json`, `findings.json`, `coverage.json`) are written by the auditor; the orchestrator verifies their presence + JSON parseability per `commands/build.md` Step 5.2 post-dispatch verification.
+- Failure modes (graph queries fail, graph layer absent, agent-browser unavailable, dev server not running, feature has no screens) are owned by the auditor — see `agents/product-reality-auditor.md` §Failure Modes. This file does not duplicate them.
 
 **Failure routing:** Track B auditor failures route through the existing fix-loop spec-gap path (`target_phase: 1, target_step: 1.6` to `product-spec-writer`) — see `commands/build.md` Step 5.2 post-dispatch verification for the escalation flow.
 
 #### Step 5.2.idx — Track B evidence graph index
 
-After all per-feature `product-reality-auditor` dispatches return and `docs/plans/evidence/product-reality/*/` is populated, index the directory into the build graph. Best-effort — downstream consumers (Phase 5.4 synthesizer, Phase 6.1 Eng-Quality chapter) fall back to file reads on indexer failure.
+After all per-feature `product-reality-auditor` dispatches return and `docs/plans/evidence/product-reality/*/` is populated, index the directory into the build graph.
+
+**Note: this is the only `.idx` block in Phase 5 that is best-effort** (does NOT STOP on indexer failure). Track B evidence is hard-gated at Phase 6.0 Step 6.0 by file presence + JSON parseability, not by graph index status. Downstream consumers (Phase 5.4 synthesizer, Phase 6.1 Eng-Quality chapter) read the JSON files directly and fall back gracefully if the graph fragment is absent. Step 5.1.idx and Step 5.3b.idx STOP on indexer failure because their downstream consumers (Brand chapter, dogfood synthesizer) require the graph fragment.
 
 Run via the Bash tool:
 
 - Command: `node ${CLAUDE_PLUGIN_ROOT}/bin/graph-index.js docs/plans/evidence/product-reality/`
 - On exit 0: log success to `docs/plans/build-log.md` and continue.
-- On non-zero exit: log the error to `docs/plans/build-log.md` and continue (best-effort — Track B evidence is hard-gated at Phase 6.0 by file presence + parseability, not by graph index status).
+- On non-zero exit: log the error to `docs/plans/build-log.md` and continue.
 
 ### Step 5.3 — Cross-cutting (3 parallel, ONE message)
 
-Three checks run in parallel as a cross-cutting layer: 3-iteration Playwright E2E for multi-feature User Journeys, autonomous agent-browser dogfood for emergent issues, and the fake-data detector. The orchestrator dispatch shape (3 parallel agents in one message) is in `commands/build.md` Step 5.3.
+Three checks run in parallel as a cross-cutting layer: 3-iteration Playwright E2E for multi-feature User Journeys, autonomous agent-browser dogfood for emergent issues, and the fake-data detector. The orchestrator fires THREE Agent dispatches in one message — the E2E one runs all 3 iterations internally (see Step 5.3a "Where this runs"). Dispatch shape canonicalized in `commands/build.md` Step 5.3.
 
 #### Step 5.3a — E2E Testing (3 mandatory iterations)
+
+**Where this runs:** The orchestrator fires ONE Agent dispatch (description: "E2E runner") at Step 5.3 alongside dogfood and fake-data — three parallel agents in one message. The three iterations below run INSIDE that single E2E runner agent, sequentially. The runner agent reads this section as its instruction body and internally drives iteration 1 → 2 → 3 without coming back to the orchestrator between iterations. Do NOT misread "3 mandatory iterations" as three separate orchestrator-side dispatches.
 
 HARD-GATE: ALL 3 ITERATIONS ARE MANDATORY. Do NOT stop after iteration 1 even if all tests pass. The purpose of 3 runs is to catch flaky tests, timing-dependent failures, and race conditions that only surface on repeated execution. Skip this step ONLY if the project has no user-facing frontend.
 
@@ -425,13 +430,13 @@ Call the Agent tool — description: "E2E test generation" — subagent_type: `e
 
 INPUTS:
 Read these files via your Read tool before starting — do NOT expect pasted content:
-- User Journeys: `docs/plans/sprint-tasks.md` (User Journeys section — each cross-feature journey becomes one E2E test)
+- User Journeys: `docs/plans/sprint-tasks.md` (User Journeys section — each journey becomes one E2E test)
 - Architecture (API contracts): `docs/plans/architecture.md`
 - NFRs: `docs/plans/sprint-tasks.md` (NFR section — use performance thresholds as test assertions)
 - Visual Design Spec (component selectors): `DESIGN.md`
 
 REQUIREMENTS:
-1. One E2E test per cross-feature User Journey from sprint-tasks.md (each journey = one test file covering the full flow)
+1. One E2E test per User Journey from sprint-tasks.md (each journey = one test file covering the full flow)
 2. Use Page Object Model pattern — one page object per major view
 3. Use data-testid selectors (add them to components if missing)
 4. Wait for API responses, NEVER use arbitrary timeouts (no waitForTimeout)
@@ -442,9 +447,9 @@ REQUIREMENTS:
 9. Commit: 'test: e2e test suite for cross-feature user journeys'
 
 Test priority:
-- CRITICAL: Auth, core cross-feature happy path, data submission across features, payment/transaction flows
-- HIGH: Search across features, filtering, navigation, error states that span features
-- MEDIUM: Responsive layout for multi-feature flows, animations, edge cases"
+- CRITICAL: Auth, core happy path, data submission, payment/transaction flows
+- HIGH: Search, filtering, navigation, error states
+- MEDIUM: Responsive layout, animations, edge cases"
 
 Record results: total tests, pass count, fail count, failure details. Log to `docs/plans/.build-state.md` under `## E2E Testing`:
 
@@ -472,7 +477,11 @@ Run the agent-browser dogfood skill against the running app. Unlike Track B (whi
 
 Start the dev server if not running. Then invoke the dogfood skill:
 
-Call the Agent tool — description: "Dogfood the app" — subagent_type: `testing-evidence-collector` — mode: "bypassPermissions" — prompt: "[CONTEXT header above — phase: 5] Run the agent-browser dogfood skill against the running app at http://localhost:[port]. Explore every reachable page. Click every button. Fill every form. Check console for errors. Report a structured list of issues with severity ratings (critical/high/medium/low), screenshots, and repro steps. Save screenshots under `docs/plans/evidence/dogfood/` (one PNG/JPG per finding, named after the finding_id), and emit `docs/plans/evidence/dogfood/findings.json` (machine-readable mirror of findings.md — schema: `[{finding_id, severity, description, screenshot_path, affected_screen_id}, ...]` per agents/testing-evidence-collector.md \"Dogfood Evidence Outputs\") so the Slice 5 indexer can wire `screenshot_evidences_finding` edges. If dogfood skill is not available, use agent-browser manually: snapshot each page, click all interactive elements, check errors and network requests. Focus on emergent issues (console errors, broken layouts at 320/375/768px, failed network requests, broken navigation links) — do NOT re-audit per-feature spec coverage; that's Track B's job at Step 5.2."
+Call the Agent tool — description: "Dogfood the app" — subagent_type: `testing-evidence-collector` — mode: "bypassPermissions" — prompt: "[CONTEXT header above — phase: 5] Run the agent-browser dogfood skill against the running app at http://localhost:[port]. Explore every reachable page. Click every button. Fill every form. Check console for errors. Report a structured list of issues with severity ratings (critical/high/medium/low), screenshots, and repro steps. Save screenshots under `docs/plans/evidence/dogfood/` (one PNG/JPG per finding, named after the finding_id), and emit `docs/plans/evidence/dogfood/findings.json` (machine-readable mirror of findings.md — schema: `[{finding_id, severity, description, screenshot_path, affected_screen_id}, ...]` per agents/testing-evidence-collector.md \"Dogfood Evidence Outputs\") so the Slice 5 indexer can wire `screenshot_evidences_finding` edges.
+
+If dogfood skill is not available, use agent-browser manually: snapshot each page, click all interactive elements, check errors and network requests.
+
+Focus on emergent issues (console errors, broken layouts at 320/375/768px, failed network requests, broken navigation links) — do NOT re-audit per-feature spec coverage; that's Track B's job at Step 5.2."
 
 Classification and fix-routing of Dogfood findings is handled by the Feedback Synthesizer at `commands/build.md` Phase 5 Step 5.4 — do NOT self-classify or spawn fix agents from this step.
 
