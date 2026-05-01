@@ -282,20 +282,22 @@ For each wave in the feature delegation plan:
 
 ---
 
-### Phase 5 — Audit (TEAM of 6 + eval harness + 3 parallel + feedback synth)
+### Phase 5 — Audit (Track A + Track B + cross-cutting + synth + fix)
 
-**Kind:** `team-then-eval-then-parallel-then-synth`. **Skip conditions:** none. **Precondition:** Verify Protocol must pass.
+**Kind:** `track-a-then-track-b-then-cross-cutting-then-synth`. **Skip conditions:** none. **Precondition:** Verify Protocol must pass.
 
 #### 5.a Web branch
 
 | Step | Name | Kind | Dispatches |
 |---|---|---|---|
-| 5.1 | TEAM of 6 parallel auditors (ONE message) | dispatch-parallel (6) | see table below |
-| 5.2 | Eval Harness → Metric Loop | loop (callable service) | 8-15 executable eval cases from audit findings. Metric Loop max 4 iters, routes fixes to right specialist (security → `security-reviewer`, a11y → `engineering-frontend-developer`, perf → `testing-performance-benchmarker`). Re-run eval after loop |
-| 5.3 | TEAM of 3 parallel (ONE message) | dispatch-parallel (3) | E2E runner (Playwright, 3 iters mandatory), Dogfood runner (agent-browser), Fake-data detector |
-| 5.4 | Feedback Synthesizer | dispatch-single | `product-feedback-synthesizer` classifies Dogfood findings → routes to Phase 4 (code) / Phase 3 (visual) / Phase 2 (structural). Max 2 fix cycles |
+| 5.1 | Track A — Engineering Reality (5 parallel auditors, ONE message) | dispatch-parallel (5) | see Track A table below |
+| 5.2 | Track B — Product Reality (parallel per-feature, ONE message) | dispatch-parallel-per-feature | one `product-reality-auditor` per `feature_id` from `graph_query_feature(*)`. Zero-feature gate STOPs and routes back to 1.6 |
+| 5.2.idx | Track B evidence graph index | graph-index (best-effort) | indexes `evidence/product-reality/` — best-effort because hard-gated at 6.0 by file presence + JSON parseability |
+| 5.3 | Cross-cutting (3 parallel, ONE message) | dispatch-parallel (3) | E2E runner (Playwright, 3 iters mandatory, scope = multi-feature User Journeys ONLY), Dogfood runner (agent-browser, emergent issues only), Fake-data detector |
+| 5.4 | Feedback Synthesizer | dispatch-single | `product-feedback-synthesizer` ingests dogfood findings.md AND track-b findings.json (per feature). Output `classified-findings.json` carries `source: "dogfood" \| "product-reality"` discriminator. Routes to phase 4 / 3 / 2 / 1.6 (spec-gap) |
+| 5.5 | Fix loop | loop (max 2 cycles) | dispatches fix agents per `target_phase`. Spec-gap findings (`target_phase: 1, target_task_or_step: "1.6"`) route to `product-spec-writer` and re-trigger Track B for the affected feature on next loop |
 
-**6 auditors in ONE message:**
+**Track A — 5 auditors in ONE message:**
 
 | # | subagent_type | Focus |
 |---|---|---|
@@ -303,8 +305,13 @@ For each wave in the feature delegation plan:
 | 2 | `testing-performance-benchmarker` | response times, bottlenecks, Per-Scope bundle budgets (Marketing 500KB / Product 300KB / Dashboard 400KB / Internal 200KB gzipped, >25% over auto-blocks LRR SRE) |
 | 3 | `a11y-architect` | WCAG 2.2 AA runtime (contrast, keyboard, focus, touch targets >=44px, reduced-motion) |
 | 4 | `engineering-security-engineer` | auth, input validation, data exposure, dependency vulns |
-| 5 | `design-ux-researcher` | loading/error/empty states, mobile at 375px, form validation, visual consistency vs style guide |
-| 6 | `design-brand-guardian` | DNA drift check (Phase 5 re-invite, does NOT issue verdict — feeds LRR Brand Guardian chapter) |
+| 5 | `design-brand-guardian` | DNA drift check (Phase 5 re-invite, does NOT issue verdict — feeds LRR Brand Guardian chapter) |
+
+`design-ux-researcher` (formerly Track-A item 5) was REMOVED — its work is subsumed by Track B per-feature audits at Step 5.2.
+
+**Track B — N auditors in ONE message (one per `feature_id`):**
+
+Each `product-reality-auditor` synthesizes 7 check classes from the graph slice for its feature: (a) screen reachability, (b) state coverage, (c) transition firing, (d) business-rule enforcement, (e) happy-path walk, (f) persona walkthrough, (g) wiring + manifest coverage. Per-feature evidence written to `evidence/product-reality/{feature_id}/{tests-generated.md, results.json, findings.json, coverage.json, screenshots/}`. Routing table in `agents/product-reality-auditor.md`. Failure modes and fallback behavior also documented there.
 
 #### 5.b iOS branch
 
@@ -319,7 +326,7 @@ Required iOS artifacts after twins complete:
 - ≥1 `*.yaml` in `maestro/`
 - ≥1 `*.png` in `docs/plans/evidence/maestro-runs/`
 
-**Writes:** `docs/plans/evidence/*.json`, `evidence/fake-data-audit.md`, `evidence/dogfood/classified-findings.json`, `learnings.jsonl` (reality sweep PITFALL/PATTERN rows).
+**Writes:** `docs/plans/evidence/*.json`, `evidence/fake-data-audit.md`, `evidence/dogfood/classified-findings.json`, `evidence/product-reality/*/{tests-generated.md, results.json, findings.json, coverage.json, screenshots/}`, `learnings.jsonl` (reality sweep PITFALL/PATTERN rows).
 
 ---
 
@@ -333,7 +340,7 @@ Preconditions (HARD-GATE — orchestrator-side BEFORE dispatching Reality Checke
 
 **All projects:** `.build-state.json` exists + has recent VERIFY:PASS.
 
-**Web:** `eval-harness/baseline.json`, `eval-harness/final.json`, `e2e/iter-3-results.json`, `dogfood/findings.md`, `dogfood/classified-findings.json`, `fake-data-audit.md`, `manifest.json` (all non-empty).
+**Web:** `e2e/iter-3-results.json`, `dogfood/findings.md`, `dogfood/classified-findings.json`, `fake-data-audit.md`, `product-reality/*/coverage.json` (one per feature in product-spec; missing = BLOCK), `product-reality/*/findings.json` (one per feature), `manifest.json` (all non-empty).
 
 **iOS:** `ios-verify-report.md`, `ios-ux-review-report.md`, ≥1 `maestro/*.yaml`, ≥1 `maestro-runs/*.png`, `manifest.json`.
 
@@ -421,7 +428,7 @@ Five services invoked from multiple phases:
 
 ### 4.1 Metric Loop (`protocols/metric-loop.md`)
 
-**Callers:** Phase 2 (architecture), Phase 3 Step 3.6 (design critic web), Phase 3 Step 3.4-ios (visual QA), Phase 4 per-task, Phase 4.0.d (iOS scaffold), Phase 5 Step 5.2 (hardening), Phase 7 (documentation).
+**Callers:** Phase 2 (architecture), Phase 3 Step 3.6 (design critic web), Phase 3 Step 3.4-ios (visual QA), Phase 4 per-task, Phase 4.0.d (iOS scaffold), Phase 7 (documentation). (Note: Phase 5 no longer wires the metric loop as a primary step — it can still be invoked ad-hoc by Track A audit fixes via Step 5.5 if a check class needs iterative tightening.)
 
 **Contract:**
 - Orchestrator defines metric for the context (not predefined).
@@ -486,10 +493,12 @@ PROBLEM FOUND AT                    ROUTES BACK TO
 Gate 1 NO                       →   Phase 1 Step 1.0 (Brainstorm Facilitator r1 with feedback)
 Gate 2 NO                       →   Phase 2 (with user feedback)
 Phase 3.2b (DNA-persona)        →   Phase 3 Step 3.0 (re-lock DNA)
-Phase 5 Audit — code issue      →   Phase 4 target feature (via BO re-planning)
-Phase 5 Audit — design issue    →   Phase 3 target step
-Phase 5 Audit — spec issue      →   Phase 2 (re-architect)
-Phase 5 Dogfood — classified    →   target_phase per classified-findings.json
+Phase 5 Audit — code issue            →   Phase 4 target feature (via BO re-planning)
+Phase 5 Audit — design issue          →   Phase 3 target step
+Phase 5 Audit — spec issue            →   Phase 2 (re-architect)
+Phase 5 Track B — feature MISSING     →   Phase 1.6 (product-spec-writer) — re-triggers Track B
+Phase 5 Track B — feature PARTIAL     →   target_phase per finding (4/3/2 typically)
+Phase 5 synthesizer — classified      →   target_phase per classified-findings.json (source: "dogfood" | "product-reality")
 Phase 6 LRR BLOCK (⭐⭐)         →   Aggregator reads decisions.jsonl `decided_by` → re-open that phase
 Phase 6 LRR NEEDS_WORK (code)   →   Phase 4 target feature (via BO re-planning)
 Phase 6 LRR NEEDS_WORK (struct) →   Phase 2 or Phase 3 (by finding classification)

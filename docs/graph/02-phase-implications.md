@@ -286,6 +286,42 @@ When backward routing triggers Phase 2/3 re-dispatch:
 
 ---
 
+## Phase 5 Implications
+
+### What Track B consumes from the graph
+
+Track B (Step 5.2 — `product-reality-auditor`) is the heaviest graph consumer added in this redesign. Per `feature_id`:
+
+| Slice | Tools used | Field read |
+|---|---|---|
+| Slice 1 | `graph_query_feature(feature_id)` | states[], transitions[], business_rules[], happy_path, persona_constraints[], acceptance_criteria[], screens[] |
+| Slice 1 | `graph_query_acceptance(feature_id)` | rolled-up acceptance + business_rules + persona_constraints |
+| Slice 3 | `graph_query_screen(screen_id, full: true)` | wireframe_text, sections, screen_component_uses (joined manifest entries), key_copy |
+| Slice 3 | `graph_query_manifest()` | full slot list — used for wiring/manifest coverage check (class g) |
+| Slice 4 | `graph_query_dependencies(feature_id)` | task_dag with owns_files — used for routing finding.target_task_or_step |
+
+Track B does NOT touch Slice 5 (image classes). Slice 5 image evidence is consumed at Phase 5.1 (brand-drift screenshots) and Phase 5.3 (dogfood screenshots) — Track B writes its own screenshots under `evidence/product-reality/{feature_id}/screenshots/`, but those are not indexed by the Slice 5 extractor (Step 5.2.idx is best-effort, not Slice-5-aware).
+
+### What Track B writes back to the graph
+
+Step 5.2.idx attempts to index `evidence/product-reality/*/` but is **best-effort**. Track B evidence is hard-gated at Phase 6.0 by FILE presence + JSON parseability, NOT by graph index status. Downstream consumers (Phase 5.4 synthesizer, Phase 6.1 Eng-Quality chapter) read JSON files directly. The graph index is value-add for cross-feature query patterns but is not load-bearing.
+
+### Synthesizer (Step 5.4) graph reads
+
+The `product-feedback-synthesizer` reads:
+
+- `graph_query_dependencies(feature_id)` — to validate Track B findings' `target_task_or_step` against the current task DAG, and to route dogfood findings by file-ownership.
+- `graph_query_decisions({status: "open"})` — for both streams; finding-decision matching to surface cross-cutting concerns.
+- `graph_query_feature(feature_id)` — confirm feature membership when finding cites a feature by name.
+
+If any graph call returns `isError`, the synthesizer falls back to grep heuristics (legacy path) for both streams. Track B findings, on graph-unavailable fallback, pass through with their auditor-set `target_phase` unchanged (the auditor's routing is more authoritative than no-info).
+
+### LRR Eng-Quality (Phase 6.1) graph reads
+
+After this redesign, LRR Eng-Quality stops recomputing `requirements_coverage`. Instead it reads `evidence/product-reality/*/coverage.json` (one per feature) directly via Read/Glob — these files have stable known schemas, so the graph layer is not strictly needed for this read path. The chapter's existing graph reads (decisions, dependencies for cross-chapter context) are unchanged.
+
+---
+
 ## Fit Assessment
 
 ### What Works Out of the Box

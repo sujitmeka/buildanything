@@ -156,6 +156,34 @@ artifacts:
   - path: docs/plans/learnings.jsonl
     writers: [phase-5, phase-7]
     readers: [phase-0-learnings-loader, phase-5-reality-sweep]
+  - path: docs/plans/evidence/product-reality/{feature_id}/results.json
+    platform: web
+    writer: product-reality-auditor
+    readers: [phase-5-feedback-synthesizer, phase-6-eng-quality]
+    notes: |
+      Per-feature pass/fail evidence from Track B audit. Schema in
+      agents/product-reality-auditor.md.
+  - path: docs/plans/evidence/product-reality/{feature_id}/findings.json
+    platform: web
+    writer: product-reality-auditor
+    readers: [phase-5-feedback-synthesizer]
+    notes: |
+      Per-feature failures with target_phase pre-set by auditor;
+      synthesizer validates and passes through.
+  - path: docs/plans/evidence/product-reality/{feature_id}/coverage.json
+    platform: web
+    writer: product-reality-auditor
+    readers: [phase-6-eng-quality]
+    notes: |
+      Per-feature {COVERED|PARTIAL|MISSING} verdict. LRR Eng-Quality
+      reads these (one per feature) instead of recomputing.
+  - path: docs/plans/evidence/product-reality/{feature_id}/tests-generated.md
+    platform: web
+    writer: product-reality-auditor
+    readers: [phase-5-feedback-synthesizer, phase-6-eng-quality]
+    notes: |
+      Synthesized agent-browser scripts (one block per check case).
+      Provides debug context when results.json shows FAIL.
   - path: docs/plans/evidence/*.json
     writer: phase-5
     contributors: [phase-4]
@@ -175,9 +203,13 @@ artifacts:
     readers: [phase-6, phase-7]
     notes: |
       Nested per-task / per-run evidence JSON (smoke-test HAR analysis,
-      eval-harness baseline/final, e2e iter-3 results, dogfood classified
-      findings, maestro run summaries). Top-level evidence/*.json kept
-      separate above for the phase-5 writer narrowing.
+      e2e iter-3 results, dogfood classified findings, product-reality
+      per-feature results/findings/coverage, maestro run summaries).
+      eval-harness baseline/final files are no longer Phase 5 primary
+      outputs (Phase 5 restructured into Track A/B as of 2026-05-01) but
+      the eval-harness service is still callable ad-hoc from Step 5.5
+      fixes. Top-level evidence/*.json kept separate above for the
+      phase-5 writer narrowing.
   - path: docs/plans/evidence/**/*.md
     writers: [phase-4, phase-5]
     readers: [phase-5, phase-6, phase-7]
@@ -919,19 +951,22 @@ phases:
         to: phase-4.target-feature
       - from: phase-5-dogfood-feedback-synthesizer
         to: phase-4.target-feature
+      - from: phase-5-track-b-feedback-synthesizer
+        to: phase-1.6-product-spec-writer
+        condition: spec-gap finding (target_phase 1, target_task_or_step "1.6")
 
   - id: "5"
     name: Audit
-    kind: team-then-eval-then-parallel-then-synth
+    kind: track-a-then-track-b-then-cross-cutting-then-synth
     skip_conditions: []
     precondition: verify-protocol passes
     web_branch:
       steps:
         - id: "5.1"
-          name: TEAM of 6 parallel auditors
+          name: Track A — Engineering Reality (5 parallel auditors)
           kind: dispatch-parallel
           dispatch_mode: single-message
-          parallel_count: 6
+          parallel_count: 5
           dispatches:
             - subagent_type: testing-api-tester
               focus: API validation, edge cases, error responses, auth flows
@@ -948,37 +983,68 @@ phases:
               checks: [contrast, keyboard, focus, touch-targets>=44px, reduced-motion]
             - subagent_type: engineering-security-engineer
               focus: auth, input validation, data exposure, dependency vulns
-            - subagent_type: design-ux-researcher
-              focus: loading/error/empty states, mobile@375px, form validation, visual consistency vs style guide
             - subagent_type: design-brand-guardian
               focus: DNA drift check
               notes: Phase 5 re-invite, does NOT issue verdict — feeds LRR Brand Guardian chapter
+          notes: |
+            design-ux-researcher (formerly item 5) was REMOVED — its work is
+            subsumed by Track B per-feature audits at Step 5.2.
         - id: "5.2"
-          name: Eval Harness -> Metric Loop
-          kind: loop
-          service: metric-loop
-          eval_case_count: 8-15
-          max_iterations: 4
-          fix_routing:
-            security: security-reviewer
-            a11y: engineering-frontend-developer
-            perf: testing-performance-benchmarker
-          post_loop: re-run-eval
+          name: Track B — Product Reality (parallel per-feature)
+          kind: dispatch-parallel-per-feature
+          dispatch_mode: single-message
+          parallel_count: N (one per feature_id from graph_query_feature)
+          subagent_type: product-reality-auditor
+          feature_enumeration: graph-query-then-file-fallback
+          zero_feature_gate: stop-and-route-to-1.6
+          post_dispatch_verification:
+            - presence-and-json-parseability-of-four-evidence-files
+            - retry_once_with_graph_used_false
+            - synthesize_finding_target_phase_1_step_1.6_on_second_failure
+          writes_per_feature:
+            - docs/plans/evidence/product-reality/{feature_id}/tests-generated.md
+            - docs/plans/evidence/product-reality/{feature_id}/results.json
+            - docs/plans/evidence/product-reality/{feature_id}/findings.json
+            - docs/plans/evidence/product-reality/{feature_id}/coverage.json
+            - docs/plans/evidence/product-reality/{feature_id}/screenshots/
+        - id: "5.2.idx"
+          name: Track B evidence graph index (best-effort)
+          kind: graph-index
+          best_effort: true
+          rationale: hard-gated at Phase 6.0 by file presence + JSON parseability, not by graph index
+          command: "node ${CLAUDE_PLUGIN_ROOT}/bin/graph-index.js docs/plans/evidence/product-reality/"
         - id: "5.3"
-          name: TEAM of 3 parallel
+          name: Cross-cutting (3 parallel, ONE message)
           kind: dispatch-parallel
           dispatch_mode: single-message
           parallel_count: 3
           dispatches:
-            - e2e-runner: Playwright, 3 iters mandatory
-            - dogfood-runner: agent-browser
+            - e2e-runner:
+                tool: Playwright
+                iterations: 3-mandatory
+                scope: multi-feature User Journeys ONLY (single-feature happy paths covered by Track B at 5.2)
+            - dogfood-runner:
+                tool: agent-browser
+                scope: emergent issues only (do not re-audit per-feature spec coverage)
             - fake-data-detector
         - id: "5.4"
           name: Feedback Synthesizer
           kind: dispatch-single
           subagent_type: product-feedback-synthesizer
-          classifies_to: [phase-4-code, phase-3-visual, phase-2-structural]
+          inputs:
+            - docs/plans/evidence/dogfood/findings.md
+            - docs/plans/evidence/product-reality/*/findings.json
+          output: docs/plans/evidence/dogfood/classified-findings.json
+          output_per_finding_fields: [finding_id, source, severity, target_phase, target_task_or_step, description, evidence_ref, related_decision_id]
+          output_footer_fields: [graph_used, re_routed_findings, source_counts]
+          source_discriminator: "dogfood | product-reality"
+          routing_arms: [phase-4-code, phase-3-visual, phase-2-structural, phase-1.6-spec-gap]
+          track_b_handling: validate-pass-through (re-route only if graph rejects)
+        - id: "5.5"
+          name: Fix loop
+          kind: loop
           max_fix_cycles: 2
+          spec_gap_routing: target_phase 1, target_task_or_step "1.6" -> product-spec-writer (re-triggers Track B for affected feature)
     ios_branch:
       replaces: web-6+3
       mode: three-slash-commands-in-sequence
@@ -995,6 +1061,7 @@ phases:
       - docs/plans/evidence/*.json
       - evidence/fake-data-audit.md
       - evidence/dogfood/classified-findings.json
+      - "evidence/product-reality/*/{tests-generated.md, results.json, findings.json, coverage.json, screenshots/}"
       - "learnings.jsonl (reality sweep PITFALL/PATTERN rows)"
 
   - id: "6"
@@ -1006,12 +1073,12 @@ phases:
       hard_gate_preconditions:
         all_projects: [".build-state.json exists + has recent VERIFY:PASS"]
         web:
-          - eval-harness/baseline.json
-          - eval-harness/final.json
           - e2e/iter-3-results.json
           - dogfood/findings.md
           - dogfood/classified-findings.json
           - fake-data-audit.md
+          - "product-reality/*/coverage.json (one per feature in product-spec; missing = BLOCK)"
+          - "product-reality/*/findings.json (one per feature)"
           - manifest.json
         ios:
           - ios-verify-report.md
