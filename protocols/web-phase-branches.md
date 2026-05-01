@@ -74,13 +74,13 @@ Output: `DESIGN.md` (repo root) — Pass 1. Step 3.4 completes Pass 2.
 
 #### Step 3.0.idx — DESIGN.md Pass 1 graph index
 
-After `design-brand-guardian` returns and `DESIGN.md` is on disk, index it into the build graph. Slice 2 graph index — best-effort, BO falls back to file reads on failure.
+After `design-brand-guardian` returns and `DESIGN.md` is on disk, index it into the build graph. Slice 2 graph index — required for downstream agents.
 
 Run via the Bash tool:
 
 - Command: `node ${CLAUDE_PLUGIN_ROOT}/bin/graph-index.js DESIGN.md`
 - On exit 0: log success to `docs/plans/build-log.md` and continue.
-- On non-zero exit: log a warning line to `docs/plans/build-log.md` (`graph-index DESIGN.md failed — continuing with file-read fallback`) and continue. The graph never blocks builds.
+- On non-zero exit: STOP. Log the error to `docs/plans/build-log.md` and report the failure. Downstream agents require the graph — do not proceed without a successful index.
 
 ### Step 3.1 — Visual Research (2 agents, parallel, both Playwright-driven)
 
@@ -96,13 +96,13 @@ Output: `docs/plans/design-references.md` — reference paths grouped by DNA axi
 
 #### Step 3.1.idx — Design references graph index
 
-After both `visual-research` agents return and `docs/plans/design-references/` is populated with screenshots, index the directory into the build graph as Slice 5 reference fragments. Best-effort, BO falls back to file reads on failure.
+After both `visual-research` agents return and `docs/plans/design-references/` is populated with screenshots, index the directory into the build graph as Slice 5 reference fragments. Required for downstream agents.
 
 Run via the Bash tool:
 
 - Command: `node ${CLAUDE_PLUGIN_ROOT}/bin/graph-index.js docs/plans/design-references/`
 - On exit 0: log success to `docs/plans/build-log.md` and continue.
-- On non-zero exit: log a warning line to `docs/plans/build-log.md` (`graph-index design-references/ failed — continuing with file-read fallback`) and continue. The graph never blocks builds.
+- On non-zero exit: STOP. Log the error to `docs/plans/build-log.md` and report the failure. Downstream agents require the graph — do not proceed without a successful index.
 
 ### Step 3.2 — Component Library Mapping (single agent, HARD-GATE source)
 
@@ -118,13 +118,13 @@ Output: `docs/plans/component-manifest.md` — locked component manifest.
 
 #### Step 3.2.idx — Component manifest graph index
 
-After `design-ui-designer` returns and `docs/plans/component-manifest.md` is on disk, index it into the build graph. Slice 2 graph index — best-effort.
+After `design-ui-designer` returns and `docs/plans/component-manifest.md` is on disk, index it into the build graph. Slice 2 graph index — required for downstream agents.
 
 Run via the Bash tool:
 
 - Command: `node ${CLAUDE_PLUGIN_ROOT}/bin/graph-index.js docs/plans/component-manifest.md`
 - On exit 0: log success to `docs/plans/build-log.md` and continue.
-- On non-zero exit: log a warning line to `docs/plans/build-log.md` (`graph-index component-manifest.md failed — continuing with file-read fallback`) and continue.
+- On non-zero exit: STOP. Log the error to `docs/plans/build-log.md` and report the failure. Downstream agents require the graph — do not proceed without a successful index.
 
 ### Step 3.2b — DNA Persona Check
 
@@ -165,7 +165,7 @@ Run via the Bash tool:
 
 - Command: `node ${CLAUDE_PLUGIN_ROOT}/bin/graph-index.js docs/plans/page-specs/`
 - On exit 0: log success to `docs/plans/build-log.md` and continue.
-- On non-zero exit: log a warning line to `docs/plans/build-log.md` (`graph-index page-specs/ failed — continuing with file-read fallback`) and continue. The graph never blocks builds.
+- On non-zero exit: STOP. Log the error to `docs/plans/build-log.md` and report the failure. Downstream agents require the graph — do not proceed without a successful index.
 
 ### Step 3.3b — UX Flow Validation
 
@@ -207,7 +207,7 @@ Run via the Bash tool:
 
 - Command: `node ${CLAUDE_PLUGIN_ROOT}/bin/graph-index.js DESIGN.md`
 - On exit 0: log success to `docs/plans/build-log.md` and continue.
-- On non-zero exit: log a warning line to `docs/plans/build-log.md` (`graph-index DESIGN.md (Pass 2) failed — continuing with file-read fallback`) and continue.
+- On non-zero exit: STOP. Log the error to `docs/plans/build-log.md` and report the failure. Downstream agents require the graph — do not proceed without a successful index.
 
 ### Step 3.5 — Inclusive Visuals Check (single agent)
 
@@ -347,13 +347,13 @@ Uses agent-browser against localhost to open the app, execute the task's behavio
 
 ## Phase 5 — Audit (web branch)
 
-Phase 5 in the web branch contains the 5-agent audit team, eval harness, hardening metric loop, 3-iteration E2E testing, autonomous dogfooding, and fake-data detector. The orchestrator-side machinery (TEAM dispatch, Feedback Synthesizer, evidence writes) follows `commands/build.md` Phase 5. Reality Check and LRR Aggregation moved to Phase 6 — do NOT run them here.
+Phase 5 in the web branch is split into three layers — Track A (engineering envelope: 5 parallel auditors), Track B (product reality: parallel per-feature audit driven by graph queries), and Cross-cutting (3-iteration Playwright E2E, autonomous agent-browser dogfood, fake-data detector). All findings route through the Feedback Synthesizer (Step 5.4) and Fix loop (Step 5.5). The orchestrator-side machinery (Track-A team dispatch, Track-B fan-out, synthesizer, evidence writes, fix loop) follows `commands/build.md` Phase 5 — this file carries web-branch-specific elaboration only. Reality Check and LRR Aggregation are Phase 6, not here.
 
-### Step 5.1 — Initial Audit (6 agents in parallel, ONE message)
+### Step 5.1 — Track A: Engineering Reality (5 agents in parallel, ONE message)
 
-Read the NFRs from `docs/plans/quality-targets.json` (and `docs/plans/sprint-tasks.md` NFR section if present). Pass the relevant NFR thresholds to each audit agent so they have concrete targets, not generic checks. The sixth auditor is the Brand Guardian drift check — it runs alongside the technical auditors to catch DNA drift before the Phase 6 LRR Brand Guardian chapter renders its verdict.
+Read the NFRs from `docs/plans/quality-targets.json` (and `docs/plans/sprint-tasks.md` NFR section if present). Pass the relevant NFR thresholds to each audit agent so they have concrete targets, not generic checks. The fifth auditor is the Brand Guardian drift check — it runs alongside the technical auditors to catch DNA drift before the Phase 6 LRR Brand Guardian chapter renders its verdict. Per-feature UX quality (loading states, empty states, error states, mobile responsiveness, visual consistency) is now covered feature-by-feature in Step 5.2 Track B — DO NOT add a generic UX-quality dispatch back here.
 
-Call the Agent tool 6 times in one message:
+Call the Agent tool 5 times in one message:
 
 1. Description: "API testing" — subagent_type: `testing-api-tester` — Prompt: "[CONTEXT header above — phase: 5] Comprehensive API validation: all endpoints, edge cases, error responses, auth flows. NFR targets: Read `docs/plans/quality-targets.json` via your Read tool for performance and reliability thresholds. Report findings with counts."
 
@@ -371,9 +371,7 @@ Exceeding the budget by >25% auto-blocks the Phase 6 LRR SRE chapter. Budget vio
 
 4. Description: "Security audit" — subagent_type: `engineering-security-engineer` — Prompt: "[CONTEXT header above — phase: 5] Security review: auth, input validation, data exposure, dependency vulnerabilities. NFR targets: Read `docs/plans/quality-targets.json` via your Read tool for security thresholds. Report findings with severity."
 
-5. Description: "UX quality audit" — subagent_type: `design-ux-researcher` — Prompt: "[CONTEXT header above — phase: 5] UX quality review of every user-facing page. NFR targets: Read `docs/plans/quality-targets.json` via your Read tool for accessibility and UX thresholds. First, screenshot the living style guide at /design-system as your reference for how components should look. Then review every product page and check: loading states (every async action must show a loading indicator), error states (every form and API call must show user-friendly error feedback), empty states (every list/table must handle zero items gracefully), mobile responsiveness (test at 375px viewport — touch targets >= 44px, no horizontal scroll, readable text), form validation (inline feedback, not just alert()), transition smoothness (no layout shifts, no janky animations), visual consistency (compare each page's components against the style guide — buttons, inputs, cards, colors, spacing should match). Report issues with page, severity, and screenshot."
-
-6. Description: "Brand Guardian drift check" — subagent_type: `design-brand-guardian` — Prompt: "[CONTEXT header above — phase: 5] You are the Phase 5 drift check (proposed state §5 re-invite). Read `DESIGN.md` (the DNA card locked at Phase 3.0) + the actually-built pages via Playwright screenshots under `docs/plans/evidence/brand-drift/` (write production screenshots there as PNG/JPG files, one per page audited, named `<screen-id>.png`). Score whether Phase 4 implementers stayed true to the DNA or drifted away from it. Specifically check each of the 6 DNA axes (Scope / Density / Character / Material / Motion / Type) against what the built product actually renders. Report drift count and specific elements (file:line references). Save findings to `docs/plans/evidence/brand-drift.md`. This is a drift check only — the Phase 6 LRR Brand Guardian chapter does the verdict. You do NOT issue a pass/fail here, only surface findings for the LRR chapter to read."
+5. Description: "Brand Guardian drift check" — subagent_type: `design-brand-guardian` — Prompt: "[CONTEXT header above — phase: 5] You are the Phase 5 drift check (proposed state §5 re-invite). Read `DESIGN.md` (the DNA card locked at Phase 3.0) + the actually-built pages via Playwright screenshots under `docs/plans/evidence/brand-drift/` (write production screenshots there as PNG/JPG files, one per page audited, named `<screen-id>.png`). Score whether Phase 4 implementers stayed true to the DNA or drifted away from it. Specifically check each of the 6 DNA axes (Scope / Density / Character / Material / Motion / Type) against what the built product actually renders. Report drift count and specific elements (file:line references). Save findings to `docs/plans/evidence/brand-drift.md`. This is a drift check only — the Phase 6 LRR Brand Guardian chapter does the verdict. You do NOT issue a pass/fail here, only surface findings for the LRR chapter to read."
 
 #### Step 5.1.idx — Brand drift screenshots graph index
 
@@ -383,45 +381,57 @@ Run via the Bash tool:
 
 - Command: `node ${CLAUDE_PLUGIN_ROOT}/bin/graph-index.js docs/plans/evidence/brand-drift/`
 - On exit 0: log success to `docs/plans/build-log.md` and continue.
-- On non-zero exit: log a warning line to `docs/plans/build-log.md` (`graph-index evidence/brand-drift/ failed — continuing with file-read fallback`) and continue. The graph never blocks builds.
+- On non-zero exit: STOP. Log the error to `docs/plans/build-log.md` and report the failure. Downstream agents require the graph — do not proceed without a successful index.
 
-### Step 5.2 — Eval Harness
+### Step 5.2 — Track B: Product Reality (parallel per-feature, ONE message)
 
-Run the Eval Harness Protocol (`protocols/eval-harness.md`). Define 8-15 concrete, executable eval cases from the audit findings and architecture doc. For UI flows, eval cases should use agent-browser: "agent-browser open /dashboard -> agent-browser click @submit -> agent-browser wait --text Success -> expect text contains confirmation ID". Run the eval agent. Record baseline pass rate. CRITICAL and HIGH failures feed into the metric loop in Step 5.3 as specific issues to fix.
+Track B audits the built app against `product-spec.md` on a per-feature basis. The orchestrator-side dispatch shape (feature enumeration via the graph, zero-feature gate, parallel `product-reality-auditor` fan-out, post-dispatch evidence verification) is canonically described in `commands/build.md` Step 5.2 — follow that for orchestration. This section adds web-branch-specific elaboration.
 
-### Step 5.3 — Metric Loop: Hardening Quality
+**What the auditor does** (per-feature, in parallel): synthesizes agent-browser scripts from the graph slice (states, transitions, business rules, happy path, persona constraints, page-spec wiring, manifest coverage), executes them against the running web app, captures screenshots, and writes structured evidence. The auditor's contract is in `agents/product-reality-auditor.md`. The seven check classes (a–g) and the routing table live there — do not paraphrase them here.
 
-Per `protocols/metric-loop.md` Step 0.5, extract audit findings (from Step 5.1 and Step 5.2 eval harness) into the Scoring Criteria Checklist via a **one-shot extractor dispatch** — single agent call reads the audit reports and outputs a prioritized findings checklist with severity, description, and file refs. Persist to `active_metric_loop.scoring_criteria_checklist` in `.build-state.json`. Critic receives the checklist + fresh measurement results each iteration. Do NOT re-inject full audit reports per iteration.
+**Web-branch specifics:**
+- The running app is at `http://localhost:[port]` (orchestrator must have the dev server running before Step 5.2 — same as for E2E/dogfood at Step 5.3).
+- agent-browser is the primary execution surface; Playwright loaded via the Skill tool is the fallback (one retry total).
+- Screenshots and per-case evidence land under `docs/plans/evidence/product-reality/{feature_id}/screenshots/`. Each case_id maps 1:1 to a PNG file (or `screenshot: null` for non-visual checks like manifest-slot-empty).
+- The four evidence files per feature (`tests-generated.md`, `results.json`, `findings.json`, `coverage.json`) are written by the auditor; the orchestrator verifies their presence + JSON parseability per `commands/build.md` Step 5.2 post-dispatch verification.
 
-Run the Metric Loop Protocol on the full codebase using the checklist as scoring input. Define a composite metric based on what this project needs. Max 4 iterations.
+**Failure routing:** Track B auditor failures route through the existing fix-loop spec-gap path (`target_phase: 1, target_step: 1.6` to `product-spec-writer`) — see `commands/build.md` Step 5.2 post-dispatch verification for the escalation flow.
 
-When fixing, dispatch to the RIGHT specialist. Security → security agent. Accessibility → frontend agent. Don't send everything to one agent.
+#### Step 5.2.idx — Track B evidence graph index
 
-### Step 5.3b — Eval Re-run
+After all per-feature `product-reality-auditor` dispatches return and `docs/plans/evidence/product-reality/*/` is populated, index the directory into the build graph. Best-effort — downstream consumers (Phase 5.4 synthesizer, Phase 6.1 Eng-Quality chapter) fall back to file reads on indexer failure.
 
-Re-run the Eval Harness after the metric loop exits. All CRITICAL eval cases must now pass. If any CRITICAL case still fails, include it as evidence for the Phase 6 Reality Check sweep.
+Run via the Bash tool:
 
-### Step 5.4 — E2E Testing (3 mandatory iterations)
+- Command: `node ${CLAUDE_PLUGIN_ROOT}/bin/graph-index.js docs/plans/evidence/product-reality/`
+- On exit 0: log success to `docs/plans/build-log.md` and continue.
+- On non-zero exit: log the error to `docs/plans/build-log.md` and continue (best-effort — Track B evidence is hard-gated at Phase 6.0 by file presence + parseability, not by graph index status).
+
+### Step 5.3 — Cross-cutting (3 parallel, ONE message)
+
+Three checks run in parallel as a cross-cutting layer: 3-iteration Playwright E2E for multi-feature User Journeys, autonomous agent-browser dogfood for emergent issues, and the fake-data detector. The orchestrator dispatch shape (3 parallel agents in one message) is in `commands/build.md` Step 5.3.
+
+#### Step 5.3a — E2E Testing (3 mandatory iterations)
 
 HARD-GATE: ALL 3 ITERATIONS ARE MANDATORY. Do NOT stop after iteration 1 even if all tests pass. The purpose of 3 runs is to catch flaky tests, timing-dependent failures, and race conditions that only surface on repeated execution. Skip this step ONLY if the project has no user-facing frontend.
 
-Generate and execute end-to-end tests using Playwright against the running application. Tests cover the **User Journeys** defined in `docs/plans/sprint-tasks.md` (Step 0 of the Planning Protocol). Each journey = one E2E test file.
+**Scope (POST Track B):** E2E covers **multi-feature User Journeys ONLY** — login → browse → buy, signup → onboarding → first-action, etc. Single-feature happy paths are covered by Track B per-feature auditors at Step 5.2 — DO NOT duplicate. The User Journey list lives in `docs/plans/sprint-tasks.md` (Step 0 of the Planning Protocol). Each cross-feature journey = one E2E test file.
 
 **Iteration 1 — Generate & Run:**
 
 Call the Agent tool — description: "E2E test generation" — subagent_type: `engineering-frontend-developer` — mode: "bypassPermissions" — prompt:
 
-"[CONTEXT header above — phase: 5] [COMPLEXITY: L] Generate and run end-to-end Playwright tests for this application.
+"[CONTEXT header above — phase: 5] [COMPLEXITY: L] Generate and run end-to-end Playwright tests for cross-feature User Journeys ONLY (single-feature happy paths are covered by Track B at Step 5.2 — do NOT duplicate them here).
 
 INPUTS:
 Read these files via your Read tool before starting — do NOT expect pasted content:
-- User Journeys: `docs/plans/sprint-tasks.md` (User Journeys section — each journey becomes one E2E test)
+- User Journeys: `docs/plans/sprint-tasks.md` (User Journeys section — each cross-feature journey becomes one E2E test)
 - Architecture (API contracts): `docs/plans/architecture.md`
 - NFRs: `docs/plans/sprint-tasks.md` (NFR section — use performance thresholds as test assertions)
 - Visual Design Spec (component selectors): `DESIGN.md`
 
 REQUIREMENTS:
-1. One E2E test per User Journey from sprint-tasks.md (each journey = one test file covering the full flow)
+1. One E2E test per cross-feature User Journey from sprint-tasks.md (each journey = one test file covering the full flow)
 2. Use Page Object Model pattern — one page object per major view
 3. Use data-testid selectors (add them to components if missing)
 4. Wait for API responses, NEVER use arbitrary timeouts (no waitForTimeout)
@@ -429,12 +439,12 @@ REQUIREMENTS:
 6. Configure multi-browser: Chromium + Firefox + WebKit
 7. Set up playwright.config.ts with: fullyParallel, retries: 0 (we handle retries ourselves), screenshot: 'only-on-failure', video: 'retain-on-failure', trace: 'on-first-retry'
 8. Run all tests. Report: total, passed, failed, with failure details and screenshot paths.
-9. Commit: 'test: e2e test suite for critical user journeys'
+9. Commit: 'test: e2e test suite for cross-feature user journeys'
 
 Test priority:
-- CRITICAL: Auth, core feature happy path, data submission, payment/transaction flows
-- HIGH: Search, filtering, navigation, error states
-- MEDIUM: Responsive layout, animations, edge cases"
+- CRITICAL: Auth, core cross-feature happy path, data submission across features, payment/transaction flows
+- HIGH: Search across features, filtering, navigation, error states that span features
+- MEDIUM: Responsive layout for multi-feature flows, animations, edge cases"
 
 Record results: total tests, pass count, fail count, failure details. Log to `docs/plans/.build-state.md` under `## E2E Testing`:
 
@@ -456,27 +466,27 @@ Call the Agent tool — description: "E2E stability run" — subagent_type: `eng
 
 Record final results. Include in the Phase 6.0 Reality Check evidence sweep (see `commands/build.md` Phase 6 Step 6.0).
 
-### Step 5.5 — Autonomous Dogfooding
+#### Step 5.3b — Autonomous Dogfooding
 
-Run the agent-browser dogfood skill against the running app. Unlike the per-task smoke tests (which verify specific acceptance criteria), dogfooding is **exploratory** — it autonomously navigates every reachable page, clicks buttons, fills forms, checks console errors, and finds issues we didn't think to test.
+Run the agent-browser dogfood skill against the running app. Unlike Track B (which checks built features against the spec) and unlike per-task smoke tests (which verify specific acceptance criteria), dogfooding is **exploratory** — it autonomously navigates every reachable page, clicks buttons, fills forms, checks console errors, and finds issues we didn't think to test. Spec-blind by design — that's the point.
 
 Start the dev server if not running. Then invoke the dogfood skill:
 
-Call the Agent tool — description: "Dogfood the app" — subagent_type: `testing-evidence-collector` — mode: "bypassPermissions" — prompt: "[CONTEXT header above — phase: 5] Run the agent-browser dogfood skill against the running app at http://localhost:[port]. Explore every reachable page. Click every button. Fill every form. Check console for errors. Report a structured list of issues with severity ratings (critical/high/medium/low), screenshots, and repro steps. Save screenshots under `docs/plans/evidence/dogfood/` (one PNG/JPG per finding, named after the finding_id), and emit `docs/plans/evidence/dogfood/findings.json` (machine-readable mirror of findings.md — schema: `[{finding_id, severity, description, screenshot_path, affected_screen_id}, ...]` per agents/testing-evidence-collector.md "Dogfood Evidence Outputs") so the Slice 5 indexer can wire `screenshot_evidences_finding` edges. If dogfood skill is not available, use agent-browser manually: snapshot each page, click all interactive elements, check errors and network requests. Also evaluate UX quality: missing loading states, poor error messages, broken mobile layouts (resize to 375px), visual inconsistencies, missing empty states, form validation gaps. Report UX issues separately from functional issues."
+Call the Agent tool — description: "Dogfood the app" — subagent_type: `testing-evidence-collector` — mode: "bypassPermissions" — prompt: "[CONTEXT header above — phase: 5] Run the agent-browser dogfood skill against the running app at http://localhost:[port]. Explore every reachable page. Click every button. Fill every form. Check console for errors. Report a structured list of issues with severity ratings (critical/high/medium/low), screenshots, and repro steps. Save screenshots under `docs/plans/evidence/dogfood/` (one PNG/JPG per finding, named after the finding_id), and emit `docs/plans/evidence/dogfood/findings.json` (machine-readable mirror of findings.md — schema: `[{finding_id, severity, description, screenshot_path, affected_screen_id}, ...]` per agents/testing-evidence-collector.md \"Dogfood Evidence Outputs\") so the Slice 5 indexer can wire `screenshot_evidences_finding` edges. If dogfood skill is not available, use agent-browser manually: snapshot each page, click all interactive elements, check errors and network requests. Focus on emergent issues (console errors, broken layouts at 320/375/768px, failed network requests, broken navigation links) — do NOT re-audit per-feature spec coverage; that's Track B's job at Step 5.2."
 
 Classification and fix-routing of Dogfood findings is handled by the Feedback Synthesizer at `commands/build.md` Phase 5 Step 5.4 — do NOT self-classify or spawn fix agents from this step.
 
-#### Step 5.5.idx — Dogfood evidence graph index
+##### Step 5.3b.idx — Dogfood evidence graph index
 
-After `testing-evidence-collector` returns and `docs/plans/evidence/dogfood/` is populated with finding screenshots, index the directory into the build graph as Slice 5 dogfood fragments. Best-effort, the feedback synthesizer falls back to file reads on failure. The indexer reads BOTH the screenshots in `evidence/dogfood/` AND the `findings.json` side-channel to wire `screenshot_evidences_finding` edges. Note: schema doc 11-slice5-schema.md §7 names this trigger "Step 5.3.idx" because the dogfood agent ran at Step 5.3 in the schema-time orchestration; in this file it follows Step 5.5.
+After `testing-evidence-collector` returns and `docs/plans/evidence/dogfood/` is populated with finding screenshots, index the directory into the build graph as Slice 5 dogfood fragments. Best-effort, the feedback synthesizer falls back to file reads on failure. The indexer reads BOTH the screenshots in `evidence/dogfood/` AND the `findings.json` side-channel to wire `screenshot_evidences_finding` edges.
 
 Run via the Bash tool:
 
 - Command: `node ${CLAUDE_PLUGIN_ROOT}/bin/graph-index.js docs/plans/evidence/dogfood/`
 - On exit 0: log success to `docs/plans/build-log.md` and continue.
-- On non-zero exit: log a warning line to `docs/plans/build-log.md` (`graph-index evidence/dogfood/ failed — continuing with file-read fallback`) and continue. The graph never blocks builds.
+- On non-zero exit: STOP. Log the error to `docs/plans/build-log.md` and report the failure. Downstream agents require the graph — do not proceed without a successful index.
 
-### Step 5.6 — Fake Data Detector
+#### Step 5.3c — Fake Data Detector
 
 Call the Agent tool — description: "Fake data audit" — subagent_type: `silent-failure-hunter` — mode: "bypassPermissions" — prompt: "[CONTEXT header above — phase: 5] Run the Fake Data Detector Protocol (protocols/fake-data-detector.md). Check for mock/hardcoded data in production paths. Static analysis: grep for Math.random() business data, hardcoded API responses, setTimeout faking async, placeholder text. Dynamic analysis: inspect HAR files from docs/plans/evidence/ for missing real API calls, static responses, absent WebSocket traffic. Report findings with file:line references and severity."
 
@@ -486,6 +496,14 @@ Call the Agent tool — description: "Fake data audit" — subagent_type: `silen
 3. After fixes, re-run the fake data detector (static checks only — fast). Max 2 fix cycles.
 
 Remaining findings feed into the Phase 6.0 Reality Check evidence sweep (see `commands/build.md` Phase 6 Step 6.0).
+
+### Step 5.4 — Feedback Synthesizer
+
+The orchestrator-side dispatch and prompt body live in `commands/build.md` Step 5.4. The synthesizer ingests both Track B `findings.json` (one per feature) and Dogfood `findings.md`/`findings.json`, validates target_phase routing against the graph, and emits `docs/plans/evidence/dogfood/classified-findings.json` with a `source: "dogfood" | "product-reality"` discriminator. Web-branch note: for `project_type=web` this is always the path; for iOS see `protocols/ios-phase-branches.md`.
+
+### Step 5.5 — Fix loop
+
+The orchestrator-side fix-loop dispatch lives in `commands/build.md` Step 5.5. Max 2 fix cycles. Routing template at the bottom of `commands/build.md` ("Re-entry dispatch template"). Findings with `target_phase: 1, target_step: 1.6` route back to `product-spec-writer`, which re-triggers Track B for the affected feature on the next loop.
 
 ## Phase 7 — Ship (web branch)
 
