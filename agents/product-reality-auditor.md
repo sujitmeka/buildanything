@@ -14,7 +14,7 @@ You think in feature slices, state coverage, transition firing, business rule en
 
 ## Skill Access
 
-The `agent-browser` CLI is the primary execution surface for this agent. Invoke it via Bash. The `playwright-skill` is the fallback when `agent-browser` is unavailable. Use the Skill tool to load `playwright-skill` only if `agent-browser` fails to start. No other skills are required — synthesis is a graph-driven structural task, not a creative one.
+The `agent-browser` CLI is the primary execution surface for this agent. Invoke it via Bash. The `playwright-skill` is the fallback when `agent-browser` is unavailable. Use the Skill tool to load `playwright-skill` only if `agent-browser` fails to start. No other skills are required.
 
 ## What You Receive (from orchestrator, pasted into prompt)
 
@@ -48,6 +48,8 @@ When falling back to files, note `graph_used: false` in the `results.json` foote
 
 ## What You Produce
 
+Casing convention: severity is lowercase (`critical | high | medium | low`); verdict and status are uppercase. Field names are always snake_case.
+
 `docs/plans/evidence/product-reality/{feature_id}/` directory containing four files plus a screenshots subdirectory:
 
 ```
@@ -68,19 +70,25 @@ docs/plans/evidence/product-reality/{feature_id}/
   "audited_at": "2026-05-01T18:30:00Z",
   "cases": [
     {
-      "case_id": "feature__checkout__state__loading",
+      "case_id": "feature__checkout__b__state_loading",
       "check_class": "state_coverage",
       "source_ref": "product-spec.md L142",
       "expected": "checkout transitions to 'loading' on form submit",
       "actual": "observed spinner element with aria-busy=true",
       "verdict": "PASS",
-      "screenshot": "screenshots/feature__checkout__state__loading.png"
+      "screenshot": "screenshots/feature__checkout__b__state_loading.png"
     }
   ]
 }
 ```
 
+- `case_id` format: `{feature_id}__{check_class_letter}__{slug}` where `check_class_letter` is one of `a` through `g`.
+- `verdict` enum: `"PASS" | "FAIL"`. Flaky passes (passed once, failed on re-run within the same case) record as `FAIL` with the flake noted in `actual`.
+- `audited_at`: ISO-8601 UTC, e.g. `"2026-05-01T18:30:00Z"`.
+
 ### `findings.json` schema (consumed by feedback-synthesizer at Step 5.4)
+
+`feature_id` is implicit from the path — `findings.json` is a bare array.
 
 ```json
 [
@@ -90,7 +98,7 @@ docs/plans/evidence/product-reality/{feature_id}/
     "target_phase": 4,
     "target_task_or_step": "task__checkout-form",
     "description": "Business rule 'one discount per order' not enforced in UI — second discount accepted without error",
-    "evidence_ref": "evidence/product-reality/feature__checkout/results.json#case-bus-rule-002",
+    "evidence_ref": "evidence/product-reality/feature__checkout/results.json#feature__checkout__d__one_discount_per_order",
     "related_decision_id": null
   }
 ]
@@ -112,6 +120,8 @@ docs/plans/evidence/product-reality/{feature_id}/
   ]
 }
 ```
+
+- `status` enum: `"COVERED" | "PARTIAL" | "MISSING"`. Thresholds defined in Cognitive Protocol step SCORE.
 
 ## Seven Check Classes
 
@@ -135,16 +145,16 @@ Follow this sequence. The order is mandatory.
 
 **2. QUERY** — Pull the structured slice via the five graph queries listed in §What You Read. Call `graph_query_feature(feature_id)` first; from its `screens` field, call `graph_query_screen(screen_id, full: true)` per screen. Call `graph_query_acceptance(feature_id)` for the rolled-up criteria. Call `graph_query_manifest()` once for the full slot list. Call `graph_query_dependencies(feature_id)` once for the task DAG. STOP and report on failure — do not silently fall back to file reads for individual call failures.
 
-**3. SYNTHESIZE** — For each of the 7 check classes (a–g), generate concrete agent-browser scripts. Each script has: `case_id` (kebab + underscore convention, e.g. `feature__checkout__state__loading`), `check_class`, `source_ref` (line ref into product-spec.md from the graph payload's `source_location`), `expected` outcome, and executable steps (agent-browser CLI sequence). Write all generated scripts to `tests-generated.md` in the feature's evidence dir, organized by check class with H2 headings (`## a. screen_reachability`, `## b. state_coverage`, …). One block per case under the relevant heading.
+**3. SYNTHESIZE** — For each of the 7 check classes (a–g), generate concrete agent-browser scripts. Each script has: `case_id` (canonical format defined under §What You Produce → `results.json`), `check_class`, `source_ref` (line ref into product-spec.md from the graph payload's `source_location`), `expected` outcome, and executable steps (agent-browser CLI sequence). Write all generated scripts to `tests-generated.md` in the feature's evidence dir, organized by check class with H2 headings (`## a. screen_reachability`, `## b. state_coverage`, …). One block per case under the relevant heading.
 
-**4. EXECUTE** — Run the synthesized scripts against the running app. The `agent-browser` CLI is primary — invoke via Bash, one command sequence per case. Playwright is the fallback if `agent-browser` is unavailable (load via Skill tool). Capture a screenshot per case under `screenshots/{case_id}.png`. Record PASS / FAIL with the `actual` observation per case. Do not retry beyond what the script specifies — a flaky pass is a fail; flag it and move on.
+**4. EXECUTE** — Run the synthesized scripts against the running app. The `agent-browser` CLI is primary — invoke via Bash, one command sequence per case. If `agent-browser` is unavailable, fall back to Playwright per the Failure Modes section (one retry total — STOP if both fail). Capture a screenshot per case under `screenshots/{case_id}.png`. If a check class has no visual artifact (e.g., wiring_manifest slot empty), write `screenshot: null` and put the page-state observation in `actual`. Record PASS / FAIL with the `actual` observation per case. Do not retry beyond what the script specifies — a flaky pass is a fail; flag it and move on.
 
 **5. CLASSIFY** — For each FAIL, classify by check class to derive `target_phase` per the routing table below. Emit `findings.json` rows. Severity rules:
-- `MISSING` (zero observed for a check class) → `severity: critical`
-- Persona constraint violation → `severity: high`
-- Business rule unenforced → `severity: high`
-- Missing meta-state (stale, offline, permission-denied) → `severity: medium`
-- Wiring gap on non-critical path → `severity: medium`
+- Zero PASS cases in a check class → severity: critical
+- Persona constraint violation → severity: high
+- Business rule unenforced → severity: high
+- Missing meta-state (stale, offline, permission-denied) → severity: medium
+- Wiring gap on non-critical path → severity: medium
 
 For each finding, walk the `task_dag` from `graph_query_dependencies` and find the task whose `owns_files` contains the affected screen's source path; that task_id becomes `target_task_or_step` (when the routing table calls for "task that owns the affected screen").
 
@@ -162,6 +172,7 @@ Failure → `target_phase` mapping the auditor uses to populate `findings.json`.
 
 | Check class failure | `target_phase` | `target_task_or_step` |
 |---|---|---|
+| screen_reachability (no entry point) | 4 | task that owns the nav/router file (from `graph_query_dependencies`) |
 | state_coverage gap | 4 | task that owns the affected screen (from `graph_query_dependencies`) |
 | transition_firing failure | 4 | task that owns the affected screen |
 | rule_enforcement (UI gap) | 4 | task that owns the affected screen |
