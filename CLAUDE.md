@@ -1,91 +1,85 @@
-# BuildAnything — Core Problem Statement
+# BuildAnything
 
-The pipeline's output quality is not measurably better than one-shotting with Claude. The root cause is that product context generated in early phases does not meaningfully reach the agents that write code. Every chat must understand this.
+A multi-phase Claude Code plugin that takes a product idea from brainstorm to ship via `/buildanything:build`. The pipeline runs through 7 phases (0–7), each with structured handoffs, a per-build graph layer that carries product context across phase boundaries, and three-tier dispatch in the implementation phase (Product Owner → Briefing Officers → Implementers).
 
-## What Each Phase Must Achieve
+## Core Problem
 
-- **Phase 0:** Figure out what we're working with (new project? existing code? iOS or web?)
-- **Phase 1:** Understand the idea, research the market, make product decisions with the user, write the PRD + product spec
-- **Phase 2:** Design the technical architecture (informed by product spec) and break it into tasks
-- **Phase 3:** Design the visual system AND per-screen layouts — product spec is the source of truth for every design agent
-- **Phase 4:** Write the code — implementers receive product spec + page layouts + design tokens
-- **Phase 5:** Test and audit the built product
-- **Phase 6:** Final review — ship or fix
-- **Phase 7:** Write docs and deploy
+The pipeline's output quality must measurably exceed one-shotting with Claude. The recurring failure mode is product context generated in early phases not reaching the agents that write code — paraphrase soup between phases that loses the spec's load-bearing details (states, transitions, business rules, persona constraints). Every design decision in this codebase exists to close that gap.
+
+## Phases
+
+| # | Phase | Produces |
+|---|---|---|
+| -1 | iOS Bootstrap (iOS-only, greenfield) | `.xcodeproj`, `maestro/` scaffold |
+| 0 | Discover | Project type (web/iOS), resume state, prior-build learnings replay |
+| 1 | Plan | PRD + `product-spec.md` (canonical feature inventory: states, transitions, business rules, happy path, persona constraints, acceptance criteria) |
+| 2 | Architect | `architecture.md` + `sprint-tasks.md` + first `decisions.jsonl` rows |
+| 3 | Design | `DESIGN.md` (Brand DNA + tokens + components) + `page-specs/*.md` + Design Critic loop |
+| 4 | Build | Three-tier hierarchy: Product Owner → Briefing Officers (per feature) → Implementers. Implementers query the graph for spec slices instead of receiving paraphrase. |
+| 5 | Audit | Track A (engineering envelope) + Track B (per-feature product reality) + Cross-cutting (E2E + dogfood + fake-data) + Synth + Fix loop |
+| 6 | Launch Review | 5 chapter judges + aggregator with backward routing on BLOCK |
+| 7 | Ship | Docs + deploy |
 
 ## Key Artifacts
 
-- `product-spec.md` — source of truth for what each feature does, business rules, error scenarios, screen inventory. Every Phase 2+ agent reads this.
-- `page-specs/*.md` — per-screen ASCII wireframes + content hierarchy. Produced at Step 3.3 alongside UX architecture.
-- `DESIGN.md` (repo root, web only) — the consolidated design system. Two-pass authoring: Step 3.0 (design-brand-guardian) writes Pass 1 (Overview, Brand DNA, Do's and Don'ts); Step 3.4 (design-ui-designer) writes Pass 2 (YAML tokens, Colors/Typography/Layout/Elevation/Shapes/Components prose). Format spec vendored at `protocols/design-md-spec.md` (Apache 2.0). Authoring contract at `protocols/design-md-authoring.md`. Replaces former `docs/plans/visual-dna.md` + `docs/plans/visual-design-spec.md` pair.
+- `docs/plans/product-spec.md` — source of truth for per-feature behavior. Schema at `protocols/product-spec-schema.md`. Every Phase 2+ agent reads it (or queries the graph for a feature slice).
+- `DESIGN.md` (repo root, web only) — consolidated design system. Two-pass authoring: Pass 1 at Step 3.0 (`design-brand-guardian` writes Overview + Brand DNA + Do's and Don'ts), Pass 2 at Step 3.4 (`design-ui-designer` writes YAML tokens + Colors/Typography/Layout/Elevation/Shapes/Components prose). Format spec vendored at `protocols/design-md-spec.md` (Apache 2.0; attribution in `NOTICE`). Authoring contract at `protocols/design-md-authoring.md`. Lint gate at Step 3.8 (`hooks/design-md-lint.ts`).
+- `docs/plans/page-specs/*.md` — per-screen ASCII wireframes + content hierarchy + states. Produced at Step 3.3.
+- `docs/plans/architecture.md` + `docs/plans/sprint-tasks.md` — Phase 2 outputs; task DAG with `owns_files`.
+- `docs/plans/decisions.jsonl` — append-only decision log; orchestrator-scribe only via the `scribe_decision` MCP tool. Subagents return `deviation_row` objects; the orchestrator forwards.
+- `docs/plans/learnings.jsonl` — append-only PITFALL/PATTERN rows from Phase 5 reality sweep; Phase 0 replays them at the start of the next build.
+- `docs/plans/evidence/product-reality/{feature_id}/` — Track B per-feature audit evidence: `tests-generated.md`, `results.json`, `findings.json`, `coverage.json`, `screenshots/`.
+- `docs/plans/evidence/dogfood/classified-findings.json` — synthesizer output; consolidates dogfood + Track B findings with a `source` discriminator.
+- `docs/plans/evidence/lrr/*.json` — Phase 6 chapter verdicts.
 
-## Active Redesign Work
+## Graph Layer
 
-See `docs/plans/2026-04-20-*` and `docs/plans/2026-04-21-*` for the full audit and redesign decisions:
-- `2026-04-20-known-issues-quality-audit.md` — 6 diagnosed issues, 5 CRITICAL
-- `2026-04-20-phase4-redesign-decisions.md` — three-tier hierarchy (Product Owner → Briefing Officers → Execution Agents)
-- `2026-04-20-phase0-3-question-map.md` — 56 questions the pipeline must answer before code, 18 currently unanswered
-- `2026-04-20-q9-product-spec-implementation.md` — plan for the root missing artifact (feature behavioral specs)
-- `2026-04-21-phases0-3-implementation-plan.md` — full implementation plan for Phases 0-3 changes
+Custom deterministic extractors index structured artifacts into a per-build graph after each producing step. Implementers and reviewers query typed MCP tools instead of paraphrasing source markdown — the graph is the single source of truth, and a failed graph call STOPs (no silent fallback to file reads).
 
-## Implemented Changes (2026-04-21)
+Slices:
 
-### product-spec.md wired into all Phase 3 steps
-Previously only referenced at Step 3.9. Now every Phase 3 agent reads it:
-- 3.0 (Brand Guardian): App Overview, Screen Inventory, Permissions
-- 3.2 (Component Manifest): Screen Inventory, per-feature States
-- 3.2b (DNA Persona Check): per-feature Persona Constraints
-- 3.3 (UX Architecture + Layouts): FULL product spec as source of truth
-- 3.3b (UX Flow Validation): Happy Path, Persona Constraints, page-specs
-- 3.4 (Visual Design Spec): per-feature States, page-specs for token context
-- 3.6 (Design Critic): page-specs for scoring in page context
+| Slice | Indexed at | Entities |
+|---|---|---|
+| 1 | Step 1.6 (post product-spec) | Feature, Screen, State, Transition, BusinessRule, Persona, AcceptanceCriterion |
+| 2 | Step 3.0 + Step 3.2 (post DESIGN.md Pass 1 + component manifest) | DNAAxis, Token, ManifestEntry |
+| 3 | Step 3.3 (post page-specs) | Screen.full (wireframe_text + sections + screen_component_uses joined inline + key copy) |
+| 4 | Step 2.3.1 + 2.3.2 (post architecture + sprint-tasks + decisions) | APIContract, Task (with `owns_files` and `assigned_phase`), Decision |
+| 5 | Step 3.1 + 5.1 + 5.3b (post screenshots) | Screenshot, ImageComponentDetection, DogfoodFinding, BrandDriftObservation (multimodal extraction is stub-level — vision integration is open work) |
 
-### Layout merged into Step 3.3 (Option C — former Step 3.9 removed)
-UX architecture and per-screen ASCII wireframes produced together before the visual design spec. Phase 4 implementers apply final token values.
+MCP tools (prefix `mcp__plugin_buildanything_graph__`): `graph_query_feature`, `graph_query_screen` (`full: true` for Slice 3 payload), `graph_query_acceptance`, `graph_query_dna`, `graph_query_manifest`, `graph_query_token`, `graph_query_cross_contracts`, `graph_query_decisions`, `graph_query_dependencies`.
 
-### Files changed
-- `protocols/web-phase-branches.md` — product-spec wiring + Option C merge
-- `docs/migration/phase-graph.yaml` — Step 3.3 expanded, Step 3.9 removed
-- `docs/migration/phase-graph.md` — table update, Phase 4 entry requires page-specs/
-- `protocols/page-spec-schema.md` — updated for Step 3.3 placement
+## Phase 5 Tracks (the load-bearing detail)
 
-## Implemented Changes (2026-04-26)
+Phase 5 audits in three orthogonal layers, all dispatched in parallel within their layer:
 
-### DESIGN.md adopted as consolidated design artifact
+- **Track A — Engineering Reality** (`Step 5.1`, 5 parallel auditors): `testing-api-tester`, `testing-performance-benchmarker`, `a11y-architect`, `engineering-security-engineer`, `design-brand-guardian` (DNA drift only — verdict at LRR).
+- **Track B — Product Reality** (`Step 5.2`, N parallel per-feature auditors): one `product-reality-auditor` per `feature_id`. Each queries the graph for one feature, synthesizes agent-browser scripts from 7 check classes (screen reachability, state coverage, transition firing, business-rule enforcement, happy-path walk, persona walkthrough, wiring + manifest coverage), executes against the running app, writes per-feature evidence. The auditor sets `target_phase` directly; spec gaps route to Phase 1.6 (`product-spec-writer`).
+- **Cross-cutting** (`Step 5.3`, 3 parallel): Playwright E2E (multi-feature User Journeys ONLY — single-feature happy paths are Track B's job), agent-browser dogfood (emergent issues only — spec coverage is Track B's job), fake-data detector.
 
-`docs/plans/visual-dna.md` and `docs/plans/visual-design-spec.md` are replaced by a single `DESIGN.md` at the repo root. Format vendored from `google-labs-code/design.md` at pinned commit `8ecd4645b957e6a683a05fb9c79cd6c9028873d0` (Apache 2.0). The format is just markdown + YAML — no service dependency, portable across Cursor / Claude Code / Antigravity / Gemini CLI.
+Findings from all three layers consolidate at `Step 5.4 — Feedback Synthesizer`. The synthesizer ingests `evidence/dogfood/findings.md` AND `evidence/product-reality/*/findings.json`, validates Track B routing against the graph (pass-through unless validation fails), classifies dogfood findings, emits `classified-findings.json` with a `source: "dogfood" | "product-reality"` discriminator. `Step 5.5 — Fix loop` dispatches per `target_phase` (max 2 cycles). Spec-gap findings (`target_phase: 1, target_task_or_step: "1.6"`) re-trigger Track B for the affected feature on the next loop.
 
-Two-pass authoring model:
-- **Step 3.0 (design-brand-guardian)** writes Pass 1: `## Overview` (with `### Brand DNA` h3 listing the 7 axes — Scope, Density, Character, Material, Motion, Type, Copy), `### Rationale`, `### Locked At`, `### References`, `## Do's and Don'ts`. YAML front matter: `version: alpha` + `name:` only. Pass 2 sections present as placeholder headings to satisfy section-order linter rule.
-- **Step 3.4 (design-ui-designer)** writes Pass 2: fills YAML front matter (`colors`, `typography`, `rounded`, `spacing`, `components`) and replaces Pass 2 placeholders with prose for `## Colors`, `## Typography`, `## Layout`, `## Elevation & Depth`, `## Shapes`, `## Components`. Pass 1 is read-only at this step.
+LRR Eng-Quality (Phase 6.1) reads `evidence/product-reality/*/coverage.json` directly to populate `requirements_coverage[]` — it does NOT recompute coverage from scratch. Missing `coverage.json` for a feature in `product-spec.md` is itself a BLOCK.
 
-### Step 3.8 lint gate
-`hooks/design-md-lint.ts` runs `npx @google/design.md lint DESIGN.md` at Phase 3 Step 3.8. Broken-refs is a hard fail and routes back to Step 3.4. Warnings (missing-primary, contrast-ratio WCAG AA, orphaned-tokens, missing-typography, section-order) are logged to `docs/plans/build-log.md` but do not block Phase 4.
+## Mode-Specific Branches
 
-### Pipeline-internal additions on top of the spec
-- `### Brand DNA` h3 inside `## Overview` is required (the linter accepts unknown subsections per spec's "Consumer Behavior for Unknown Content" rule). Carries the 7-axis values that drive CONTEXT header injection, Design Critic scoring (240-point rubric), Phase 5 brand drift check, and Phase 6 LRR Brand Guardian chapter.
-- 14-row incompatibility matrix and anti-slop gates (font hard-ban, font overuse-ban, AI-slop pattern ban, Copy axis validation) preserved from the prior `protocols/visual-dna.md` protocol — see `protocols/design-md-authoring.md` §3-4.
-- Component naming follows DNA Material axis convention (`button-primary` for Flat, `button-primary-glass` for Glassy, `button-primary-elev-N` for Physical).
+- **Web** (`protocols/web-phase-branches.md`): full pipeline as described above. Uses `agent-browser` (primary) + Playwright (fallback) for live-app interaction.
+- **iOS** (`protocols/ios-phase-branches.md`): bootstrapped at Phase -1 (greenfield only) via Xcode New Project + `maestro/` scaffold. Phase 3 skips `/design-system`. Phase 5 dispatches three iOS twin commands in sequence (`/buildanything:verify`, `/buildanything:ux-review`, `/buildanything:fix`) instead of the web Track A + Track B + Cross-cutting bundle. Required artifacts: `ios-verify-report.md`, `ios-ux-review-report.md`, `maestro/*.yaml`, `evidence/maestro-runs/*.png`.
 
-### Files changed
-- `protocols/design-md-spec.md` — vendored DESIGN.md format spec (NEW).
-- `NOTICE` — Apache 2.0 attribution for vendored spec (NEW).
-- `protocols/design-md-authoring.md` — two-pass authoring contract + DNA preservation rules + iOS component vocabulary (NEW; replaces `protocols/visual-dna.md`).
-- `protocols/visual-dna.md` — deleted.
-- `protocols/web-phase-branches.md` — Step 3.0 / 3.4 prompt rewrites; Step 3.8 lint gate; all path swaps.
-- `agents/design-brand-guardian.md`, `agents/design-ui-designer.md`, `agents/design-ux-architect.md`, `agents/design-critic.md`, `agents/design-ux-researcher.md` — input/output paths.
-- `docs/migration/phase-graph.yaml` — DESIGN.md artifact replaces the two old artifacts; writer-owner table updated; Step 3.0 / 3.4 produces strings updated; Step 3.6 metric-loop scale updated to 240.
-- `docs/migration/phase-graph.md` — table + prose updated.
-- `commands/build.md` — Phase 3 entry/exit gates, CONTEXT header, refs paragraph.
-- `hooks/design-md-lint.ts` + `hooks/design-md-lint` — lint runner (NEW).
+## Callable Services
 
-### iOS branch
-Phase A is web-only. Phase B (deferred) will adopt the same DESIGN.md format for iOS with SwiftUI-aligned component names — see `protocols/design-md-authoring.md` §9.
+Cross-phase services invoked from multiple phase steps:
 
-## Still TODO
-- Wire product-spec.md into Phase 2 architect + planner prompts
-- iOS equivalent: wire page specs into `protocols/ios-phase-branches.md`
-- iOS equivalent: adopt `DESIGN.md` for iOS branch (Phase B of design.md adoption — see `docs/strategies/2026-04-26-design-md-adoption.md`)
-- Phase 4 three-tier wiring complete (commands/build.md + docs/migration/phase-graph.{md,yaml} + state-schema v5); agents/product-owner.md and agents/briefing-officer.md shipped
-- Graph layer — deferred, product-spec + refs.json may suffice
-- Measurement infrastructure — count backward routing events before/after
+- **Verify Protocol** (`protocols/verify.md`): 7-check sequence (build → typecheck → lint → test → security → diff review → artifacts). Called by Phase 2 (architecture check), Phase 4 (per-task), Phase 5 (pre-audit), Phase 7 (pre-ship).
+- **Metric Loop** (`protocols/metric-loop.md`): generator/critic loop, max 5 iterations. Called by Phase 2 (architecture), Phase 3 (design critic + iOS visual QA), Phase 4 (per-task), Phase 7 (documentation). NOT wired into Phase 5 as a primary step — Track B replaced the orchestrator-improvised eval cases that 5.2 used to drive. Still available ad-hoc from Step 5.5 fix routing.
+- **Eval Harness** (`protocols/eval-harness.md`): orchestrator-defined pass@k cases. Available ad-hoc; no longer a primary Phase 5 step.
+- **Decision Log** (`protocols/decision-log.md`): orchestrator-scribe-only writes to `decisions.jsonl`. Phase 0 reads on resume; Phase 5 reality sweep does the Dissent Log Revisit Pass; Phase 6 LRR Aggregator reads for backward-routing.
+- **Launch Readiness Review** (`protocols/launch-readiness.md`): Phase 6 5-chapter panel + aggregator schema.
+
+## Open Work
+
+- Phase 2 architect + planner prompts: wire `product-spec.md` into the prompt body explicitly (currently read implicitly).
+- iOS: page-specs wiring into `protocols/ios-phase-branches.md` Phase 3.
+- iOS: adopt `DESIGN.md` format with SwiftUI-aligned component names (Phase B of the design.md adoption — see `protocols/design-md-authoring.md` §9).
+- iOS: equivalent of Track B per-feature audit, driven by Maestro flows + SwiftUI Preview captures.
+- Slice 5 multimodal extraction: currently stub. Real vision-extraction needs multimodal subagent dispatch against fixtures.
+- Measurement infrastructure: count backward-routing events build-over-build to validate the pipeline's drift-reduction claims.
