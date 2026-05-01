@@ -396,7 +396,7 @@ Track B audits the built app against `product-spec.md` on a per-feature basis. T
 - The four evidence files per feature (`tests-generated.md`, `results.json`, `findings.json`, `coverage.json`) are written by the auditor; the orchestrator verifies their presence + JSON parseability per `commands/build.md` Step 5.2 post-dispatch verification.
 - Failure modes (graph queries fail, graph layer absent, agent-browser unavailable, dev server not running, feature has no screens) are owned by the auditor — see `agents/product-reality-auditor.md` §Failure Modes. This file does not duplicate them.
 
-**Failure routing:** Track B auditor failures route through the existing fix-loop spec-gap path (`target_phase: 1, target_step: 1.6` to `product-spec-writer`) — see `commands/build.md` Step 5.2 post-dispatch verification for the escalation flow.
+**Failure routing:** Track B auditor failures route through the existing fix-loop spec-gap path (`target_phase: 1, target_task_or_step: "1.6"` to `product-spec-writer`) — see `commands/build.md` Step 5.2 post-dispatch verification for the escalation flow.
 
 #### Step 5.2.idx — Track B evidence graph index
 
@@ -512,7 +512,7 @@ The orchestrator-side dispatch and prompt body live in `commands/build.md` Step 
 
 ### Step 5.5 — Fix loop
 
-The orchestrator-side fix-loop dispatch lives in `commands/build.md` Step 5.5. Max 2 fix cycles. Routing template at the bottom of `commands/build.md` ("Re-entry dispatch template"). Findings with `target_phase: 1, target_step: 1.6` route back to `product-spec-writer`, which re-triggers Track B for the affected feature on the next loop.
+The orchestrator-side fix-loop dispatch lives in `commands/build.md` Step 5.5. Max 2 fix cycles. Routing template at the bottom of `commands/build.md` ("Re-entry dispatch template"). Findings with `target_phase: 1, target_task_or_step: "1.6"` route back to `product-spec-writer`, which re-triggers Track B for the affected feature on the next loop.
 
 ## Phase 7 — Ship (web branch)
 
