@@ -936,7 +936,7 @@ Before starting Phase 5: run the Verify Protocol (7 checks) one more time. All c
 
 Read the NFRs from `docs/plans/quality-targets.json`. Pass the relevant targets to each audit agent so they have concrete thresholds, not generic checks.
 
-**CONTEXT header:** Render `rendered_context_header` for phase 5 Track A per the canonical template (see CONTEXT HEADER HARD-GATE above). Prepend to every Phase 5 prompt below.
+**CONTEXT header:** Render `rendered_context_header` for phase 5 per the canonical template (see CONTEXT HEADER HARD-GATE above). Prepend to every Step 5.X dispatch prompt below.
 
 Call the Agent tool 5 times in one message:
 
@@ -954,22 +954,24 @@ Call the Agent tool 5 times in one message:
 
 Track B audits the built app against `product-spec.md` on a per-feature basis. Each feature gets its own auditor; all auditors run in parallel.
 
-**CONTEXT header:** Render `rendered_context_header` for phase 5 Track B per the canonical template. Prepend to every Track B prompt.
+**CONTEXT header:** Render `rendered_context_header` for phase 5 per the canonical template (see CONTEXT HEADER HARD-GATE above). Prepend to every Step 5.X dispatch prompt below.
 
 **Feature enumeration:** Before dispatch, query the graph for the full feature inventory:
 
 - Call `mcp__plugin_buildanything_graph__graph_query_feature` with no argument (or per-feature in a loop) to enumerate every `feature_id` in the indexed product-spec. The orchestrator OWNS this enumeration — auditors never enumerate themselves.
 - If the graph layer is unavailable for this build, fall back to parsing `## Feature: {Name}` headings in `docs/plans/product-spec.md` and emit `feature_id = feature__{kebab-case-name}` for each. Pass `graph_used: false` in the auditor prompt so it knows to use file-based reads.
 
+**Zero-feature gate:** If feature enumeration returns zero features, STOP. This indicates either the graph indexer is broken or `product-spec.md` has no recognizable `## Feature:` sections — neither is a Phase 5 problem. Log `TRACK B BLOCKED: zero features enumerated` to `docs/plans/build-log.md` and route the build back to Step 1.6 (product-spec-writer) via the standard backward-routing template. Do NOT proceed with Cross-cutting (Step 5.3) on a feature-less Track B run.
+
 **Dispatch:** Call the Agent tool N times in ONE message — one per `feature_id`:
 
-- Description: `"Product Reality Audit: {feature_label}"`
-- subagent_type: `product-reality-auditor`
-- Prompt: `"[CONTEXT header above] Audit feature_id: {feature_id}. Follow your Cognitive Protocol (ABSORB → QUERY → SYNTHESIZE → EXECUTE → CLASSIFY → SCORE → WRITE). Write evidence to docs/plans/evidence/product-reality/{feature_id}/. Report manifest of evidence paths back. graph_used: {true|false}."`
+- Description: "Product Reality Audit: {feature_label}"
+- subagent_type: product-reality-auditor
+- Prompt: "[CONTEXT header above] Audit feature_id: {feature_id}. Follow your Cognitive Protocol (ABSORB → QUERY → SYNTHESIZE → EXECUTE → CLASSIFY → SCORE → WRITE). Write evidence to docs/plans/evidence/product-reality/{feature_id}/. Report manifest of evidence paths back. graph_used: {true|false}."
 
-**Post-dispatch verification:** After all Track B auditors return, verify each feature has the four evidence files (`tests-generated.md`, `results.json`, `findings.json`, `coverage.json`). If any feature is missing files, log `TRACK B EVIDENCE MISSING: {feature_id}` to `docs/plans/build-log.md` and re-dispatch that feature's auditor once. If still missing after retry, route to Step 5.5 fix loop with `target_phase: 5.2` (re-run that auditor with explicit guidance).
+**Post-dispatch verification:** After all Track B auditors return, verify each feature has the four evidence files (`tests-generated.md`, `results.json`, `findings.json`, `coverage.json`) AND that each JSON file parses as valid JSON. If any feature is missing a file or has a malformed JSON file, log `TRACK B EVIDENCE MISSING/MALFORMED: {feature_id}: {path}` to `docs/plans/build-log.md` and re-dispatch that feature's auditor once with `graph_used: false` to force file-fallback mode (this distinguishes the retry from the first attempt). If the second attempt still fails, emit a synthetic finding with `target_phase: 1, target_step: 1.6` (the auditor failing twice on the same feature is a strong signal the spec for that feature is malformed) and let it route through the existing spec-gap path at Step 5.4.
 
-**Note on the metric loop:** The Metric Loop callable service is no longer wired as a primary Phase 5 step. It can still be invoked ad-hoc by Track A audit fixes via Step 5.5 if a single check class needs iterative tightening, but the structured per-feature audit replaces the orchestrator-improvised eval cases that 5.2 used to drive.
+**Note on the metric loop:** The Metric Loop callable service is no longer wired as a primary Phase 5 step. It can still be invoked ad-hoc by Track A audit fixes via Step 5.5 if a single check class needs iterative tightening, but the structured per-feature audit replaces the orchestrator-improvised eval cases that the previous Step 5.2 (Eval Harness → Metric Loop) drove.
 
 ### Step 5.3 — Cross-cutting (3 parallel, ONE message)
 
@@ -988,7 +990,7 @@ The Dogfood findings used to dead-end. Now route them to fix loops.
 Call the Agent tool — description: "Synthesize dogfood findings" — subagent_type: `product-feedback-synthesizer` — Prompt: "[CONTEXT header above] Interpret findings from Track B (per-feature product-reality audits) AND Dogfood (autonomous exploration). Inputs:
 
 - `docs/plans/evidence/dogfood/findings.md` — autonomous exploration findings, each requires classification + routing
-- `docs/plans/evidence/product-reality/*/findings.json` — one per feature, each finding ALREADY CARRIES `target_phase` and `target_task_or_step` set by the product-reality-auditor. VALIDATE these against the graph (same `graph_query_dependencies` walk used for dogfood findings) and pass through if valid; only re-route if validation fails (e.g., the targeted task no longer exists in the task DAG).
+- `docs/plans/evidence/product-reality/*/findings.json` — one per feature (web only — for iOS this glob is empty and Track B did not run). Each Track B finding ALREADY CARRIES `target_phase` and `target_task_or_step` set by the product-reality-auditor. VALIDATE these against the graph (same `graph_query_dependencies` walk used for dogfood findings) and pass through if valid; only re-route if validation fails (e.g., the targeted task no longer exists in the task DAG).
 
 For each finding, ensure it ends up classified with:
   - Code-level bug (broken feature, failing logic, fake data) → `target_phase: 4`, assign to the specific task that owns the affected file
@@ -1088,7 +1090,7 @@ Before writing the final verdict, spawn a parallel subagent dispatch: descriptio
 
 Evaluate code quality + test coverage adequacy + architecture conformance + requirements coverage TOGETHER (single coherent view — merged from old Eng + QA chapters). Check: do declared behavioral tests actually exercise the features? Are there stub-flagged tests? Do tests match task acceptance criteria? Does the built code match architecture MUSTs? Are features all COVERED?
 
-Write verdict to `docs/plans/evidence/lrr/eng-quality.json` per `protocols/launch-readiness.md` schema. Fields: `chapter=eng-quality`, `verdict` (PASS|CONCERNS|BLOCK), `override_blocks_launch` (false unless BLOCK), `evidence_files_read` (non-empty, MUST include eng-quality-coverage.json), `findings[]` (each with `severity`, `description`, `evidence_ref`, `related_decision_id` if blocker ties to a decisions.jsonl row), `requirements_coverage[]` (one entry per feature with `{feature, status}`), `follow_up_spawned=false`, `follow_up_findings=null`. Eng-Quality CANNOT spawn follow-ups."
+Write verdict to `docs/plans/evidence/lrr/eng-quality.json` per `protocols/launch-readiness.md` schema. Fields: `chapter=eng-quality`, `verdict` (PASS|CONCERNS|BLOCK), `override_blocks_launch` (false unless BLOCK), `evidence_files_read` (non-empty, MUST include eng-quality-coverage.json), `findings[]` (each with `severity`, `description`, `evidence_ref`, `related_decision_id` if blocker ties to a decisions.jsonl row), `requirements_coverage[]` (shape per the Track B aggregation paragraph above — `{feature_id, feature_label, status, coverage_pct, blocker_summary}`), `follow_up_spawned=false`, `follow_up_findings=null`. Eng-Quality CANNOT spawn follow-ups."
 
 2. Description: "LRR Security chapter" — subagent_type: `security-reviewer` — Prompt: "[CONTEXT header above] You are the Security chapter of the LRR. Read: `docs/plans/evidence/fake-data-audit.md`, Phase 5 security audit output (from Step 5.1). Also read `docs/plans/decisions.jsonl` for context.
 
