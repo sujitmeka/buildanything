@@ -63,6 +63,9 @@ BARE_NAME_IGNORE: set[str] = {
     "Info.plist",
     "playwright.config.ts",
     "playwright.config.js",
+    "decisions.json",       # regex false positive: "Do NOT write decisions.jsonl" truncated
+    "findings.json",        # nested path (evidence/product-reality/*/findings.json), not docs/plans/
+    "slice-3-tokens.json",  # graph index output at project root, not docs/plans/
 }
 
 
@@ -167,7 +170,7 @@ def _normalize(path: str) -> str | None:
     # "learnings.jsonl (reality sweep ...)".
     path = re.sub(r"\s*\([^)]*\)\s*$", "", path).strip()
     # Project-root files are their own entries in artifacts: — do NOT promote.
-    if path == "CLAUDE.md":
+    if path in ("CLAUDE.md", "DESIGN.md"):
         return path
     # Paths starting with "evidence/", "phase1-scratch/", or any bare top-
     # level name known to live under docs/plans/ should be resolved to
@@ -206,6 +209,10 @@ def _collect_protocol_writes() -> set[str]:
         for m in BARE_NAME_RE.finditer(text):
             name = m.group("name")
             if name in BARE_NAME_IGNORE:
+                continue
+            # Repo-root files — do NOT promote to docs/plans/.
+            if name in ("CLAUDE.md", "DESIGN.md"):
+                out.add(name)
                 continue
             out.add(f"docs/plans/{name}")
     return out

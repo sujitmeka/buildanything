@@ -66,6 +66,8 @@ for name, fn in [("fresh_acquire", t1), ("overlapping_denied", t2),
     run(name, fn)
 
 passed, total = sum(r["pass"] for r in results), len(results)
-print(json.dumps({"suite": "write_lease", "passed": passed, "total": total, "results": results}, indent=2))
-print(f"\n{'✅' if passed == total else '❌'} {passed}/{total} write-lease checks passed")
-sys.exit(0 if passed == total else 1)
+
+if __name__ == "__main__":
+    print(json.dumps({"suite": "write_lease", "passed": passed, "total": total, "results": results}, indent=2))
+    print(f"\n{'✅' if passed == total else '❌'} {passed}/{total} write-lease checks passed")
+    sys.exit(0 if passed == total else 1)

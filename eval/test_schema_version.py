@@ -52,6 +52,8 @@ for name, fn in [("current_accepted", t1), ("future_rejected", t2),
 
 passed = sum(r["pass"] for r in results)
 total = len(results)
-print(json.dumps({"suite": "schema_version", "passed": passed, "total": total, "results": results}, indent=2))
-print(f"\n{'✅' if passed == total else '❌'} {passed}/{total} schema-version checks passed")
-sys.exit(0 if passed == total else 1)
+
+if __name__ == "__main__":
+    print(json.dumps({"suite": "schema_version", "passed": passed, "total": total, "results": results}, indent=2))
+    print(f"\n{'✅' if passed == total else '❌'} {passed}/{total} schema-version checks passed")
+    sys.exit(0 if passed == total else 1)

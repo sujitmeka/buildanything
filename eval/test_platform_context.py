@@ -89,9 +89,10 @@ RESULTS_DIR.mkdir(parents=True, exist_ok=True)
 result = {"passed": passed, "total": total, "ok": ok, "checks": checks}
 (RESULTS_DIR / "platform-context.json").write_text(json.dumps(result, indent=2) + "\n")
 
-print(f"Platform context: {passed}/{total} checks passed {'✓' if ok else '✗'}")
-for c in checks:
-    mark = "✓" if c["pass"] else "✗"
-    detail = f"  ({c['detail']})" if c["detail"] else ""
-    print(f"  {mark} {c['name']}{detail}")
-sys.exit(0 if ok else 1)
+if __name__ == "__main__":
+    print(f"Platform context: {passed}/{total} checks passed {'✓' if ok else '✗'}")
+    for c in checks:
+        mark = "✓" if c["pass"] else "✗"
+        detail = f"  ({c['detail']})" if c["detail"] else ""
+        print(f"  {mark} {c['name']}{detail}")
+    sys.exit(0 if ok else 1)
