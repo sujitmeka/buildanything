@@ -26,6 +26,7 @@ import {
   loadGraph,
   loadAllGraphs,
   queryFeature,
+  queryFeatureList,
   queryScreen,
   queryAcceptance,
   queryDna,
@@ -167,6 +168,25 @@ function registerTools(server: McpServer): void {
         return okResult(result);
       } catch (err) {
         return errResult("graph_query_feature", err);
+      }
+    },
+  );
+
+  server.registerTool(
+    "graph_list_features",
+    {
+      description:
+        "Returns all feature IDs, labels, and kebab anchors from the indexed product-spec. No arguments. Used by the orchestrator at Step 5.2 to enumerate features for Track B dispatch.",
+      inputSchema: {},
+    },
+    async () => {
+      try {
+        const loaded = loadOrError("graph_list_features", process.cwd());
+        if (isErrPayload(loaded)) return loaded;
+        const result = queryFeatureList(loaded.fragment);
+        return okResult(result);
+      } catch (err) {
+        return errResult("graph_list_features", err);
       }
     },
   );

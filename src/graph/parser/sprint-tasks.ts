@@ -2,7 +2,7 @@
 // Source of truth: docs/graph/09-slice4-schema.md.
 // No LLM, no I/O. Caller passes the markdown content and path.
 
-import { ids, kebab, sha256Hex } from "../ids.js";
+import { ids, sha256Hex } from "../ids.js";
 import type {
   ExtractError,
   ExtractResult,
@@ -136,71 +136,6 @@ function makeEdge(
 }
 
 // ---------------------------------------------------------------------------
-// Feature ID heuristic (title-only, case-insensitive)
-// ---------------------------------------------------------------------------
-
-type FeatureRule = { patterns: RegExp[]; featureKebab: string };
-
-const FEATURE_RULES: FeatureRule[] = [
-  { patterns: [/auth/i, /authentication/i, /login/i], featureKebab: "feature__auth" },
-  { patterns: [/shopping cart/i], featureKebab: "feature__cart" },
-  { patterns: [/cart/i], featureKebab: "feature__cart" },
-  { patterns: [/checkout/i, /shipping form/i], featureKebab: "feature__checkout" },
-  { patterns: [/order placement/i, /place order/i], featureKebab: "feature__order-placement" },
-  { patterns: [/seller order/i, /seller inbox/i, /mark shipped/i, /payout/i, /fulfillment/i], featureKebab: "feature__seller-fulfillment" },
-  { patterns: [/product listing/i, /product detail/i, /catalog/i, /search filters/i, /infinite scroll/i], featureKebab: "feature__product-discovery" },
-  { patterns: [/order/i, /orders/i], featureKebab: "feature__orders" },
-  { patterns: [/account settings/i, /account/i], featureKebab: "feature__account" },
-  { patterns: [/receipt/i, /submit expense/i, /expense/i], featureKebab: "feature__expense-submission" },
-  { patterns: [/my reports/i, /reports list/i], featureKebab: "feature__expense-submission" },
-  { patterns: [/approval/i, /approve/i, /reject/i, /request-changes/i, /audit log/i, /audit/i], featureKebab: "feature__approval-workflow" },
-];
-
-function deriveFeatureId(title: string): string | null {
-  for (const rule of FEATURE_RULES) {
-    for (const pat of rule.patterns) {
-      if (pat.test(title)) return rule.featureKebab;
-    }
-  }
-  return null;
-}
-
-// ---------------------------------------------------------------------------
-// Screen ID heuristic (title + behavioral test, case-insensitive)
-// ---------------------------------------------------------------------------
-
-type ScreenRule = { patterns: RegExp[]; screenId: string };
-
-const SCREEN_RULES: ScreenRule[] = [
-  { patterns: [/catalog page/i, /catalog/i], screenId: ids.screen("catalog") },
-  { patterns: [/cart review/i, /cart-review/i], screenId: ids.screen("cart-review") },
-  { patterns: [/checkout shipping/i, /shipping form/i], screenId: ids.screen("checkout-shipping") },
-  { patterns: [/product detail/i, /\/product\//i], screenId: ids.screen("product-detail") },
-  { patterns: [/seller inbox/i, /seller order inbox/i], screenId: ids.screen("seller-inbox") },
-  { patterns: [/order fulfillment detail/i, /mark shipped/i], screenId: ids.screen("order-fulfillment-detail") },
-  { patterns: [/payout dashboard/i, /payouts page/i], screenId: ids.screen("payout-dashboard") },
-  { patterns: [/account settings/i, /account\.tsx/i, /\/account/i], screenId: ids.screen("account-settings") },
-  { patterns: [/submit expense/i, /submit\.tsx/i], screenId: ids.screen("submit-expense") },
-  { patterns: [/approval queue/i], screenId: ids.screen("approval-queue") },
-  { patterns: [/admin audit log/i, /audit\.tsx/i], screenId: ids.screen("admin-audit-log") },
-  { patterns: [/my reports/i, /my-reports/i], screenId: ids.screen("my-reports") },
-];
-
-function deriveScreenIds(title: string, behavioralTest: string): string[] {
-  const text = `${title} ${behavioralTest}`;
-  const matched = new Set<string>();
-  for (const rule of SCREEN_RULES) {
-    for (const pat of rule.patterns) {
-      if (pat.test(text)) {
-        matched.add(rule.screenId);
-        break;
-      }
-    }
-  }
-  return [...matched].sort();
-}
-
-// ---------------------------------------------------------------------------
 // Owns-files parsing
 // ---------------------------------------------------------------------------
 
@@ -224,6 +159,8 @@ const REQUIRED_COLUMNS = [
   "behavioral test",
   "owns files",
   "implementing phase",
+  "feature",
+  "screens",
 ];
 
 const VALID_SIZES = new Set(["S", "M", "L"]);
@@ -252,11 +189,11 @@ export function extractSprintTasks(input: {
   const allRows: { row: TableRow; headers: string[]; headerLine: number }[] = [];
 
   for (const table of tables) {
-    if (table.headers.length < 7) {
+    if (table.headers.length < 9) {
       pushError(
         ctx,
         table.headerLine,
-        `Table has fewer than 7 columns (got ${table.headers.length})`,
+        `Table has fewer than 9 columns (got ${table.headers.length})`,
       );
       continue;
     }
@@ -319,8 +256,10 @@ export function extractSprintTasks(input: {
     const behavioralTest = (row.cells["behavioral test"] ?? "").trim();
     const implementingPhase = (row.cells["implementing phase"] ?? "").trim();
     const ownsFiles = parseOwnsFiles(row.cells["owns files"] ?? "");
-    const featureId = deriveFeatureId(title);
-    const screenIds = deriveScreenIds(title, behavioralTest);
+    const featureRaw = (row.cells['feature'] ?? '').trim();
+    const featureId = isEmptyRef(featureRaw) ? null : ids.feature(featureRaw);
+    const screensRaw = (row.cells['screens'] ?? '').trim();
+    const screenIds = isEmptyRef(screensRaw) ? [] : screensRaw.split(',').map((s) => s.trim()).filter((s) => s.length > 0).map((s) => ids.screen(s)).sort();
 
     const node: TaskNode = {
       id: ids.task(taskId),

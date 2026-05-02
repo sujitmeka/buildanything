@@ -18,6 +18,9 @@
 import { createHash } from "node:crypto";
 import { ids, kebab } from "../ids.js";
 import type {
+  BrandDriftObservationNode,
+  Confidence,
+  DogfoodFindingNode,
   GraphEdge,
   GraphNode,
   ImageComponentDetectionNode,
@@ -32,6 +35,12 @@ import { dhash } from "../util/dhash.js";
 
 const PRODUCED_BY_AGENT = "screenshot-extractor-stub";
 const PRODUCED_AT_STEP = "varies";
+
+/**
+ * Stub nodes are INFERRED: caption/dna_axis_tags/palette are LLM-derived even in production.
+ */
+const SCREENSHOT_STUB_CONFIDENCE: Confidence = "INFERRED";
+
 /** Schema tag for Slice 5 fragments — referenced in doc comment above. */
 const SCHEMA_TAG = "buildanything-slice-5";
 
@@ -57,9 +66,27 @@ export interface ScreenshotInput {
   imageBytes: Uint8Array;
   linkedScreenId?: string | null;
   linkedFindingId?: string | null;
+  findingSeverity?: "critical" | "major" | "minor";
+  findingDescription?: string;
 }
 
 export interface ScreenshotExtractResult {
+  ok: boolean;
+  nodes: GraphNode[];
+  edges: GraphEdge[];
+  errors: { message: string }[];
+}
+
+export interface BrandDriftObservationInput {
+  prodScreenshotId: string;
+  referenceScreenshotId: string;
+  axis: "scope" | "density" | "character" | "material" | "motion" | "type" | "copy";
+  score: number;
+  verdict: "drift" | "ok" | "needs-review";
+  observationId: string;
+}
+
+export interface BrandDriftObservationResult {
   ok: boolean;
   nodes: GraphNode[];
   edges: GraphEdge[];
@@ -157,19 +184,45 @@ export function extractScreenshot(input: ScreenshotInput): ScreenshotExtractResu
     dominantPalette = [];
   }
 
+  // -- Dogfood finding node (emitted before screenshot so we can reference its id) --
+
+  const isDogfoodWithFinding =
+    input.imageClass === "dogfood" &&
+    input.linkedFindingId &&
+    input.linkedFindingId.trim();
+
+  const resolvedFindingId = isDogfoodWithFinding
+    ? ids.dogfoodFinding(input.linkedFindingId!)
+    : null;
+
+  if (isDogfoodWithFinding) {
+    const findingNode: DogfoodFindingNode = {
+      id: resolvedFindingId!,
+      label: input.linkedFindingId!,
+      entity_type: "dogfood_finding",
+      source_file: input.imagePath,
+      source_location: "L0",
+      confidence: SCREENSHOT_STUB_CONFIDENCE,
+      finding_id: input.linkedFindingId!,
+      severity: input.findingSeverity ?? "minor",
+      description:
+        input.findingDescription ??
+        "Stub finding — Slice 5 production mode reads evidence/dogfood/findings.json",
+      screenshot_id: screenshotId,
+      affected_screen_id: input.linkedScreenId ?? null,
+    };
+    nodes.push(findingNode);
+  }
+
   // -- Screenshot node ------------------------------------------------------
 
-  // TODO(Slice 5 production): In production, confidence should be split:
-  //   - EXTRACTED for hash, dimensions, palette (deterministic byte-level)
-  //   - INFERRED for caption, dna_axis_tags, component detections (multimodal subagent)
-  // This stub uses EXTRACTED uniformly because all values are deterministic.
   const screenshotNode: ScreenshotNode = {
     id: screenshotId,
     label: rawBasename,
     entity_type: "screenshot",
     source_file: input.imagePath,
     source_location: "L0",
-    confidence: "EXTRACTED",
+    confidence: SCREENSHOT_STUB_CONFIDENCE,
     image_path: input.imagePath,
     image_class: input.imageClass,
     caption,
@@ -178,7 +231,7 @@ export function extractScreenshot(input: ScreenshotInput): ScreenshotExtractResu
     image_dimensions: "0x0",
     dna_axis_tags: dnaAxisTags,
     linked_screen_id: input.linkedScreenId ?? null,
-    linked_finding_id: input.linkedFindingId ?? null,
+    linked_finding_id: resolvedFindingId,
   };
   nodes.push(screenshotNode);
 
@@ -196,7 +249,7 @@ export function extractScreenshot(input: ScreenshotInput): ScreenshotExtractResu
       entity_type: "image_component_detection",
       source_file: input.imagePath,
       source_location: "L0",
-      confidence: "EXTRACTED",
+      confidence: SCREENSHOT_STUB_CONFIDENCE,
       screenshot_id: screenshotId,
       component_label: "stub-component",
       bounding_box: null,
@@ -216,11 +269,74 @@ export function extractScreenshot(input: ScreenshotInput): ScreenshotExtractResu
     );
   }
 
-  if (input.linkedFindingId && input.linkedFindingId.trim()) {
+  if (isDogfoodWithFinding) {
     edges.push(
-      makeEdge(screenshotId, input.linkedFindingId, "screenshot_evidences_finding", input.imagePath),
+      makeEdge(screenshotId, resolvedFindingId!, "screenshot_evidences_finding", input.imagePath),
     );
   }
+
+  return { ok: true, nodes, edges, errors };
+}
+
+export function extractBrandDriftObservation(
+  input: BrandDriftObservationInput,
+): BrandDriftObservationResult {
+  const errors: { message: string }[] = [];
+  const nodes: GraphNode[] = [];
+  const edges: GraphEdge[] = [];
+
+  if (!input.prodScreenshotId || !input.prodScreenshotId.trim()) {
+    errors.push({ message: "prodScreenshotId is empty" });
+  }
+  if (!input.referenceScreenshotId || !input.referenceScreenshotId.trim()) {
+    errors.push({ message: "referenceScreenshotId is empty" });
+  }
+  if (!input.observationId || !input.observationId.trim()) {
+    errors.push({ message: "observationId is empty" });
+  }
+  if (errors.length > 0) {
+    return { ok: false, nodes, edges, errors };
+  }
+
+  const nodeId = ids.brandDriftObservation(input.observationId);
+
+  const node: BrandDriftObservationNode = {
+    id: nodeId,
+    label: input.observationId,
+    entity_type: "brand_drift_observation",
+    source_file: "<brand-guardian>",
+    source_location: "L0",
+    confidence: "INFERRED",
+    observation_id: input.observationId,
+    prod_screenshot_id: input.prodScreenshotId,
+    reference_screenshot_id: input.referenceScreenshotId,
+    axis: input.axis,
+    score: input.score,
+    verdict: input.verdict,
+  };
+  nodes.push(node);
+
+  const edgeBase = {
+    confidence: "INFERRED" as Confidence,
+    source_file: "<brand-guardian>",
+    source_location: "L0",
+    produced_by_agent: "design-brand-guardian",
+    produced_at_step: "5.1",
+  };
+
+  edges.push({
+    source: nodeId,
+    target: input.prodScreenshotId,
+    relation: "prod_drifts_from_reference_prod",
+    ...edgeBase,
+  });
+
+  edges.push({
+    source: nodeId,
+    target: input.referenceScreenshotId,
+    relation: "prod_drifts_from_reference_ref",
+    ...edgeBase,
+  });
 
   return { ok: true, nodes, edges, errors };
 }

@@ -1,5 +1,5 @@
-| Task ID | Title | Size | Dependencies | Behavioral Test | Owns Files | Implementing Phase | Feature | Screen |
-|---------|-------|------|--------------|-----------------|------------|-------------------|---------|--------|
+| Task ID | Title | Size | Dependencies | Behavioral Test | Owns Files | Implementing Phase | Feature | Screens |
+|---------|-------|------|--------------|-----------------|------------|-------------------|---------|---------|
 | T-1 | Setup Auth0 integration | M | — | Verify that user can authenticate via Auth0 Universal Login and session persists across page reloads | src/auth/*.ts | phase-4-backend | Auth | — |
 | T-2 | Receipt upload API with multipart | M | T-1 | Verify that POST /api/receipts/upload accepts PDF, JPG, PNG, and HEIC files up to 10MB and returns thumbnail URL | src/api/receipts.ts | phase-4-backend | Expense Submission | — |
 | T-3 | Submit expense form UI | L | T-2 | Verify that user can drag-drop receipt files and form draft autosaves to localStorage every 5 seconds | src/routes/submit.tsx | phase-4-frontend | Expense Submission | Submit Expense |

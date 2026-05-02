@@ -14,6 +14,7 @@ import { fileURLToPath } from 'node:url';
 import { extractProductSpec } from '../../src/graph/parser/product-spec.js';
 import {
   graphPath,
+  loadAllGraphs,
   loadGraph,
   queryAcceptance,
   queryFeature,
@@ -334,6 +335,26 @@ describe('storage failures and guards', () => {
     writeFileSync(target, JSON.stringify(wrong, null, 2), 'utf-8');
     assert.equal(loadGraph(dir), null);
   });
+
+  it('loadGraph accepts all 5 slice schemas', () => {
+    const slices = [
+      'buildanything-slice-1',
+      'buildanything-slice-2',
+      'buildanything-slice-3',
+      'buildanything-slice-4',
+      'buildanything-slice-5',
+    ] as const;
+    for (const schema of slices) {
+      const dir = newTmp();
+      const target = graphPath(dir);
+      mkdirSync(dirname(target), { recursive: true });
+      const frag = { ...buildMinimalFragment(), schema };
+      writeFileSync(target, JSON.stringify(frag, null, 2), 'utf-8');
+      const loaded = loadGraph(dir);
+      assert.ok(loaded, `loadGraph rejected schema ${schema}`);
+      assert.equal(loaded.schema, schema);
+    }
+  });
 });
 
 describe('storage query layer (against parsed marketplace fixture)', () => {
@@ -383,5 +404,66 @@ describe('storage query layer (against parsed marketplace fixture)', () => {
       assert.ok(typeof a.text === 'string' && a.text.length > 0);
       assert.equal(a.verified, false);
     }
+  });
+});
+
+describe('loadAllGraphs duplicate-id handling', () => {
+  it('warns to stderr naming both fragments and keeps last-write-wins', () => {
+    const dir = newTmp();
+    const fragA: GraphFragment = {
+      ...buildMinimalFragment(),
+      source_file: 'fragA.md',
+      nodes: [
+        {
+          id: 'feature__shared',
+          label: 'A-version',
+          entity_type: 'feature',
+          source_file: 'fragA.md',
+          confidence: 'EXTRACTED',
+          name: 'A-version',
+          kebab_anchor: 'a-version',
+        },
+      ],
+      edges: [],
+    };
+    const fragB: GraphFragment = {
+      ...buildMinimalFragment(),
+      source_file: 'fragB.md',
+      nodes: [
+        {
+          id: 'feature__shared',
+          label: 'B-version',
+          entity_type: 'feature',
+          source_file: 'fragB.md',
+          confidence: 'EXTRACTED',
+          name: 'B-version',
+          kebab_anchor: 'b-version',
+        },
+      ],
+      edges: [],
+    };
+    saveGraph(dir, fragA, 'a-slice-1.json');
+    saveGraph(dir, fragB, 'b-slice-1.json');
+
+    const captured: string[] = [];
+    const origErr = console.error;
+    console.error = (...args: unknown[]) => {
+      captured.push(args.map((a) => String(a)).join(' '));
+    };
+    try {
+      const merged = loadAllGraphs(dir);
+      assert.ok(merged);
+      // Files load alphabetically: a-slice-1 first, b-slice-1 second → B wins.
+      const winning = merged.nodes.find((n) => n.id === 'feature__shared');
+      assert.ok(winning);
+      assert.equal((winning as { label: string }).label, 'B-version');
+    } finally {
+      console.error = origErr;
+    }
+    const dupWarnings = captured.filter((m) => m.includes('duplicate node id') && m.includes('feature__shared'));
+    assert.ok(dupWarnings.length >= 1, `expected duplicate-id warning, got: ${captured.join(' | ')}`);
+    const w = dupWarnings[0];
+    assert.ok(w.includes('fragA.md'), `warning should name fragA.md, got: ${w}`);
+    assert.ok(w.includes('fragB.md'), `warning should name fragB.md, got: ${w}`);
   });
 });

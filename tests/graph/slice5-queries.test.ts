@@ -295,7 +295,7 @@ describe('slice 5 end-to-end: extract → save → loadAllGraphs → query', () 
       imagePath: DOGFOOD_PATH,
       imageClass: 'dogfood',
       imageBytes: readBytes(DOGFOOD_PATH),
-      linkedFindingId: 'dogfood_finding__f-001',
+      linkedFindingId: 'f-001',
     });
 
     for (const r of [refExtract, prodExtract, dashExtract, dogfoodExtract]) {

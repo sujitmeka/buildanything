@@ -27,6 +27,12 @@ Dead-code removal for JS/TS is primarily driven by static-analysis tools (knip, 
 **Forbidden defaults:**
 - Do NOT load `skills/ios/swift-concurrency` (older) — superseded by `swift-concurrency-6-2`.
 
+## Graph Tools (read-only)
+
+The build pipeline indexes the component manifest into a knowledge graph. During cleanup, use this tool to check whether a hand-written component should have been imported from the manifest instead:
+
+- `mcp__plugin_buildanything_graph__graph_query_manifest(slot?)` — look up a component slot's library/variant binding. If `hard_gate: true`, the implementer was required to import the listed library variant — a hand-written replacement is a HARD-GATE violation. Flag it for revert. Call with no argument to get all entries, or pass a slot name for a single lookup. If the tool errors, STOP and report the error to the orchestrator.
+
 ## Core Responsibilities
 
 1. **Dead Code Detection** -- Find unused code, exports, dependencies
@@ -48,6 +54,7 @@ npx eslint . --report-unused-disable-directives  # Unused eslint directives
 ### 1. Analyze
 - Run detection tools in parallel
 - Categorize by risk: **SAFE** (unused exports/deps), **CAREFUL** (dynamic imports), **RISKY** (public API)
+- Check for manifest HARD-GATE violations: call `graph_query_manifest()` to get all entries, then scan for hand-written components that duplicate a `hard_gate: true` manifest slot — flag these for replacement with the library import
 
 ### 2. Verify
 For each item to remove:

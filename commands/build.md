@@ -19,7 +19,7 @@ Exception: Brainstorming in Phase 1 Step 1.0 and Step 1.3 uses an INTERNAL Brain
 <HARD-GATE>
 SUBAGENT_TYPE REQUIRED.
 
-Every Agent tool call MUST include a `subagent_type` field unless the dispatch is explicitly marked INTERNAL (inline role-string). INTERNAL dispatches are orchestrator helpers: Brainstorm Facilitator, Research Synthesizer, Design Doc Writer, Prereq Collector, Task DAG Validator, Refs Indexer, Briefing Officer, Dogfood runner, Fake-Data Detector, PM chapter, LRR Aggregator, Completion Report, Verify scaffolding dispatcher.
+Every Agent tool call MUST include a `subagent_type` field unless the dispatch is explicitly marked INTERNAL (inline role-string). INTERNAL dispatches are orchestrator helpers: Brainstorm Facilitator, Research Synthesizer, Design Doc Writer, Prereq Collector, Task DAG Validator, Refs Indexer, Briefing Officer, PM chapter, LRR Aggregator, Completion Report, Verify scaffolding dispatcher.
 
 Missing `subagent_type` on a non-INTERNAL dispatch is a HARD-GATE violation. The orchestrator rejects dispatches that don't name a specific agent. If you catch yourself typing `description: "..."` without a `subagent_type:` line alongside it, STOP and look up the right agent from the per-phase dispatch tables further down in this file.
 </HARD-GATE>
@@ -958,8 +958,8 @@ Track B audits the built app against `product-spec.md` on a per-feature basis. E
 
 **Feature enumeration:** Before dispatch, query the graph for the full feature inventory:
 
-- Call `mcp__plugin_buildanything_graph__graph_query_feature` with no argument (or per-feature in a loop) to enumerate every `feature_id` in the indexed product-spec. The orchestrator OWNS this enumeration — auditors never enumerate themselves.
-- If the graph layer is unavailable for this build, fall back to parsing `## Feature: {Name}` headings in `docs/plans/product-spec.md` and emit `feature_id = feature__{kebab-case-name}` for each. Pass `graph_used: false` in the auditor prompt so it knows to use file-based reads.
+- Call `mcp__plugin_buildanything_graph__graph_list_features` (no arguments) to get the full feature inventory. Returns an array of `{id, label, kebab_anchor}` for every feature in the indexed product-spec. The orchestrator OWNS this enumeration — auditors never enumerate themselves.
+- If the call fails, STOP. Log `TRACK B BLOCKED: graph_list_features failed` to `docs/plans/build-log.md` and report the error. The graph must be indexed correctly before Track B can run.
 
 **Zero-feature gate:** If feature enumeration returns zero features, STOP. This indicates either the graph indexer is broken or `product-spec.md` has no recognizable `## Feature:` sections — neither is a Phase 5 problem. Log `TRACK B BLOCKED: zero features enumerated` to `docs/plans/build-log.md` and route the build back to Step 1.6 (product-spec-writer) via the standard backward-routing template. Do NOT proceed with Cross-cutting (Step 5.3) on a feature-less Track B run.
 
@@ -967,9 +967,9 @@ Track B audits the built app against `product-spec.md` on a per-feature basis. E
 
 - Description: "Product Reality Audit: {feature_label}"
 - subagent_type: product-reality-auditor
-- Prompt: "[CONTEXT header above] Audit feature_id: {feature_id}. Follow your Cognitive Protocol (ABSORB → QUERY → SYNTHESIZE → EXECUTE → CLASSIFY → SCORE → WRITE). Write evidence to docs/plans/evidence/product-reality/{feature_id}/. Report manifest of evidence paths back. graph_used: {true|false}."
+- Prompt: "[CONTEXT header above] Audit feature_id: {feature_id}. Follow your Cognitive Protocol (ABSORB → QUERY → SYNTHESIZE → EXECUTE → CLASSIFY → SCORE → WRITE). Write evidence to docs/plans/evidence/product-reality/{feature_id}/. Report manifest of evidence paths back."
 
-**Post-dispatch verification:** After all Track B auditors return, verify each feature has the four evidence files (`tests-generated.md`, `results.json`, `findings.json`, `coverage.json`) AND that each JSON file parses as valid JSON. If any feature is missing a file or has a malformed JSON file, log `TRACK B EVIDENCE MISSING/MALFORMED: {feature_id}: {path}` to `docs/plans/build-log.md` and re-dispatch that feature's auditor once with `graph_used: false` to force file-fallback mode (this distinguishes the retry from the first attempt). If the second attempt still fails, emit a synthetic finding with `target_phase: 1, target_task_or_step: "1.6"` (the auditor failing twice on the same feature is a strong signal the spec for that feature is malformed) and let it route through the existing spec-gap path at Step 5.4.
+**Post-dispatch verification:** After all Track B auditors return, verify each feature has the four evidence files (`tests-generated.md`, `results.json`, `findings.json`, `coverage.json`) AND that each JSON file parses as valid JSON. If any feature is missing a file or has a malformed JSON file, log `TRACK B EVIDENCE MISSING/MALFORMED: {feature_id}: {path}` to `docs/plans/build-log.md` and re-dispatch that feature's auditor once (this distinguishes the retry from the first attempt). If the second attempt still fails, emit a synthetic finding with `target_phase: 1, target_task_or_step: "1.6"` (the auditor failing twice on the same feature is a strong signal the spec for that feature is malformed) and let it route through the existing spec-gap path at Step 5.4.
 
 **Note on the metric loop:** The Metric Loop callable service is no longer wired as a primary Phase 5 step. It can still be invoked ad-hoc by Track A audit fixes via Step 5.5 if a single check class needs iterative tightening, but the structured per-feature audit replaces the orchestrator-improvised eval cases that the previous Step 5.2 (Eval Harness → Metric Loop) drove.
 
@@ -979,18 +979,21 @@ Call the Agent tool 3 times in one message:
 
 1. Description: "E2E runner" — INTERNAL inline role-string — mode: "bypassPermissions" — Prompt: "Run Playwright E2E test generation, execution, and stability check per `protocols/web-phase-branches.md` Phase 5 E2E steps (generate and run E2E tests for User Journeys, 3 mandatory iterations for flakiness detection). Report results + artifact paths. Records results to `docs/plans/evidence/e2e/iter-3-results.json`. Scope: multi-feature User Journeys ONLY (login → browse → buy, signup → onboarding → first-action). Single-feature happy paths are covered by Track B per-feature auditors at Step 5.2 — do NOT duplicate."
 
-2. Description: "Dogfood the app" — INTERNAL inline role-string + agent-browser skill — mode: "bypassPermissions" — Prompt: "You are the Dogfood runner. Run the agent-browser dogfood skill against the running app at http://localhost:[port]. Explore every reachable page. Click every button. Fill every form. Check console for errors. Report a structured list of issues with severity ratings, screenshots, repro steps. Write findings to `docs/plans/evidence/dogfood/findings.md` AND a machine-readable mirror at `docs/plans/evidence/dogfood/findings.json` (schema: `[{finding_id, severity, description, screenshot_path, affected_screen_id}, ...]` per agents/testing-evidence-collector.md "Dogfood Evidence Outputs"). Do NOT classify or route findings — that's the Feedback Synthesizer's job at Step 5.4."
+2. Description: "Dogfood the app" — subagent_type: `testing-evidence-collector`
 
-3. Description: "Fake-data detector" — subagent_type: `fake-data-detector` — INTERNAL inline role-string — mode: "bypassPermissions" — Prompt: "Run the Fake Data Detector Protocol (`protocols/fake-data-detector.md`). Static analysis: grep for Math.random() in business data paths, hardcoded API responses, setTimeout faking async, placeholder text. Dynamic analysis: inspect HAR files from `docs/plans/evidence/` for missing real API calls, static responses, absent WebSocket traffic. Write findings to `docs/plans/evidence/fake-data-audit.md` with file:line refs and severity."
+3. Description: "Fake-data detector" — subagent_type: `silent-failure-hunter` — mode: "bypassPermissions" — Prompt: "Run the Fake Data Detector Protocol (`protocols/fake-data-detector.md`). Static analysis: grep for Math.random() in business data paths, hardcoded API responses, setTimeout faking async, placeholder text. Dynamic analysis: inspect HAR files from `docs/plans/evidence/` for missing real API calls, static responses, absent WebSocket traffic. Write findings to `docs/plans/evidence/fake-data-audit.md` with file:line refs and severity."
 
 ### Step 5.4 — Feedback Synthesizer
 
 The Dogfood findings used to dead-end. Now route them to fix loops.
 
-Call the Agent tool — description: "Synthesize dogfood findings" — subagent_type: `product-feedback-synthesizer` — Prompt: "[CONTEXT header above] Interpret findings from Track B (per-feature product-reality audits) AND Dogfood (autonomous exploration). Inputs:
+Call the Agent tool — description: "Synthesize all findings" — subagent_type: `product-feedback-synthesizer` — Prompt: "[CONTEXT header above] Interpret findings from Track A, Track B, and Cross-cutting streams. Inputs:
 
 - `docs/plans/evidence/dogfood/findings.md` — autonomous exploration findings, each requires classification + routing
 - `docs/plans/evidence/product-reality/*/findings.json` — one per feature (web only — for iOS this glob is empty and Track B did not run). Each Track B finding ALREADY CARRIES `target_phase` and `target_task_or_step` set by the product-reality-auditor. VALIDATE these against the graph (same `graph_query_dependencies` walk used for dogfood findings) and pass through if valid; only re-route if validation fails (e.g., the targeted task no longer exists in the task DAG).
+- E2E test failures: `docs/plans/evidence/e2e/iter-3-results.json` — failures that persisted through 3 Playwright iterations. For each, set `source: "e2e"`, classify severity, route to `target_phase: 4`.
+- Fake-data findings: `docs/plans/evidence/fake-data-audit.md` — hardcoded/mock data in production paths. For each, set `source: "fake-data"`, classify severity, route to `target_phase: 4`.
+- Track A audit findings: `docs/plans/evidence/brand-drift.md`, API tester output, performance audit output, a11y audit output, security audit output from Step 5.1. These are engineering-focused findings. For each Track A finding, set `source: "track-a"`, classify severity, and route: API/perf/security findings → `target_phase: 4` (implementation fix); a11y findings → `target_phase: 4` (implementation fix); brand-drift findings → `target_phase: 3` (design fix, re-run Brand Guardian at Step 3.0).
 
 For each finding, ensure it ends up classified with:
   - Code-level bug (broken feature, failing logic, fake data) → `target_phase: 4`, assign to the specific task that owns the affected file
@@ -998,7 +1001,7 @@ For each finding, ensure it ends up classified with:
   - Structural/architecture issue (missing feature, wrong data flow, API mismatch) → `target_phase: 2`, assign to the architecture section
   - Spec-gap (acceptance criteria too vague, persona constraint not measurable) → `target_phase: 1, target_task_or_step: "1.6"`
 
-Output: `docs/plans/evidence/dogfood/classified-findings.json` with shape `[{finding_id, source: \"dogfood\" | \"product-reality\", severity, target_phase, target_task_or_step, description, evidence_ref, related_decision_id?: string}, ...]`. The `source` field distinguishes the two input streams. The file also carries a footer object with: `graph_used: boolean` (false if any graph call failed and grep fallback ran), `re_routed_findings: [{finding_id, original_target, new_target, reason}, ...]` (Track B findings whose routing the synthesizer overrode after graph validation failed — empty array if none), `source_counts: {dogfood: N, product_reality: M}` (count by input stream). This file is read by the Phase 5 fix loop and by the Phase 6 LRR Aggregator for backward routing."
+Output: `docs/plans/evidence/dogfood/classified-findings.json` with shape `[{finding_id, source: \"dogfood\" | \"product-reality\" | \"track-a\" | \"e2e\" | \"fake-data\", severity, target_phase, target_task_or_step, description, evidence_ref, related_decision_id?: string}, ...]`. The `source` field distinguishes the five input streams. The file also carries a footer object with: `graph_used: boolean` (false if any graph call failed and grep fallback ran), `re_routed_findings: [{finding_id, original_target, new_target, reason}, ...]` (Track B findings whose routing the synthesizer overrode after graph validation failed — empty array if none), `source_counts: {dogfood: N, product_reality: M, track_a: P, e2e: N, fake_data: N}` (count by input stream). This file is read by the Phase 5 fix loop and by the Phase 6 LRR Aggregator for backward routing."
 
 ### Step 5.5 — Fix loop
 

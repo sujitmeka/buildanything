@@ -19,8 +19,11 @@ import {
 } from '../../src/graph/storage/index.js';
 import type {
   GraphFragment,
+  PageSpecNode,
   ScreenComponentUseNode,
   ScreenNode,
+  ScreenStateSlotNode,
+  StateNode,
   TokenNode,
 } from '../../src/graph/types.js';
 
@@ -272,6 +275,75 @@ describe('queryScreenFull / queryScreen', () => {
     assert.ok(primary, 'expected colors.primary in tokens_used');
     assert.equal(primary.value, '#0F172A');
     assert.equal(primary.layer, 'color');
+  });
+
+  it('resolves kebab state label to real state ID at query time (Issue #4)', () => {
+    const tmp = newTmp();
+    const synth: GraphFragment = {
+      version: 1, schema: 'buildanything-slice-1',
+      source_file: '<synth>', source_sha: '0'.repeat(64),
+      produced_at: new Date().toISOString(),
+      nodes: [
+        {
+          id: 'screen__login', label: 'Login', entity_type: 'screen',
+          source_file: '<synth>', confidence: 'EXTRACTED',
+          description: 'Login screen', feature_ids: ['feature__authentication'],
+        } as ScreenNode,
+        {
+          id: 'state__authentication__loading', label: 'loading', entity_type: 'state',
+          source_file: '<synth>', confidence: 'EXTRACTED',
+          feature_id: 'feature__authentication', is_initial: false, meta_state: true,
+        } as StateNode,
+        {
+          id: 'page_spec__login', label: 'Login', entity_type: 'page_spec',
+          source_file: '<synth>', confidence: 'EXTRACTED',
+          screen_id: 'screen__login', wireframe_text: '', content_hierarchy: [], route: null,
+        } as PageSpecNode,
+        {
+          id: 'screen_state_slot__login__loading', label: 'loading', entity_type: 'screen_state_slot',
+          source_file: '<synth>', confidence: 'EXTRACTED',
+          screen_id: 'screen__login', state_id: 'loading', appearance_text: 'spinner',
+        } as ScreenStateSlotNode,
+      ],
+      edges: [],
+    };
+    saveGraph(tmp, synth, 'synth.json');
+    const merged = loadAllGraphs(tmp)!;
+    const result = queryScreenFull(merged, 'screen__login')!;
+    assert.ok(result);
+    assert.equal(result.screen_state_slots[0].state_id, 'state__authentication__loading');
+  });
+
+  it('keeps kebab label when no matching StateNode exists (Issue #4 negative)', () => {
+    const tmp = newTmp();
+    const synth: GraphFragment = {
+      version: 1, schema: 'buildanything-slice-1',
+      source_file: '<synth>', source_sha: '0'.repeat(64),
+      produced_at: new Date().toISOString(),
+      nodes: [
+        {
+          id: 'screen__login', label: 'Login', entity_type: 'screen',
+          source_file: '<synth>', confidence: 'EXTRACTED',
+          description: 'Login screen', feature_ids: ['feature__authentication'],
+        } as ScreenNode,
+        {
+          id: 'page_spec__login', label: 'Login', entity_type: 'page_spec',
+          source_file: '<synth>', confidence: 'EXTRACTED',
+          screen_id: 'screen__login', wireframe_text: '', content_hierarchy: [], route: null,
+        } as PageSpecNode,
+        {
+          id: 'screen_state_slot__login__loading', label: 'loading', entity_type: 'screen_state_slot',
+          source_file: '<synth>', confidence: 'EXTRACTED',
+          screen_id: 'screen__login', state_id: 'loading', appearance_text: 'spinner',
+        } as ScreenStateSlotNode,
+      ],
+      edges: [],
+    };
+    saveGraph(tmp, synth, 'synth.json');
+    const merged = loadAllGraphs(tmp)!;
+    const result = queryScreenFull(merged, 'screen__login')!;
+    assert.ok(result);
+    assert.equal(result.screen_state_slots[0].state_id, 'loading');
   });
 });
 

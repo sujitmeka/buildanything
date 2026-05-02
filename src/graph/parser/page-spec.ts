@@ -287,7 +287,7 @@ function parseStates(
     return;
   }
   // Try bullets
-  const bulletRe = /^\s*-\s+(?:\*\*(.+?)\*\*\s*(?:—|--|-)?\s*(.*)$|(.+?):\s+(.*)$)/;
+  const bulletRe = /^\s*-\s+(?:\*\*(.+?)\*\*\s*(?:—|--|-|:)?\s*(.*)$|(.+?):\s+(.*)$)/;
   for (const line of section.bodyLines) {
     const m = line.text.match(bulletRe);
     if (!m) continue;
@@ -315,7 +315,7 @@ function emitStateSlot(
     source_location: loc(line),
     confidence: "EXTRACTED",
     screen_id: screenId,
-    state_id: `unresolved__state__${kebab(screenName)}__${kebab(stateName)}`,
+    state_id: kebab(stateName),
     appearance_text: appearance,
   };
   ctx.nodes.push(node);
@@ -373,6 +373,7 @@ function parseComponentPicks(
   const slotCol = table.headers.find((h) => h === "manifest slot" || h === "slot");
   const sectionCol = table.headers.find((h) => h === "section" || h === "section name");
   if (!slotCol || !sectionCol) return;
+  const propsCol = table.headers.find((h) => h === "prop overrides" || h === "props" || h === "overrides");
   for (const row of table.rows) {
     const sectionName = (row.cells[sectionCol] ?? "").trim();
     let rawSlot = (row.cells[slotCol] ?? "").trim();
@@ -384,6 +385,7 @@ function parseComponentPicks(
     rawSlot = rawSlot.replace(/\s*\([^)]*\)\s*$/, "").trim();
     const slot = kebab(rawSlot);
     if (!slot || !sectionName) continue;
+    const propOverrides = propsCol ? (row.cells[propsCol] ?? "").trim() : "";
     const node: ScreenComponentUseNode = {
       id: ids.screenComponentUse(screenName, slot, sectionName),
       label: `${slot} @ ${sectionName}`,
@@ -394,7 +396,7 @@ function parseComponentPicks(
       screen_id: screenId,
       slot,
       position_in_wireframe: sectionName,
-      prop_overrides: "",
+      prop_overrides: propOverrides,
     };
     ctx.nodes.push(node);
     ctx.edges.push(makeEdge(ctx, pageSpecId, node.id, "slot_used_on_screen", row.line));

@@ -158,6 +158,86 @@ describe('design-md parser — determinism', () => {
   });
 });
 
+describe('design-md parser — axis word-boundary matching (regression: substring false positives)', () => {
+  const baseFixture = readFileSync(join(FIXTURES, 'design-md-pass1-marketplace.md'), 'utf-8');
+
+  function withReferences(refsBlock: string): string {
+    // Replace the entire `### References` block (up to the next `## ` h2) with a synthetic one.
+    return baseFixture.replace(
+      /### References\n[\s\S]*?(?=\n## )/,
+      `### References\n\n${refsBlock}\n`,
+    );
+  }
+
+  function withDosBlock(dosBlock: string): string {
+    return baseFixture.replace(
+      /## Do's and Don'ts\n[\s\S]*$/,
+      `## Do's and Don'ts\n\n${dosBlock}\n`,
+    );
+  }
+
+  it('brand_reference: substring "designscope" does NOT match "scope" axis (no false positive)', () => {
+    const md = withReferences('- Designscope (https://example.com/designscope) — a portfolio site');
+    const result = extractDesignMd({ mdPath: 'inline.md', mdContent: md });
+    assert.equal(result.ok, true);
+    assert.ok(result.fragment);
+    const refs = nodesOfType<BrandReferenceNode>(result.fragment, 'brand_reference');
+    assert.equal(refs.length, 1);
+    assert.deepEqual(refs[0].exemplifies_axes, [], 'expected no axis matches for "designscope"');
+  });
+
+  it('brand_reference: "exemplifies Density" matches the density axis', () => {
+    const md = withReferences('- Acme (https://acme.example) — exemplifies Density');
+    const result = extractDesignMd({ mdPath: 'inline.md', mdContent: md });
+    assert.equal(result.ok, true);
+    assert.ok(result.fragment);
+    const refs = nodesOfType<BrandReferenceNode>(result.fragment, 'brand_reference');
+    assert.equal(refs.length, 1);
+    assert.deepEqual(refs[0].exemplifies_axes, ['density']);
+  });
+
+  it('brand_reference: "Density and Motion" matches both axes (sorted)', () => {
+    const md = withReferences('- Linear (https://linear.app) — exemplifies Density and Motion');
+    const result = extractDesignMd({ mdPath: 'inline.md', mdContent: md });
+    assert.equal(result.ok, true);
+    assert.ok(result.fragment);
+    const refs = nodesOfType<BrandReferenceNode>(result.fragment, 'brand_reference');
+    assert.equal(refs.length, 1);
+    assert.deepEqual(refs[0].exemplifies_axes, ['density', 'motion']);
+  });
+
+  it('brand_reference: compound "designtype" does NOT match "type" axis', () => {
+    const md = withReferences('- Designtype Studio (https://example.com/designtype) — typography agency');
+    const result = extractDesignMd({ mdPath: 'inline.md', mdContent: md });
+    assert.equal(result.ok, true);
+    assert.ok(result.fragment);
+    const refs = nodesOfType<BrandReferenceNode>(result.fragment, 'brand_reference');
+    assert.equal(refs.length, 1);
+    assert.deepEqual(refs[0].exemplifies_axes, [], 'expected no axis matches for "designtype"');
+  });
+
+  it("guideline axis_scope: 'characterize the page' does NOT set axis_scope to 'character'", () => {
+    const dos = [
+      "- Do keep table row height at 32px or below — violating Density=Dense kills the catalog scan rhythm.",
+      "- Do use JetBrains Mono for every SKU, lot number, quantity, and price — needed for the brand signal.",
+      "- Do use 1px hairlines for all dividers.",
+      "- Don't characterize the page with too many fonts.",
+    ].join('\n');
+    const md = withDosBlock(dos);
+    const result = extractDesignMd({ mdPath: 'inline.md', mdContent: md });
+    assert.equal(result.ok, true);
+    assert.ok(result.fragment);
+    const guidelines = nodesOfType<BrandDnaGuidelineNode>(result.fragment, 'brand_dna_guideline');
+    const characterize = guidelines.find((g) => /characterize the page/.test(g.text));
+    assert.ok(characterize, 'expected the "characterize the page" guideline to be parsed');
+    assert.notEqual(
+      characterize.axis_scope,
+      'character',
+      'word-boundary should prevent "characterize" from matching "character"',
+    );
+  });
+});
+
 describe('design-md parser — pass detection and ID stability', () => {
   it('marketplace fixture: pass_complete = { pass1: true, pass2: false }', () => {
     const result = parseFixture('design-md-pass1-marketplace.md');

@@ -51,7 +51,7 @@ Write findings to `docs/plans/.build-state.md` under `## Fake Data Detector`:
 |---|-----------|---------|----------------|----------|---------------|
 
 <HARD-GATE>
-CRITICAL findings block the Reality Checker (Step 6.3). Do not proceed past Phase 6.2d until all CRITICAL findings are resolved or explicitly accepted by the user.
+CRITICAL findings route through the Feedback Synthesizer (Step 5.4) and Fix loop (Step 5.5) — they do NOT block inline. The synthesizer classifies and routes them like all other finding streams.
 </HARD-GATE>
 
 ---

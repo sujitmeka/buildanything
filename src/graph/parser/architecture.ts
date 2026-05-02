@@ -2,6 +2,7 @@ import { ids, kebab, sha256Hex } from "../ids.js";
 import type {
   ApiContractNode,
   ArchitectureModuleNode,
+  Confidence,
   DataModelNode,
   ExtractError,
   ExtractResult,
@@ -39,11 +40,6 @@ const PATH_STOP_WORDS = new Set([
   "me",
   "self",
 ]);
-
-// Common noise tokens for description-prose feature inference. The regex
-// itself anchors on a verb ("provided by", "consumed by", etc.) so this list
-// only filters obvious non-feature targets that follow.
-const PROSE_STOP_WORDS = new Set(["the", "a", "an"]);
 
 interface Line {
   n: number;
@@ -115,12 +111,13 @@ function makeEdge(
   target: string,
   relation: Relation,
   line: number,
+  confidence: Confidence = "EXTRACTED",
 ): GraphEdge {
   return {
     source,
     target,
     relation,
-    confidence: "EXTRACTED",
+    confidence,
     source_file: ctx.mdPath,
     source_location: loc(line),
     produced_by_agent: PRODUCED_BY,
@@ -202,12 +199,13 @@ function splitParenAware(value: string): string[] {
 // is also present. Unmatched edges are tolerable — queryDependencies and
 // queryCrossContracts simply return empty arrays for unknown features.
 //
-// Resolution order (explicit annotations and heuristics all contribute; the
-// resulting feature ID set is deduplicated per endpoint per relation):
-//   1. Explicit annotation on heading line: `(provides: x)` / `(consumes: y)`
-//   2. Description-prose phrasing: "provided by X", "consumed by X"
-//   3. Path-segment inference (provides only): first non-stopword segment
-//   4. Module-name match (provides only): module kebab matches a feature
+// Edge emission precedence (highest to lowest confidence):
+//   1. Explicit annotation: `(provides: x)` / `(consumes: y)` → EXTRACTED
+//   2. Path-segment inference (provides only): first non-stopword segment → INFERRED
+//   3. Module-name match (provides only): module kebab matches a feature → INFERRED
+//
+// Prose heuristics ("provided by X", "consumed by X") removed 2026-04-30
+// after ultrareview flagged them as a major false-positive source.
 
 interface EndpointAnnotation {
   provides: string[];
@@ -244,25 +242,6 @@ function inferFeatureFromPath(path: string): string | null {
   return null;
 }
 
-function inferFeaturesFromProse(block: Line[]): EndpointAnnotation {
-  const provides: string[] = [];
-  const consumes: string[] = [];
-  const re = /\b(provided|consumed|used)\s+by\s+([A-Za-z][A-Za-z0-9 _-]*?)(?=[.,;)\n]|$)/gi;
-  for (const line of block) {
-    const t = line.text;
-    re.lastIndex = 0;
-    let m: RegExpExecArray | null;
-    while ((m = re.exec(t)) !== null) {
-      const verb = m[1].toLowerCase();
-      const target = kebab(m[2].trim());
-      if (!target || PROSE_STOP_WORDS.has(target)) continue;
-      if (verb === "provided") provides.push(target);
-      else consumes.push(target);
-    }
-  }
-  return { provides, consumes };
-}
-
 function inferFeatureFromModuleName(moduleName: string): string | null {
   const kebabbed = kebab(moduleName);
   const GENERIC = new Set([
@@ -278,26 +257,50 @@ function inferFeatureFromModuleName(moduleName: string): string | null {
   return kebabbed;
 }
 
+/**
+ * Edge emission precedence (highest to lowest confidence):
+ * 1. Explicit annotation: `**POST /api/orders** (provides: checkout)` → confidence: EXTRACTED
+ * 2. Path inference: `**POST /api/checkout**` in any module → confidence: INFERRED
+ * 3. Module-name match: any endpoint in a module named after a feature → confidence: INFERRED
+ *
+ * Prose heuristics ("provided by X", "consumed by X") removed as of 2026-04-30
+ * after ultrareview flagged them as a major false-positive source.
+ */
 function emitFeatureEdges(
   ctx: Ctx,
   contractId: string,
   line: number,
-  annotation: EndpointAnnotation,
+  explicit: EndpointAnnotation,
+  inferred: EndpointAnnotation,
 ): void {
   const seenProvides = new Set<string>();
-  for (const f of annotation.provides) {
+  for (const f of explicit.provides) {
     if (!f || seenProvides.has(f)) continue;
     seenProvides.add(f);
     ctx.edges.push(
-      makeEdge(ctx, `feature__${f}`, contractId, "feature_provides_endpoint", line),
+      makeEdge(ctx, `feature__${f}`, contractId, "feature_provides_endpoint", line, "EXTRACTED"),
     );
   }
   const seenConsumes = new Set<string>();
-  for (const f of annotation.consumes) {
+  for (const f of explicit.consumes) {
     if (!f || seenConsumes.has(f)) continue;
     seenConsumes.add(f);
     ctx.edges.push(
-      makeEdge(ctx, `feature__${f}`, contractId, "feature_consumes_endpoint", line),
+      makeEdge(ctx, `feature__${f}`, contractId, "feature_consumes_endpoint", line, "EXTRACTED"),
+    );
+  }
+  for (const f of inferred.provides) {
+    if (!f || seenProvides.has(f)) continue;
+    seenProvides.add(f);
+    ctx.edges.push(
+      makeEdge(ctx, `feature__${f}`, contractId, "feature_provides_endpoint", line, "INFERRED"),
+    );
+  }
+  for (const f of inferred.consumes) {
+    if (!f || seenConsumes.has(f)) continue;
+    seenConsumes.add(f);
+    ctx.edges.push(
+      makeEdge(ctx, `feature__${f}`, contractId, "feature_consumes_endpoint", line, "INFERRED"),
     );
   }
 }
@@ -414,20 +417,14 @@ function parseEndpointsInSection(
     ctx.edges.push(makeEdge(ctx, moduleId, node.id, "module_has_contract", headLine.n));
 
     const explicit = parseEndpointAnnotation(trailing);
-    const merged: EndpointAnnotation = {
-      provides: [...explicit.provides],
-      consumes: [...explicit.consumes],
-    };
+    const inferred: EndpointAnnotation = { provides: [], consumes: [] };
     if (explicit.provides.length === 0 && explicit.consumes.length === 0) {
-      const prose = inferFeaturesFromProse(block);
-      merged.provides.push(...prose.provides);
-      merged.consumes.push(...prose.consumes);
       const pathHint = inferFeatureFromPath(path);
-      if (pathHint) merged.provides.push(pathHint);
+      if (pathHint) inferred.provides.push(pathHint);
       const moduleHint = inferFeatureFromModuleName(moduleName);
-      if (moduleHint) merged.provides.push(moduleHint);
+      if (moduleHint) inferred.provides.push(moduleHint);
     }
-    emitFeatureEdges(ctx, node.id, headLine.n, merged);
+    emitFeatureEdges(ctx, node.id, headLine.n, explicit, inferred);
   }
 }
 

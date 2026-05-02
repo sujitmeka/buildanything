@@ -3,8 +3,9 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { extractScreenshot } from '../../src/graph/parser/screenshot.js';
+import { extractScreenshot, extractBrandDriftObservation } from '../../src/graph/parser/screenshot.js';
 import type {
+  DogfoodFindingNode,
   GraphEdge,
   GraphNode,
   ImageComponentDetectionNode,
@@ -52,7 +53,7 @@ describe('extractScreenshot — reference class', () => {
       (e: GraphEdge) => e.relation === 'image_has_component_detection',
     );
     assert.equal(detectionEdges.length, 1);
-    assert.equal(detectionEdges[0].source, result.nodes[0].id);
+    assert.equal(detectionEdges[0].source, nodesOfType<ScreenshotNode>(result.nodes, 'screenshot')[0].id);
     assert.equal(detectionEdges[0].target, detections[0].id);
   });
 
@@ -94,12 +95,12 @@ describe('extractScreenshot — brand_drift class', () => {
 });
 
 describe('extractScreenshot — dogfood class', () => {
-  it('emits 1 screenshot node + screenshot_evidences_finding edge when linkedFindingId provided', () => {
+  it('emits 1 screenshot node + screenshot_evidences_finding edge + dogfood_finding node when linkedFindingId provided', () => {
     const result = extractScreenshot({
       imagePath: DOGFOOD_PATH,
       imageClass: 'dogfood',
       imageBytes: readBytes(DOGFOOD_PATH),
-      linkedFindingId: 'dogfood_finding__f-001',
+      linkedFindingId: 'f-001',
     });
     assert.equal(result.ok, true);
     assert.equal(nodesOfType<ScreenshotNode>(result.nodes, 'screenshot').length, 1);
@@ -108,6 +109,71 @@ describe('extractScreenshot — dogfood class', () => {
     );
     assert.equal(evidences.length, 1);
     assert.equal(evidences[0].target, 'dogfood_finding__f-001');
+
+    // DogfoodFindingNode emitted
+    const findings = nodesOfType<DogfoodFindingNode>(result.nodes, 'dogfood_finding');
+    assert.equal(findings.length, 1);
+    assert.equal(findings[0].finding_id, 'f-001');
+    assert.equal(findings[0].severity, 'minor');
+    const screenshotNode = nodesOfType<ScreenshotNode>(result.nodes, 'screenshot')[0];
+    assert.equal(findings[0].screenshot_id, screenshotNode.id);
+  });
+
+  it('extractScreenshot dogfood with severity + description override', () => {
+    const result = extractScreenshot({
+      imagePath: DOGFOOD_PATH,
+      imageClass: 'dogfood',
+      imageBytes: readBytes(DOGFOOD_PATH),
+      linkedFindingId: 'df-002',
+      findingSeverity: 'critical',
+      findingDescription: 'Submit button broken on mobile',
+    });
+    assert.equal(result.ok, true);
+    const findings = nodesOfType<DogfoodFindingNode>(result.nodes, 'dogfood_finding');
+    assert.equal(findings.length, 1);
+    assert.equal(findings[0].severity, 'critical');
+    assert.equal(findings[0].description, 'Submit button broken on mobile');
+  });
+
+  it('extractScreenshot dogfood without linkedFindingId emits NO dogfood_finding and NO evidences edge', () => {
+    const result = extractScreenshot({
+      imagePath: DOGFOOD_PATH,
+      imageClass: 'dogfood',
+      imageBytes: readBytes(DOGFOOD_PATH),
+    });
+    assert.equal(result.ok, true);
+    assert.equal(nodesOfType<DogfoodFindingNode>(result.nodes, 'dogfood_finding').length, 0);
+    assert.equal(
+      result.edges.filter((e: GraphEdge) => e.relation === 'screenshot_evidences_finding').length,
+      0,
+    );
+  });
+});
+
+describe('extractScreenshot — confidence', () => {
+  it('extractScreenshot all classes return nodes with confidence INFERRED', () => {
+    const refResult = extractScreenshot({
+      imagePath: REF_PATH,
+      imageClass: 'reference',
+      imageBytes: readBytes(REF_PATH),
+    });
+    const driftResult = extractScreenshot({
+      imagePath: PROD_PATH,
+      imageClass: 'brand_drift',
+      imageBytes: readBytes(PROD_PATH),
+    });
+    const dogfoodResult = extractScreenshot({
+      imagePath: DOGFOOD_PATH,
+      imageClass: 'dogfood',
+      imageBytes: readBytes(DOGFOOD_PATH),
+      linkedFindingId: 'f-conf-test',
+    });
+    for (const result of [refResult, driftResult, dogfoodResult]) {
+      assert.equal(result.ok, true);
+      for (const node of result.nodes) {
+        assert.equal(node.confidence, 'INFERRED', `node ${node.id} should be INFERRED`);
+      }
+    }
   });
 });
 
@@ -197,5 +263,42 @@ describe('extractScreenshot — properties', () => {
     assert.equal(result.ok, true);
     const shot = nodesOfType<ScreenshotNode>(result.nodes, 'screenshot')[0];
     assert.match(shot.perceptual_hash, /^[0-9a-f]{16}$/);
+  });
+});
+
+describe('extractBrandDriftObservation', () => {
+  it('returns 1 node + 2 edges with confidence INFERRED', () => {
+    const result = extractBrandDriftObservation({
+      prodScreenshotId: 'screenshot__prod__abc12345',
+      referenceScreenshotId: 'screenshot__ref__def67890',
+      axis: 'material',
+      score: 0.72,
+      verdict: 'drift',
+      observationId: 'bdo-test-001',
+    });
+    assert.equal(result.ok, true);
+    assert.equal(result.nodes.length, 1);
+    assert.equal(result.edges.length, 2);
+    assert.equal(result.nodes[0].entity_type, 'brand_drift_observation');
+    assert.equal(result.nodes[0].confidence, 'INFERRED');
+    for (const edge of result.edges) {
+      assert.equal(edge.confidence, 'INFERRED');
+    }
+    const relations = new Set(result.edges.map((e) => e.relation));
+    assert.ok(relations.has('prod_drifts_from_reference_prod'));
+    assert.ok(relations.has('prod_drifts_from_reference_ref'));
+  });
+
+  it('returns ok:false when prodScreenshotId is empty', () => {
+    const result = extractBrandDriftObservation({
+      prodScreenshotId: '',
+      referenceScreenshotId: 'screenshot__ref__def67890',
+      axis: 'density',
+      score: 0.5,
+      verdict: 'ok',
+      observationId: 'bdo-test-002',
+    });
+    assert.equal(result.ok, false);
+    assert.ok(result.errors.length > 0);
   });
 });
