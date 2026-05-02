@@ -929,7 +929,7 @@ Before starting Phase 5: run the Verify Protocol (7 checks) one more time. All c
 **Goal**: Surface quality issues before Launch Review. Phase 5 runs in three layers: Track A audits the engineering envelope (API / perf / a11y / security / brand drift), Track B audits the built product against `product-spec.md` per-feature (states, transitions, business rules, happy path, persona constraints, wiring, manifest coverage), and Cross-cutting checks (E2E user journeys, autonomous dogfood, fake-data detector) catch what neither track anticipates. Findings from all three layers route through one Feedback Synthesizer (Step 5.4) and one Fix loop (Step 5.5).
 
 **Mode-specific branch:**
-- `project_type=ios`: follow `protocols/ios-phase-branches.md` §Phase 5 (iOS twin commands: `/buildanything:verify` → `/buildanything:ux-review` → `/buildanything:fix` in sequence; Maestro smoke tests). Skip the web TEAM below and jump to Step 5.4 Feedback Synthesizer with iOS evidence.
+- `project_type=ios`: follow `protocols/ios-phase-branches.md` §Phase 5 for iOS-adapted Track A/B + cross-cutting (XcodeBuildMCP + Maestro execution surface). Steps 5.1–5.3 are defined in the iOS protocol; Steps 5.4–5.5 below are shared.
 - `project_type=web`: continue below.
 
 ### Step 5.1 — Track A: Engineering Reality (5 parallel auditors, ONE message)
@@ -990,10 +990,10 @@ The Dogfood findings used to dead-end. Now route them to fix loops.
 Call the Agent tool — description: "Synthesize all findings" — subagent_type: `product-feedback-synthesizer` — Prompt: "[CONTEXT header above] Interpret findings from Track A, Track B, and Cross-cutting streams. Inputs:
 
 - `docs/plans/evidence/dogfood/findings.md` — autonomous exploration findings, each requires classification + routing
-- `docs/plans/evidence/product-reality/*/findings.json` — one per feature (web only — for iOS this glob is empty and Track B did not run). Each Track B finding ALREADY CARRIES `target_phase` and `target_task_or_step` set by the product-reality-auditor. VALIDATE these against the graph (same `graph_query_dependencies` walk used for dogfood findings) and pass through if valid; only re-route if validation fails (e.g., the targeted task no longer exists in the task DAG).
+- `docs/plans/evidence/product-reality/*/findings.json` — one per feature (web uses agent-browser evidence; iOS uses XcodeBuildMCP + Maestro evidence). Each Track B finding ALREADY CARRIES `target_phase` and `target_task_or_step` set by the product-reality-auditor. VALIDATE these against the graph (same `graph_query_dependencies` walk used for dogfood findings) and pass through if valid; only re-route if validation fails (e.g., the targeted task no longer exists in the task DAG).
 - E2E test failures: `docs/plans/evidence/e2e/iter-3-results.json` — failures that persisted through 3 Playwright iterations. For each, set `source: "e2e"`, classify severity, route to `target_phase: 4`.
 - Fake-data findings: `docs/plans/evidence/fake-data-audit.md` — hardcoded/mock data in production paths. For each, set `source: "fake-data"`, classify severity, route to `target_phase: 4`.
-- Track A audit findings: `docs/plans/evidence/brand-drift.md`, API tester output, performance audit output, a11y audit output, security audit output from Step 5.1. These are engineering-focused findings. For each Track A finding, set `source: "track-a"`, classify severity, and route: API/perf/security findings → `target_phase: 4` (implementation fix); a11y findings → `target_phase: 4` (implementation fix); brand-drift findings → `target_phase: 3` (design fix, re-run Brand Guardian at Step 3.0).
+- Track A audit findings: `docs/plans/evidence/brand-drift.md`, `docs/plans/evidence/track-a/*.json` (API contract, performance, a11y, security). Web uses Playwright/Lighthouse; iOS uses XcodeBuildMCP/Instruments. These are engineering-focused findings. For each Track A finding, set `source: "track-a"`, classify severity, and route: API/perf/security findings → `target_phase: 4` (implementation fix); a11y findings → `target_phase: 4` (implementation fix); brand-drift findings → `target_phase: 3` (design fix, re-run Brand Guardian at Step 3.0).
 
 For each finding, ensure it ends up classified with:
   - Code-level bug (broken feature, failing logic, fake data) → `target_phase: 4`, assign to the specific task that owns the affected file

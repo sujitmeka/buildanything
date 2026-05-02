@@ -184,6 +184,34 @@ artifacts:
     notes: |
       Synthesized agent-browser scripts (one block per check case).
       Provides debug context when results.json shows FAIL.
+  - path: docs/plans/evidence/product-reality/{feature_id}/results.json
+    platform: ios
+    writer: ios-product-reality-auditor
+    readers: [phase-5-feedback-synthesizer, phase-6-eng-quality]
+    notes: |
+      iOS Track B per-feature pass/fail evidence. Same schema as web
+      product-reality-auditor but driven by XcodeBuildMCP + Maestro.
+  - path: docs/plans/evidence/product-reality/{feature_id}/findings.json
+    platform: ios
+    writer: ios-product-reality-auditor
+    readers: [phase-5-feedback-synthesizer]
+  - path: docs/plans/evidence/product-reality/{feature_id}/coverage.json
+    platform: ios
+    writer: ios-product-reality-auditor
+    readers: [phase-6-eng-quality]
+  - path: docs/plans/evidence/product-reality/{feature_id}/tests-generated.md
+    platform: ios
+    writer: ios-product-reality-auditor
+    readers: [phase-5-feedback-synthesizer, phase-6-eng-quality]
+    notes: |
+      Synthesized Maestro YAML flows (one block per check case).
+  - path: docs/plans/evidence/track-a/*.json
+    writers: [phase-5, testing-api-tester, testing-performance-benchmarker, a11y-architect, engineering-security-engineer]
+    readers: [phase-5-feedback-synthesizer, phase-6]
+    notes: |
+      Track A engineering audit evidence. Web and iOS both write here.
+      Per-auditor files: api-contract.json, performance.json,
+      accessibility.json, security.json.
   - path: docs/plans/evidence/*.json
     writer: phase-5
     contributors: [phase-4]
@@ -200,7 +228,7 @@ artifacts:
       silent-failure-hunter writes fake-data-audit.md (commands/build.md:984);
       agent-role enforcement fires alongside the phase-5 phase-match.
   - path: docs/plans/evidence/**/*.json
-    writers: [phase-4, phase-5, phase-6]
+    writers: [phase-4, phase-5, phase-6, ios-product-reality-auditor]
     readers: [phase-6, phase-7]
     notes: |
       Nested per-task / per-run evidence JSON (smoke-test HAR analysis,
@@ -212,13 +240,13 @@ artifacts:
       fixes. Top-level evidence/*.json kept separate above for the
       phase-5 writer narrowing.
   - path: docs/plans/evidence/**/*.md
-    writers: [phase-4, phase-5]
+    writers: [phase-4, phase-5, ios-product-reality-auditor]
     readers: [phase-5, phase-6, phase-7]
     notes: |
       Nested per-task / per-run evidence markdown (brand-drift.md,
       fake-data-audit.md, dogfood/findings.md, per-task smoke-test notes).
   - path: docs/plans/evidence/**/*.png
-    writers: [phase-3, phase-4, phase-5]
+    writers: [phase-3, phase-4, phase-5, ios-product-reality-auditor]
     readers: [phase-5, phase-6, phase-7]
     notes: |
       Playwright screenshots, SwiftUI Preview captures, Maestro run captures,

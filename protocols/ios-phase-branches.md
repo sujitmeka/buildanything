@@ -358,26 +358,53 @@ Executes the task's **Maestro** flow from `maestro/` against a booted simulator 
 
 ## Phase 5 — Audit (iOS branch)
 
-Phase 5 does NOT run the web audit bundle. Instead, **dispatch to the three iOS twin commands in sequence** (these are slash-command dispatches, not Agent tool calls — each twin command owns its own internal `subagent_type` wiring):
+Phase 5 runs in three layers matching the web structure: Track A (engineering reality), Track B (product reality per-feature), and Cross-cutting. All findings consolidate at the Feedback Synthesizer (Step 5.4 in `commands/build.md`) and route through the Fix loop (Step 5.5).
 
-1. `/buildanything:verify` (iOS twin — functional correctness, XcodeBuildMCP diagnostics, Maestro E2E)
-2. `/buildanything:ux-review` (iOS twin — HIG audit via SwiftUI Preview captures + Apple HIG checklist)
-3. `/buildanything:fix` (iOS twin — dispatches specialist iOS agents for each finding, including `subagent_type: ios-app-review-guardian` for App Review rejection risks)
+### Step 5.1 — Track A: Engineering Reality (5 parallel auditors, ONE message)
 
-Each twin owns its own scope and reviewer — they are NOT merged into a single loop. After all three twins complete, verify the following output artifacts exist and are non-empty before proceeding to Phase 6:
+Call the Agent tool 5 times in one message:
 
-- `docs/plans/ios-verify-report.md` — written by the `/buildanything:verify` twin
-- `docs/plans/ios-ux-review-report.md` — written by the `/buildanything:ux-review` twin
-- At least one `*.yaml` file in `maestro/` — Maestro flows from Phase 4 scaffold
-- At least one `*.png` screenshot in `docs/plans/evidence/maestro-runs/` — from the verify run
+1. **API Contract** — subagent_type: `testing-api-tester` — Run network integration tests via XcodeBuildMCP test runner. Validate URLSession/networking layer against architecture.md API contracts. Evidence: `docs/plans/evidence/track-a/api-contract.json`
 
-If any required artifact is missing, re-dispatch the owning twin once. If still missing after one retry, log a blocker and present to user (interactive) or proceed with a warning in the Completion Report (autonomous).
+2. **Performance** — subagent_type: `testing-performance-benchmarker` — iOS-adapted: app launch time (cold/warm via XcodeBuildMCP), memory footprint, binary size budget, scroll jank. Use `xcodebuild -showBuildTimingSummary`. Compare against `quality-targets.json`. Evidence: `docs/plans/evidence/track-a/performance.json`
 
-Then run **Phase 6 Step 6.0 Reality Check** (in `commands/build.md`, backed by `subagent_type: testing-reality-checker`) with iOS evidence (Maestro run logs, Preview captures, HIG findings).
+3. **Accessibility** — subagent_type: `a11y-architect` — Load `swift-accessibility` skill (Mode 3: audit pass). XcodeBuildMCP `describe_ui` for accessibility tree inspection. VoiceOver labels, Dynamic Type at all sizes, contrast ratios, hit targets ≥44pt. Evidence: `docs/plans/evidence/track-a/accessibility.json`
 
-The Launch Readiness Review (Phase 6 in `commands/build.md`) also runs unchanged for iOS mode, with the usual LRR chapter agents: `subagent_type: code-reviewer` (Eng-Quality, paired with `subagent_type: swift-reviewer` for Swift-specific code review), `subagent_type: security-reviewer` (Security), `subagent_type: engineering-sre` (SRE), `subagent_type: a11y-architect` (A11y), `subagent_type: design-brand-guardian` (Brand).
+4. **Security** — subagent_type: `engineering-security-engineer` — Load `swift-security-expert` skill (audit mode). Keychain usage, CryptoKit, ATS exceptions, privacy manifest, entitlements, hardcoded secrets, `swift package audit`. Evidence: `docs/plans/evidence/track-a/security.json`
 
-Skip the web-only audit steps from `protocols/web-phase-branches.md` Phase 5 (5-agent audit team, eval harness, hardening metric loop, 3-iteration Playwright E2E, agent-browser dogfood, web fake-data patterns).
+5. **Brand Drift** — subagent_type: `design-brand-guardian` — Capture every screen via XcodeBuildMCP simulator screenshots. Score against DESIGN.md DNA axes (Character, Density, Material, Motion, Type). Save screenshots to `docs/plans/evidence/brand-drift/`. Findings to `docs/plans/evidence/brand-drift.md`. Drift check only — no pass/fail verdict.
+
+Post-5.1: Index brand drift screenshots into graph (Slice 5) via `graph-index.js`.
+
+### Step 5.2 — Track B: Product Reality (parallel per-feature, ONE message)
+
+Same feature enumeration as web: call `graph_list_features`, zero-feature gate routes back to Step 1.6.
+
+Dispatch one `ios-product-reality-auditor` per feature in ONE message. Each auditor uses XcodeBuildMCP + Maestro to run the 7 check classes against the live simulator app. Same evidence schema as web: `docs/plans/evidence/product-reality/{feature_id}/` with results.json, findings.json, coverage.json, tests-generated.md, screenshots/.
+
+Post-dispatch verification: same as web (4 evidence files per feature, JSON parse check, one retry, synthetic finding on second failure).
+
+Post-5.2: Index Track B evidence into graph.
+
+### Step 5.3 — Cross-cutting (3 parallel, ONE message)
+
+1. **Maestro E2E (3 iterations)** — INTERNAL inline — Generate multi-feature journey Maestro flows (login→browse→buy, signup→onboarding→first-action). Run 3x for flakiness detection. Multi-device: iPhone SE, iPhone 16 Pro, iPad. Quarantine flaky tests. Pass criteria: 95%+ pass rate. Evidence: `docs/plans/evidence/e2e/iter-3-results.json`.
+
+2. **iOS Dogfood** — subagent_type: `testing-evidence-collector` — Load `ios-debugger-agent` skill. Use XcodeBuildMCP to systematically explore: `describe_ui` to discover all tappable elements, navigate every screen, tap every button, fill every form. Capture console logs via `start_sim_log_cap`. Spec-blind exploratory testing. Evidence: `docs/plans/evidence/dogfood/findings.md` + `docs/plans/evidence/dogfood/findings.json`.
+
+3. **iOS Fake-Data Detector** — subagent_type: `silent-failure-hunter` — mode: "bypassPermissions" — Run `protocols/ios-fake-data-detector.md`. Static: grep for UUID() in business paths, hardcoded arrays as mock responses, Task.sleep faking async, #Preview data leaking into production, placeholder strings, hardcoded URLs. Evidence: `docs/plans/evidence/fake-data-audit.md`.
+
+### Post-audit evidence verification
+
+Verify these artifacts exist before proceeding to Step 5.4:
+- Track A: `docs/plans/evidence/track-a/*.json` (5 files), `docs/plans/evidence/brand-drift.md`
+- Track B: `docs/plans/evidence/product-reality/*/results.json` (one per feature)
+- Cross-cutting: `docs/plans/evidence/e2e/iter-3-results.json`, `docs/plans/evidence/dogfood/findings.md`, `docs/plans/evidence/fake-data-audit.md`
+- Maestro: at least one `*.yaml` in `maestro/`, at least one `*.png` in `docs/plans/evidence/maestro-runs/`
+
+Then proceed to Step 5.4 Feedback Synthesizer and Step 5.5 Fix loop in `commands/build.md` (shared web+iOS path).
+
+After Step 5.5 completes, proceed to Phase 6 (Launch Readiness Review) in `commands/build.md` — runs unchanged for iOS.
 
 ## Phase 7 — Ship (iOS branch, optional)
 
