@@ -28,7 +28,7 @@ This additionally installs XcodeBuildMCP, apple-docs-mcp, and Maestro.
 Takes an idea and builds it through 8 phases with quality gates, metric-driven iteration loops, and behavioral verification:
 
 0. **Context & Pre-Flight** — Scans for existing work, checks prerequisites, initializes state.
-1. **Brainstorm & Research** — Interactive brainstorming + 5 parallel research agents (market, tech, user, business, risk). Writes CLAUDE.md as the product brain.
+1. **Brainstorm & Research** — Interactive brainstorming + 4 parallel research agents (market, tech, user, business). Writes CLAUDE.md as the product brain.
 2. **Architecture & Planning** — 4 parallel architecture agents + sprint planning with user journeys, NFRs, and behavioral acceptance criteria per task.
 3. **Design & Visual Identity** — Competitive research via Playwright, living style guide with every component rendered and interactive, visual QA scoring at 80/100.
 4. **Foundation** — Scaffolding, design system from style guide, acceptance test stubs.

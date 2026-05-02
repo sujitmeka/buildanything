@@ -138,6 +138,8 @@ Increment after each agent returns (parallel dispatch of 6 agents = +6). Reset t
 
 **Compaction checkpoint format:** At every phase boundary, check `dispatch_count` in `docs/plans/.build-state.json`. If >= 8: save ALL state (current phase, task statuses, metric loop scores, decisions) to `docs/plans/.build-state.json` and regenerate `.build-state.md` as the rendered view. Reset `dispatch_count` to 0. TodoWrite does NOT survive compaction — rebuild it from the JSON state file on resume. See `protocols/state-schema.md` for the full schema and rendering contract.
 
+Phase 4 context pressure: With 20+ tasks, compact returns accumulate ~30-40K tokens in the orchestrator's context. The compaction checkpoint (dispatch_count >= 8) is the primary relief valve. If Phase 4 has more than 15 tasks, force a compaction checkpoint after every wave transition regardless of dispatch_count.
+
 **Cumulative-cost banner at phase boundaries:** When announcing a phase transition (e.g. "Phase N complete — proceeding to Phase N+1"), prefix the message with `[Cost so far: $X.XX • Y tokens]`. Source the values from the last-appended entry in `docs/plans/build-log.md`'s token-accounting lines (fields `cumulative_usd=...` plus the sum of `input_tokens=...` + `output_tokens=...`), written by `src/orchestrator/hooks/token-accounting.ts` (see module for exact schema). If the build-log has no token-accounting entries yet, omit the prefix rather than guessing.
 
 Input: $ARGUMENTS
@@ -270,6 +272,8 @@ Scan for existing context:
 
 Scan the build request AND any context from Step 0.1 for iOS signals. Keywords: **iOS, iPhone, iPad, SwiftUI, Swift, App Store, TestFlight, Xcode, Apple, Liquid Glass, watchOS, visionOS, SwiftData, HIG**.
 
+To avoid false positives (e.g., a web app mentioning "Apple Pay" or "Sign in with Apple"), require at least 2 iOS keywords OR 1 keyword + existing Swift/Xcode files before triggering the iOS confirmation prompt.
+
 | Signal | Action |
 |---|---|
 | iOS keywords present in prompt | Confirm with user: "This looks like an iOS app — confirm? [y/n]" |
@@ -313,7 +317,7 @@ Phase 4 implementer dispatch reads `.active-learnings.md` and injects its conten
 
 0. Create `docs/plans/` directory if it doesn't exist (greenfield projects won't have it).
 1. Create a TodoWrite checklist with Phases 0-7.
-2. Write `docs/plans/.build-state.json` per the schema in `protocols/state-schema.md`. Required top-level fields: `project_type`, `phase`, `step`, `input`, `context_level`, `prerequisites`, `dispatch_count`, `last_save_phase`, `autonomous`, `session_id`, `session_started`, `completed_tasks[]`, `metric_loop_scores[]`, `decisions_next_id` (object keyed by phase number — see Phase 4 orchestrator-scribe handler), `resume_point { phase, step, completed_tasks, git_branch }`. Then regenerate `docs/plans/.build-state.md` from the JSON as a **read-only rendered view**.
+2. Write `docs/plans/.build-state.json` per the schema in `protocols/state-schema.md`. Required top-level fields: `project_type`, `phase`, `step`, `input`, `context_level`, `prerequisites`, `dispatch_count`, `last_save_phase`, `autonomous`, `session_id`, `session_started`, `completed_tasks[]`, `metric_loop_scores[]`, `decisions_next_id` (object keyed by phase number — see Phase 4 orchestrator-scribe handler), `resume_point { phase, step, completed_tasks, git_branch }`, `backward_routing_count_by_target_phase` (object), `feature_delegation_plan_path`, `current_wave`, `completed_features[]`, `feature_acceptance{}`, `feature_briefs{}`. See `protocols/state-schema.md` for the complete and authoritative field list. This inline list is a summary. Then regenerate `docs/plans/.build-state.md` from the JSON as a **read-only rendered view**.
 3. Go to Phase 1 (or Phase 2 if context level is "Full design").
 
 **NO prereq collection in Phase 0.** Stack isn't decided yet. Prereqs move to Step 1.5, after Gate 1. Asking for creds before the stack is picked means asking for wrong creds or re-asking on rejection.
@@ -541,6 +545,8 @@ The 6 architects design as a TEAM — not 6 isolated subagents. Cross-domain con
 
 **On re-entry from LRR backward routing:** If Phase 2 is being re-opened via the re-entry dispatch template (Step 6.3), skip team creation if the original `phase-2-architects` team is still live from this build; otherwise recreate it. Pass the re-entry payload (`{blocking_finding, prior_output: "docs/plans/architecture.md", decision_row}`) into the dispatch prompt of the architect(s) whose domain matches `decision_row.author` — only those architects re-run, not all 6. The re-dispatched architect revises its `docs/plans/phase-2-contracts/<name>.md` in place, SendMessages peers on any contract boundary it now changes, and the synthesizer re-runs once to re-stitch `architecture.md`. Do NOT redo unaffected domains.
 
+After the synthesizer re-stitches `architecture.md`, re-run the Refs Indexer (Step 2.3 dispatch #4) to update `docs/plans/refs.json` with fresh anchors, and re-run the DAG Validator (Step 2.3 dispatch #3) to verify sprint-tasks.md still references valid architecture sections. Invalidate the sprint-context hash per the refs.json mutation rule.
+
 **Step 2.2a — Create the team.**
 
 Call `TeamCreate` with `team_name: "phase-2-architects"`. This team scopes the SendMessage channel for the 6 architects below. Capture the team id in `.build-state.json` for teardown.
@@ -566,6 +572,7 @@ CROSS-CHECK PAIRINGS (mandatory — if your design touches one of these boundari
   - Security ↔ Backend         on auth flow (token storage, refresh, session model, authz gates)
   - Accessibility ↔ Frontend   on component patterns (primitives, focus management, landmark structure)
   - Performance ↔ Backend+Data on query shapes (N+1 risk, indexing strategy, bundle impact of data layer choices)
+  - Security ↔ Frontend        on client-side auth (token storage location, CSRF protection, input sanitization, secure cookie flags)
 
 COORDINATION RULES:
   - Plain text in your output file is INVISIBLE to teammates. If a contract boundary intersects another architect's domain, you MUST `SendMessage` to that peer using the exact `name` from the roster above. Do not assume they will read your file.
@@ -587,7 +594,7 @@ Per-architect dispatches:
 
 3. Description: "Data engineering" — subagent_type: `engineering-data-engineer` — team_name: `phase-2-architects` — name: `data-engineer` — Prompt: "[CONTEXT header above] Design data architecture. Read these files via your Read tool before starting — do NOT expect pasted content:\n  - PRD: `docs/plans/design-doc.md`\n  - PRODUCT SPEC: `docs/plans/product-spec.md` (## App Overview, ## Screen Inventory, ## Permissions & Roles, per-feature behavioral sections — feature behaviors are the source of truth your architecture must support)\n  - DIGEST: `docs/plans/phase1-scratch/findings-digest.md`\n  - YOUR DOMAIN RAW: `docs/plans/phase1-scratch/tech-feasibility.md`\nInclude ETL/ELT patterns, schema versioning, query patterns, indexing strategy, data lineage, migration plan. Per-feature data requirements from the product spec drive your schema — derived fields, denormalizations, and access patterns must serve specific feature flows.\n\n[paste shared team brief above]"
 
-4. Description: "Security architecture" — subagent_type: `engineering-security-engineer` — team_name: `phase-2-architects` — name: `security-engineer` — Prompt: "[CONTEXT header above] Security review. Read these files via your Read tool before starting — do NOT expect pasted content:\n  - PRD: `docs/plans/design-doc.md`\n  - PRODUCT SPEC: `docs/plans/product-spec.md` (## App Overview, ## Screen Inventory, ## Permissions & Roles, per-feature behavioral sections — feature behaviors are the source of truth your architecture must support)\n  - DIGEST: `docs/plans/phase1-scratch/findings-digest.md`\nCover auth model, input validation, secrets management, threat model, dependency hygiene. Note: no raw research file routed — digest only (security architecture is a cross-cutting concern). Use the product spec's ## Permissions & Roles section to drive your auth model — roles in the product spec must map to enforceable permissions in the architecture.\n\n[paste shared team brief above]"
+4. Description: "Security architecture" — subagent_type: `engineering-security-engineer` — team_name: `phase-2-architects` — name: `security-engineer` — Prompt: "[CONTEXT header above] Security review. Read these files via your Read tool before starting — do NOT expect pasted content:\n  - PRD: `docs/plans/design-doc.md`\n  - PRODUCT SPEC: `docs/plans/product-spec.md` (## App Overview, ## Screen Inventory, ## Permissions & Roles, per-feature behavioral sections — feature behaviors are the source of truth your architecture must support)\n  - DIGEST: `docs/plans/phase1-scratch/findings-digest.md`\n  - YOUR DOMAIN RAW: `docs/plans/phase1-scratch/tech-feasibility.md`\nCover auth model, input validation, secrets management, threat model, dependency hygiene. Use the product spec's ## Permissions & Roles section to drive your auth model — roles in the product spec must map to enforceable permissions in the architecture.\n\n[paste shared team brief above]"
 
 5. Description: "A11y constraints" — subagent_type: `a11y-architect` — team_name: `phase-2-architects` — name: `accessibility-auditor` — Prompt: "[CONTEXT header above] Accessibility-driven architecture constraints. Read these files via your Read tool before starting — do NOT expect pasted content:\n  - PRD: `docs/plans/design-doc.md`\n  - PRODUCT SPEC: `docs/plans/product-spec.md` (## App Overview, ## Screen Inventory, ## Permissions & Roles, per-feature behavioral sections — feature behaviors are the source of truth your architecture must support)\n  - DIGEST: `docs/plans/phase1-scratch/findings-digest.md`\n  - YOUR DOMAIN RAW: `docs/plans/phase1-scratch/ux-research.md`\nIdentify WCAG 2.2 AA requirements that affect component choice, navigation structure, form patterns, focus management, landmark regions. Per-feature Persona Constraints (e.g., \"user scans, doesn't read\", \"operator on a phone in the field\") drive component-level a11y constraints.\n\n[paste shared team brief above]"
 
@@ -605,7 +612,7 @@ Four sequential dispatches.
 
 **CONTEXT header:** Reuse `rendered_context_header` from phase 2 (already rendered above). Prepend to Step 2.3 synthesizer + sprint-breakdown prompts.
 
-1. Description: "Implementation blueprint" — subagent_type: `code-architect` — Prompt: "[CONTEXT header above] Implementation blueprint. Read the PRD via your Read tool: `docs/plans/design-doc.md`. Read the product spec: `docs/plans/product-spec.md` (Screen Inventory + per-feature behavioral sections — your blueprint's file-and-build-order list must cover every feature in the spec). Read all 6 post-debate architect positions via your own Read tool from `docs/plans/phase-2-contracts/`:\n  - `backend-architect.md`\n  - `frontend-architect.md`\n  - `data-engineer.md`\n  - `security-engineer.md`\n  - `accessibility-auditor.md`\n  - `performance-benchmarker.md`\n\nThese files are the authoritative team positions AFTER any SendMessage-driven revisions — the architects already cross-checked each other's contract boundaries, so you can stitch without re-debating. Your job is to assemble, not adjudicate. Include specific files to create/modify, build sequence, dependency order. Write `docs/plans/architecture.md` with stable section anchors per `protocols/architecture-schema.md`. Required top-level sections: Overview, Frontend, Backend, Data Model, Security, Infrastructure, Scope, Out of Scope. Scope to the boundary from the PRD."
+1. Description: "Implementation blueprint" — subagent_type: `code-architect` — Prompt: "[CONTEXT header above] Implementation blueprint. Read the PRD via your Read tool: `docs/plans/design-doc.md`. Read the product spec: `docs/plans/product-spec.md` (Screen Inventory + per-feature behavioral sections — your blueprint's file-and-build-order list must cover every feature in the spec). Read all 6 post-debate architect positions via your own Read tool from `docs/plans/phase-2-contracts/`:\n  - `backend-architect.md`\n  - `frontend-architect.md`\n  - `data-engineer.md`\n  - `security-engineer.md`\n  - `accessibility-auditor.md`\n  - `performance-benchmarker.md`\n\nThese files are the authoritative team positions AFTER any SendMessage-driven revisions — the architects already cross-checked each other's contract boundaries, so you can stitch without re-debating. Your job is to assemble the 6 positions into a coherent architecture. Where positions conflict OUTSIDE the 5 mandatory cross-check pairings, flag the contradiction explicitly in `architecture.md` under a `### Unresolved Tensions` section and pick the safer default. Do not silently absorb contradictions. Include specific files to create/modify, build sequence, dependency order. Write `docs/plans/architecture.md` with stable section anchors per `protocols/architecture-schema.md`. Required top-level sections: Overview, Frontend, Backend, Data Model, Security, Infrastructure, Scope, Out of Scope. Scope to the boundary from the PRD."
 
 2. Description: "Sprint breakdown" — subagent_type: `planner` — Prompt: "[CONTEXT header above] Break this architecture into ordered, atomic tasks. Each task needs: description, acceptance criteria, **dependencies** (list of task IDs this depends on), size (S/M/L), **Behavioral Test** field for every UI task (concrete interaction: 'Navigate to [page], click [element], verify [outcome]') or curl-based acceptance test for API tasks. Read these files via your Read tool before starting:\n  - ARCHITECTURE: `docs/plans/architecture.md`\n  - PRODUCT SPEC: `docs/plans/product-spec.md` (per-feature behavioral sections — every feature in the spec must have at least one task, and per-feature acceptance criteria become Behavioral Test field values)\n  - PRD: `docs/plans/design-doc.md`\nSave to `docs/plans/sprint-tasks.md`. Dependencies field is load-bearing — Phase 4 uses it to batch independent tasks in parallel. Each task's Behavioral Test field SHOULD reference a specific feature acceptance criterion from the product spec (e.g., \"User can submit form with valid email; submitted form appears in admin dashboard within 5s\" — derived from product-spec.md's Happy Path or per-state criteria)."
 
@@ -764,7 +771,7 @@ Scaffolding is project skeleton + design system + acceptance test stubs. Three s
 
 3. Description: "Scaffold acceptance tests" — INTERNAL inline role-string — mode: "bypassPermissions" — prompt: "[CONTEXT header above] Scaffold acceptance tests from sprint-tasks.md. Use Page Object Model. For every task with a Behavioral Test field, create a Playwright test stub (web) or Maestro flow stub (iOS). Stubs must FAIL right now. Commit: 'test: scaffold acceptance tests from sprint tasks'."
 
-**Scaffold verification:** Run the Verify Protocol — 7 checks sequentially, stop on first FAIL. Do not proceed to Step 4.1 until PASS.
+**Scaffold verification:** Run the Verify Protocol with `scope: static` (checks 1-3 and 6 only: Build, Type-Check, Lint, Diff Review). Test stubs are designed to fail at this point — do not run checks 4, 5, or 7 until after task implementation.
 
 ### Step 4.1 — Product Owner: Feature Planning
 
@@ -845,7 +852,7 @@ Call the Agent tool 2 times in one message:
 
 **5. Metric Loop** — unchanged. Authoritative behavioral check per `protocols/metric-loop.md`. Max 5 iterations.
 
-**6. Verify Service** — unchanged. Static checks only (type-check, lint, build). Max 3 fix attempts.
+**6. Verify Service** — unchanged. Static checks only (type-check, lint, build). Max 2 fix attempts.
 
 **7. After each task completes** — Update TodoWrite and `.build-state.json`. Write summary to `docs/plans/.task-outputs/[task-id].json`.
 
@@ -865,14 +872,14 @@ Write verdict: ACCEPTED or NEEDS_REVISION with specific findings citing product-
 
 **Verdict routing:**
 - `ACCEPTED` → mark feature complete in `.build-state.json.feature_acceptance`. Proceed.
-- `NEEDS_REVISION` → orchestrator re-dispatches the Briefing Officer for this feature with the findings. BO writes an updated brief targeting only the failing tasks. Orchestrator re-executes those tasks. Max 2 revision cycles per feature. After 2nd NEEDS_REVISION: interactive → present findings to user. Autonomous → accept with gap note in build-log.md.
+- `NEEDS_REVISION` → orchestrator re-dispatches the Briefing Officer for this feature with the findings. BO writes an updated brief targeting only the failing tasks. Orchestrator re-executes those tasks. Max 2 revision cycles per feature. After 2nd NEEDS_REVISION: interactive → present findings to user. Autonomous → accept with gap note in build-log.md AND append a structured gap entry to `.build-state.json.feature_acceptance[feature].gaps[]` with shape `{finding, severity, accepted_at_cycle}`. The Phase 6 LRR Eng-Quality chapter reads these gaps as input evidence.
 
 ### Step 4.4 — Wave Transition
 
 After all features in the current wave are ACCEPTED:
 
 1. Update `.build-state.json`: add features to `completed_features`, increment `current_wave`.
-2. Handle shared file mutations: if any BO flagged shared file changes needed by the next wave, apply them now.
+2. Handle shared file mutations: if any BO flagged shared file changes needed by the next wave, apply them now. The orchestrator identifies shared files from BO cross-feature contract fields. For each shared file flagged by multiple features in the next wave, dispatch a single `code-architect` agent to reconcile the mutations before wave execution begins. Do NOT let multiple BOs independently modify the same shared file.
 3. Run a quick Verify Protocol (static checks) to confirm the wave didn't break anything.
 4. Proceed to next wave. Repeat Steps 4.2-4.4.
 
@@ -949,7 +956,7 @@ Call the Agent tool 6 times in one message:
 
 Run the Eval Harness Protocol (`protocols/eval-harness.md`). Define 8-15 concrete, executable eval cases from the audit findings and architecture doc. Run the eval agent. Record baseline pass rate. CRITICAL and HIGH failures feed into the Metric Loop as specific issues to fix.
 
-Run the Metric Loop Protocol (callable service) on the full codebase using audit findings as initial input. Define a composite metric based on what this project needs. Max 4 iterations. When fixing, dispatch to the RIGHT specialist — security → `security-reviewer`, a11y → `engineering-frontend-developer`, perf → `testing-performance-benchmarker`. Don't send everything to one agent.
+Run the Metric Loop Protocol (callable service) on the full codebase using audit findings as initial input. Define a composite metric based on what this project needs. Max 4 iterations. When fixing, dispatch to the RIGHT specialist — security → `security-reviewer`, a11y → `a11y-architect`, perf → `engineering-backend-architect`. Don't send everything to one agent.
 
 Re-run the Eval Harness after the metric loop exits. All CRITICAL eval cases must now pass. If any CRITICAL case still fails, include it as evidence for Phase 6.
 
@@ -1162,6 +1169,8 @@ On re-entry from LRR BLOCK:
     blocking_finding: {chapter, finding_id, severity, description, related_decision_id, related_files}
     prior_output: path to the phase's previous artifact
     decision_row: the row from decisions.jsonl containing original reasoning + authorship
+    cycle_number: current backward-routing cycle count for this target phase (from .build-state.json.backward_routing_count_by_target_phase)
+    downstream_phases_affected: list of phases that consume this phase's output (e.g., Phase 2 re-entry affects Phases 3, 4, 5, 6)
   TASK for the re-opened phase:
     Revise prior_output to address blocking_finding. Do NOT redo unaffected work. Emit a new decision_row documenting the revision rationale.
 ```

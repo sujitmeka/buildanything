@@ -10,6 +10,8 @@ LRR replaces the monolithic Reality Checker verdict with five independent chapte
 
 LRR runs **five chapters**: Eng-Quality, Security, SRE, A11y, and Brand Guardian.
 
+Future consideration: A Data Privacy/Compliance chapter (covering GDPR consent flows, data retention policies, PII handling, cookie consent, privacy manifest completeness for iOS) is not included in the current 5-chapter panel. For regulated industries (healthcare, finance, education), the orchestrator SHOULD add a 6th chapter by dispatching `security-reviewer` with a privacy-focused prompt. This is advisory, not a HARD-GATE.
+
 Requirements coverage is evaluated as a sub-input of the Eng-Quality chapter. There is no separate PM chapter, no `pm.json` file, and the LRR Aggregator runs exactly once. The Eng-Quality chapter agent reads the Design Doc + `sprint-tasks.md` scope directly alongside its other evidence and emits COVERED/PARTIAL/MISSING per feature inline on its own verdict (see the `requirements_coverage` field in the schema below). There is no separate Step 7.0 dispatch and no Aggregator re-run.
 
 ### Primary evidence inputs
@@ -136,6 +138,8 @@ HARD CAPS ON FOLLOW-UPS:
 - **Only Security and SRE have the power.** Eng-Quality, A11y, and Brand Guardian chapters with concerns write a CONCERNS verdict; they do not spawn follow-ups.
 - **BLOCK-only trigger.** A follow-up can only be spawned when the parent chapter's verdict is BLOCK. Concerns without a BLOCK are logged as CONCERNS; they do not justify a second dispatch.
 </HARD-GATE>
+
+SDK enforcement (Stage 5+): When dispatched via `claude-agent-sdk`, follow-up investigations MUST use `allowedTools: ["Read", "Grep", "Glob", "Bash(read-only)"]` to enforce read-only at the SDK level. The prompt-level instruction ("Read/Grep/Glob only") remains as defense-in-depth for non-SDK mode. The `maxTurns: 15` cap is enforced by the SDK harness, not self-reported.
 
 ## Fallback on malformed or timed-out follow-up
 

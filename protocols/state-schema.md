@@ -81,6 +81,11 @@
 | `resume_point` | object | yes | `{phase, step, autonomous, completed_summary, git_branch}`. Snapshot used by Phase-0 resume logic. |
 | `verification` | object | yes | `{last_verify_result, last_verify_timestamp}`. `last_verify_result` is one of `"PRODUCTION_READY"`, `"NEEDS_WORK"`, `"BLOCKED"`, or `null`. |
 | `blockers` | array | no | Open blockers. Each: `{id, description, surfaced_at, type}`. Type is `"build"`, `"design"`, `"dep"`, or `"external"`. |
+| `decisions_pruned_at_phase0` | boolean | no | Default `false`. Set to `true` after Phase 0 archives stale decision rows. |
+
+### Decision Log Pruning (Phase 0)
+
+At Phase 0, if `docs/plans/decisions.jsonl` exists and contains rows from a previous `session_id`, archive them: copy the file to `docs/plans/decisions.jsonl.prev`, then filter `decisions.jsonl` to retain only rows matching the current `session_id`. Set `decisions_pruned_at_phase0: true`. This prevents unbounded growth across builds while preserving history in the `.prev` file. The LRR Aggregator's star rule only needs current-build decisions for backward routing.
 
 ### Fields added at v2 (Stage 4)
 
@@ -168,6 +173,10 @@ Direct writes to `.build-state.json` are prohibited — a partial write leaves u
 **Read-side recovery check:** on session start / resume, if `.build-state.json.tmp` exists and `.build-state.json` does not (or is empty), treat it as a corrupted interrupted write. Do not auto-parse the `.tmp` file. Surface to the user and halt — resuming from partial state is worse than stopping.
 
 This section is the authoritative write contract. Other protocol/command files that say "write to `.build-state.json`" mean "via this protocol."
+
+### Compaction Safety Net
+
+The PreCompact hook is a prompt-level reminder (type: "prompt"), not a hard command. As defense-in-depth, the `session-start` hook reads `.build-state.json` on every session start and rebuilds TodoWrite from it. If compaction fires without the orchestrator saving state first, the session-start recovery path restores from the last checkpoint. This is a safety net, not a substitute for the orchestrator honoring compaction checkpoints.
 
 ## Validation rules
 

@@ -52,3 +52,7 @@ After the cleanup agent finishes, spot-check that acceptance criteria still hold
 - Scope is sacred. Only files from the implementation changeset. Zero exceptions.
 - This runs AFTER implementation, BEFORE the metric loop.
 - If cleanup breaks acceptance criteria, revert and skip. Never block the metric loop on a cleanup failure.
+
+### Build Log Rotation
+
+At Phase 0, if `docs/plans/build-log.md` exceeds 500 lines, archive it to `docs/plans/build-log.prev.md` and start a fresh log. The archived log preserves full history for debugging. The 500-line threshold keeps the active log within a reasonable context budget for agents that read it.

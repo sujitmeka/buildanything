@@ -349,6 +349,11 @@
       "items": { "$ref": "#/$defs/blocker" },
       "description": "Open blockers. Omitted when empty."
     },
+    "decisions_pruned_at_phase0": {
+      "type": "boolean",
+      "default": false,
+      "description": "Set to true after Phase 0 archives stale decision rows from previous builds"
+    },
     "decisions_next_id": {
       "type": "object",
       "additionalProperties": { "type": "integer", "minimum": 0 },

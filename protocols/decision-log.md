@@ -129,3 +129,7 @@ Subagents return `deviation_row` objects in their structured result. The orchest
 ## Ref Field Convention
 
 Every row carries a `ref` anchor (e.g., `architecture.md#backend/persistence` or `visual-design-spec.md#<anchor>`) that downstream readers use to widen context without pasting prose. The resume handler passes the row's short fields *plus* the ref — the resumed agent reads the anchor via its own Read tool if it needs the full context. This matches the existing `refs.json` pattern in `commands/build.md` (primary/secondary anchors handed to implementers instead of pasted content), and keeps rehydration token cost bounded to ~300 tokens for the top 5 rows regardless of how much architectural prose sits behind each anchor.
+
+### Malformed Row Handling
+
+When reading `decisions.jsonl` or `learnings.jsonl`, consumers MUST skip malformed rows (invalid JSON) with a warning logged to `build-log.md` rather than crashing. Shape: `"WARN: skipped malformed row at line N in [file]: [parse error]"`. This prevents a single corrupt append from blocking the entire LRR Aggregator or Learnings Loader.

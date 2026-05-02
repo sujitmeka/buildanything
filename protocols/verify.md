@@ -60,8 +60,13 @@ ONE AGENT, ONE PASS: The orchestrator spawns exactly ONE agent for the entire ve
 | `diff` | Check 6 only |
 | `behavioral` | Check 7 only |
 | `static` | Checks 1, 2, 3, 6 (build, types, lint, diff — no test/security/behavioral) |
+| `ci` | Checks 1, 2, 3, 4 (build, types, lint, test — no security/diff/behavioral) |
 
 The `static` macro is the standard Phase 6 post-metric-loop scope — the metric loop owns behavioral evaluation, so Phase 6 verify skips checks 4 (test), 5 (security), and 7 (behavioral).
+
+The `ci` macro is for CI pipeline integration — it runs the four deterministic, automatable checks and skips security (often handled by separate CI tooling), diff review (no uncommitted changes in CI), and behavioral (requires a running app).
+
+If no scope is specified, default to `full`.
 
 ## Step 2b — Test stub detector
 
