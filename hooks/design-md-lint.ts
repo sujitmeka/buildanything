@@ -29,6 +29,7 @@ import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, appendFileSync, writeFileSync, renameSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import process from "node:process";
+import YAML from "yaml";
 
 interface LintFinding {
   rule: string;
@@ -177,12 +178,67 @@ function main(): number {
   const findings = parseFindings(stdout);
   const errors = findings.filter((f) => f.severity === "error" && BROKEN_REF_RULES.has(f.rule));
   const warnings = findings.filter((f) => f.severity === "warning" || (f.severity === "error" && !BROKEN_REF_RULES.has(f.rule)));
+  const infos: LintFinding[] = [];
+
+  // §9.5 iOS-specific post-process checks (gated on project_type=ios).
+  const buildStatePath = resolve(cwd, "docs/plans/.build-state.json");
+  if (existsSync(buildStatePath)) {
+    try {
+      const bs = JSON.parse(readFileSync(buildStatePath, "utf8")) as Record<string, unknown>;
+      if (bs.project_type === "ios") {
+        // Parse YAML frontmatter for token inspection.
+        const fmMatch = fileContent.match(/^---\r?\n([\s\S]*?)\r?\n---/);
+        const fmYaml = fmMatch ? fmMatch[1] : "";
+        let fm: Record<string, unknown> = {};
+        try { fm = YAML.parse(fmYaml) ?? {}; } catch { /* skip if unparseable */ }
+
+        const colors = (typeof fm.colors === "object" && fm.colors !== null) ? fm.colors as Record<string, unknown> : {};
+        const typography = (typeof fm.typography === "object" && fm.typography !== null) ? fm.typography as Record<string, unknown> : {};
+        const components = (typeof fm.components === "object" && fm.components !== null) ? fm.components as Record<string, unknown> : {};
+
+        // 1. Dark-pair rule: every color token needs a -dark counterpart.
+        const colorKeys = Object.keys(colors);
+        for (const ck of colorKeys) {
+          if (ck.endsWith("-dark")) continue;
+          if (!colorKeys.includes(`${ck}-dark`)) {
+            warnings.push({ rule: "ios-dark-pair", severity: "warning", message: `colors.${ck} has no -dark pair for dark mode` });
+          }
+        }
+
+        // 2. Dynamic Type role check: typography tokens should match iOS roles.
+        const DYNAMIC_TYPE_ROLES = new Set(["largeTitle", "title", "title2", "title3", "headline", "body", "callout", "subheadline", "footnote", "caption", "caption2"]);
+        for (const tk of Object.keys(typography)) {
+          if (!DYNAMIC_TYPE_ROLES.has(tk)) {
+            warnings.push({ rule: "ios-dynamic-type", severity: "warning", message: `typography.${tk} is not a Dynamic Type role — fixed-size Font, breaks accessibility scaling` });
+          }
+        }
+
+        // 3. iOS 26 gating: Glassy material + iOS 26 → require card-glass/button-tinted.
+        const dnaMatch = fileContent.match(/###\s*Brand DNA[\s\S]*?(?=###|\n##\s|$)/);
+        const dnaBlock = dnaMatch ? dnaMatch[0] : "";
+        const materialMatch = dnaBlock.match(/Material\s*:\s*(.+)/i);
+        const material = materialMatch ? materialMatch[1].trim() : "";
+        const iosFeatures = Array.isArray(bs.ios_features) ? bs.ios_features as string[] : [];
+        const targetsIos26 = iosFeatures.some((f) => /ios\s*26|26\s*sdk/i.test(String(f)));
+        const isGlassy = /glassy/i.test(material);
+        const compKeys = Object.keys(components);
+
+        if (isGlassy && targetsIos26) {
+          if (!compKeys.includes("card-glass")) infos.push({ rule: "ios26-glassy-gate", severity: "info", message: "Material=Glassy + iOS 26 target but components.card-glass is missing" });
+          if (!compKeys.includes("button-tinted")) infos.push({ rule: "ios26-glassy-gate", severity: "info", message: "Material=Glassy + iOS 26 target but components.button-tinted is missing" });
+        } else if (!isGlassy) {
+          if (compKeys.includes("card-glass")) infos.push({ rule: "ios26-glassy-gate", severity: "info", message: "Material is not Glassy but components.card-glass is present — remove it" });
+          if (compKeys.includes("button-tinted")) infos.push({ rule: "ios26-glassy-gate", severity: "info", message: "Material is not Glassy but components.button-tinted is present — remove it" });
+        }
+      }
+    } catch { /* build-state unreadable — skip iOS checks */ }
+  }
   const brokenRefs = errors.length;
   const exitCode = brokenRefs > 0 ? 2 : 0;
 
   const ranAt = new Date().toISOString();
   const status: "pass" | "warn" | "fail" =
-    brokenRefs > 0 ? "fail" : warnings.length > 0 ? "warn" : "pass";
+    brokenRefs > 0 ? "fail" : (warnings.length > 0 || infos.length > 0) ? "warn" : "pass";
 
   // Storage layer (src/graph/storage/index.ts queryDna) reads
   // .buildanything/graph/lint-status.json and only consumes the `status`
@@ -200,6 +256,7 @@ function main(): number {
     exit_code: exitCode,
     raw_stdout: stdout.slice(0, 8000),
     raw_stderr: stderr.slice(0, 2000),
+    ...(infos.length > 0 ? { infos } : {}),
   };
 
   const summaryPath = resolve(cwd, ".buildanything/graph/lint-status.json");
@@ -225,6 +282,9 @@ function main(): number {
   }
   if (warnings.length > 0) {
     process.stdout.write(`design-md-lint: ${warnings.length} warning(s) (logged, non-blocking)\n`);
+  }
+  if (infos.length > 0) {
+    process.stdout.write(`design-md-lint: ${infos.length} info(s) (logged, non-blocking)\n`);
   }
 
   return exitCode;

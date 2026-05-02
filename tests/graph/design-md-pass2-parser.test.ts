@@ -141,3 +141,31 @@ describe('design-md-pass2 — malformed inline', () => {
     assert.ok(result.errors.length > 0);
   });
 });
+
+describe('design-md-pass2 — iOS attribution', () => {
+  it('edges use ios-swift-ui-design / 3.2-ios when projectType is ios', () => {
+    const p = join(FIXTURES, 'design-md-pass2-marketplace.md');
+    const md = readFileSync(p, 'utf-8');
+    const result = extractDesignMdTokens({ mdPath: p, mdContent: md, projectType: 'ios' });
+    assert.ok(result.fragment);
+    const edges = result.fragment.edges.filter((e) => e.relation === 'token_derived_from');
+    assert.ok(edges.length > 0);
+    for (const e of edges) {
+      assert.equal(e.produced_by_agent, 'ios-swift-ui-design');
+      assert.equal(e.produced_at_step, '3.2-ios');
+    }
+  });
+
+  it('defaults to web attribution when projectType is omitted', () => {
+    const p = join(FIXTURES, 'design-md-pass2-marketplace.md');
+    const md = readFileSync(p, 'utf-8');
+    const result = extractDesignMdTokens({ mdPath: p, mdContent: md });
+    assert.ok(result.fragment);
+    const edges = result.fragment.edges.filter((e) => e.relation === 'token_derived_from');
+    assert.ok(edges.length > 0);
+    for (const e of edges) {
+      assert.equal(e.produced_by_agent, 'design-ui-designer');
+      assert.equal(e.produced_at_step, '3.4');
+    }
+  });
+});

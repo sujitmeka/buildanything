@@ -13,8 +13,10 @@ import type {
   TokenNode,
 } from "../types.js";
 
-const PRODUCED_BY = "design-ui-designer";
-const PRODUCED_AT_STEP = "3.4";
+const PRODUCED_BY_WEB = "design-ui-designer";
+const PRODUCED_AT_STEP_WEB = "3.4";
+const PRODUCED_BY_IOS = "ios-swift-ui-design";
+const PRODUCED_AT_STEP_IOS = "3.2-ios";
 const SCHEMA = "buildanything-slice-3" as const;
 
 type TokenLayer = TokenNode["layer"];
@@ -179,8 +181,10 @@ function collectTokens(
 
 // --- Main ---
 
-export function extractDesignMdTokens(input: { mdPath: string; mdContent: string }): ExtractResult {
-  const { mdPath, mdContent } = input;
+export function extractDesignMdTokens(input: { mdPath: string; mdContent: string; projectType?: "web" | "ios" }): ExtractResult {
+  const { mdPath, mdContent, projectType } = input;
+  const producedBy = projectType === "ios" ? PRODUCED_BY_IOS : PRODUCED_BY_WEB;
+  const producedAtStep = projectType === "ios" ? PRODUCED_AT_STEP_IOS : PRODUCED_AT_STEP_WEB;
   const { yaml, found } = parseFrontmatter(mdContent);
 
   if (!found) return { ok: true, fragment: emptyFragment(mdPath, mdContent), errors: [] };
@@ -226,8 +230,8 @@ export function extractDesignMdTokens(input: { mdPath: string; mdContent: string
         confidence: "EXTRACTED",
         source_file: mdPath,
         source_location: "L1",
-        produced_by_agent: PRODUCED_BY,
-        produced_at_step: PRODUCED_AT_STEP,
+        produced_by_agent: producedBy,
+        produced_at_step: producedAtStep,
       });
     }
   }
