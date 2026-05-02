@@ -75,13 +75,13 @@ describe('page-spec parser — login.md', () => {
     assert.equal(edges.filter((e) => e.relation === 'slot_used_on_screen').length, 6);
   });
 
-  it('screen_state_slot loading has unresolved placeholder state_id', () => {
+  it('screen_state_slot loading has kebab state label as state_id', () => {
     const result = parsePageSpec('login.md');
     assert.ok(result.fragment);
     const slot = nodesOfType<ScreenStateSlotNode>(result.fragment, 'screen_state_slot')
       .find((n) => n.id === 'screen_state_slot__login__loading');
     assert.ok(slot);
-    assert.equal(slot.state_id, 'unresolved__state__login__loading');
+    assert.equal(slot.state_id, 'loading');
   });
 
   it('key_copy text is clean (no quotes, no leading dash, no placement: prefix)', () => {
@@ -149,5 +149,98 @@ describe('page-spec parser — determinism', () => {
     const { produced_at: _a, ...aRest } = a.fragment;
     const { produced_at: _b, ...bRest } = b.fragment;
     assert.equal(stableStringify(aRest), stableStringify(bRest));
+  });
+});
+
+describe('page-spec parser — bullet-form states (Issue #11)', () => {
+  const md = `# Page: TestBullet
+
+## ASCII Wireframe
+
+\`\`\`
+[Header]
+[Footer]
+\`\`\`
+
+## Content Hierarchy
+
+- Header
+- Footer
+
+## States
+
+- **idle**: empty form, focus in email field
+- **error** — bad credentials shown
+
+## Key Copy
+
+- "Welcome" — placement: page heading
+
+`;
+
+  it('bullet state with colon separator has clean appearance_text', () => {
+    const result = extractPageSpec({ mdPath: 'test-bullet.md', mdContent: md });
+    assert.equal(result.ok, true);
+    assert.ok(result.fragment);
+    const slots = nodesOfType<ScreenStateSlotNode>(result.fragment, 'screen_state_slot');
+    const idle = slots.find((s) => s.id.includes('idle'));
+    assert.ok(idle);
+    assert.equal(idle.appearance_text, 'empty form, focus in email field');
+  });
+
+  it('bullet state with dash separator has clean appearance_text', () => {
+    const result = extractPageSpec({ mdPath: 'test-bullet.md', mdContent: md });
+    assert.ok(result.fragment);
+    const slots = nodesOfType<ScreenStateSlotNode>(result.fragment, 'screen_state_slot');
+    const error = slots.find((s) => s.id.includes('error'));
+    assert.ok(error);
+    assert.equal(error.appearance_text, 'bad credentials shown');
+  });
+});
+
+describe('page-spec parser — prop_overrides column (Issue #10)', () => {
+  const md = `# Page: TestProps
+
+## ASCII Wireframe
+
+\`\`\`
+[Hero]
+\`\`\`
+
+## Content Hierarchy
+
+- Hero
+
+## Key Copy
+
+- "Sign up" — placement: primary button label
+
+## Component Picks
+
+| Section | Manifest Slot | Prop Overrides |
+|---------|---------------|----------------|
+| Hero    | primary-button | label="Sign up", variant=cta |
+
+`;
+
+  it('captures prop_overrides from table column', () => {
+    const result = extractPageSpec({ mdPath: 'test-props.md', mdContent: md });
+    assert.equal(result.ok, true);
+    assert.ok(result.fragment);
+    const uses = nodesOfType<ScreenComponentUseNode>(result.fragment, 'screen_component_use');
+    assert.equal(uses.length, 1);
+    assert.equal(uses[0].prop_overrides, 'label="Sign up", variant=cta');
+  });
+
+  it('existing fixtures have empty prop_overrides (backward compat)', () => {
+    const p = join(FIXTURES, 'page-specs', 'login.md');
+    const loginMd = readFileSync(p, 'utf-8');
+    const result = extractPageSpec({ mdPath: p, mdContent: loginMd });
+    assert.ok(result.fragment);
+    const uses = nodesOfType<ScreenComponentUseNode>(result.fragment, 'screen_component_use');
+    assert.ok(uses.length > 0);
+    for (const u of uses) {
+      assert.equal(u.prop_overrides, '', `expected empty prop_overrides for slot ${u.slot}`);
+    }
   });
 });

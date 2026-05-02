@@ -402,13 +402,11 @@ Track B audits the built app against `product-spec.md` on a per-feature basis. T
 
 After all per-feature `product-reality-auditor` dispatches return and `docs/plans/evidence/product-reality/*/` is populated, index the directory into the build graph.
 
-**Note: this is the only `.idx` block in Phase 5 that is best-effort** (does NOT STOP on indexer failure). Track B evidence is hard-gated at Phase 6.0 Step 6.0 by file presence + JSON parseability, not by graph index status. Downstream consumers (Phase 5.4 synthesizer, Phase 6.1 Eng-Quality chapter) read the JSON files directly and fall back gracefully if the graph fragment is absent. Step 5.1.idx and Step 5.3b.idx STOP on indexer failure because their downstream consumers (Brand chapter, dogfood synthesizer) require the graph fragment.
-
 Run via the Bash tool:
 
 - Command: `node ${CLAUDE_PLUGIN_ROOT}/bin/graph-index.js docs/plans/evidence/product-reality/`
 - On exit 0: log success to `docs/plans/build-log.md` and continue.
-- On non-zero exit: log the error to `docs/plans/build-log.md` and continue.
+- On non-zero exit: STOP. Log the error to `docs/plans/build-log.md` and report the failure. Downstream agents require the graph — do not proceed without a successful index.
 
 ### Step 5.3 — Cross-cutting (3 parallel, ONE message)
 

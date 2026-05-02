@@ -42,7 +42,7 @@ Every synthesized `architecture.md` MUST provide at least these subsection ancho
 ### Under `# Backend`
 
 - `backend/services` — service boundaries and responsibilities.
-- `backend/api` — API contracts (routes, request/response shapes).
+- `backend/api` — API contracts (routes, request/response shapes). Each endpoint heading MUST include feature attribution annotations: `**POST /api/orders** (provides: order-placement)` or `**GET /api/inventory/{id}** (provides: inventory) (consumes: order-placement)`. Use the feature's kebab-case name from `product-spec.md`. `provides` = the feature that implements this endpoint; `consumes` = features that call it. These annotations are parsed by the graph indexer to emit `feature_provides_endpoint` / `feature_consumes_endpoint` edges — without them, the Product Owner cannot group features by API dependency.
 - `backend/persistence` — data layer, ORM choice, query patterns.
 
 ### Under `# Data Model`

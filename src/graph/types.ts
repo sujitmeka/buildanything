@@ -312,6 +312,7 @@ export interface DecisionNode extends NodeBase {
   status: "open" | "triggered" | "resolved";
   phase: string;
   step_id: string | null;
+  ref: string | null; // e.g. "architecture.md#backend/persistence" — anchor into source doc
 }
 
 // Slice 5 additions. Source of truth: docs/graph/11-slice5-schema.md.

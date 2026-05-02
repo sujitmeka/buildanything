@@ -82,14 +82,14 @@ describe('decisions-jsonl parser -- inline fixtures', () => {
     assert.equal(edge.target, ids.decision('D-MISSING'));
   });
 
-  it('cycle detection: D-A related D-B and D-B related D-A produces WARNING', () => {
+  it('cycle detection: D-A related D-B and D-B related D-A returns ok:false', () => {
     const lines = [
       makeRow({ decision_id: 'D-A', status: 'open', related_decision_id: 'D-B' }),
       makeRow({ decision_id: 'D-B', status: 'open', related_decision_id: 'D-A', at: '2026-04-25T12:01:00Z' }),
     ].join('\n');
     const result = extractDecisionsJsonl({ mdPath: '<inline>', mdContent: lines });
-    assert.equal(result.ok, true);
-    assert.ok(result.errors.some((e) => e.message.startsWith('WARNING: cycle detected')));
+    assert.equal(result.ok, false);
+    assert.ok(result.errors.some((e) => e.message.startsWith('Cycle detected')));
   });
 
   it('invalid status DRAFT returns ok:false with error about invalid status', () => {

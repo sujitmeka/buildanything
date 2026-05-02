@@ -126,9 +126,9 @@ describe('sprint-tasks parser -- saas fixture', () => {
 describe('sprint-tasks parser -- inline fixtures', () => {
   it('empty Task ID returns ok:false with Anonymous task error', () => {
     const md = [
-      '| Task ID | Title | Size | Dependencies | Behavioral Test | Owns Files | Implementing Phase |',
-      '|---|---|---|---|---|---|---|',
-      '|  | Some title | M | — | test | — | phase-4 |',
+      '| Task ID | Title | Size | Dependencies | Behavioral Test | Owns Files | Implementing Phase | Feature | Screens |',
+      '|---|---|---|---|---|---|---|---|---|',
+      '|  | Some title | M | — | test | — | phase-4 | Auth | — |',
     ].join('\n');
     const result = extractSprintTasks({ mdPath: '<inline>', mdContent: md });
     assert.equal(result.ok, false);
@@ -137,9 +137,9 @@ describe('sprint-tasks parser -- inline fixtures', () => {
 
   it('invalid Size XL returns ok:false with Invalid Size error', () => {
     const md = [
-      '| Task ID | Title | Size | Dependencies | Behavioral Test | Owns Files | Implementing Phase |',
-      '|---|---|---|---|---|---|---|',
-      '| T-1 | Valid task | XL | — | test | — | phase-4 |',
+      '| Task ID | Title | Size | Dependencies | Behavioral Test | Owns Files | Implementing Phase | Feature | Screens |',
+      '|---|---|---|---|---|---|---|---|---|',
+      '| T-1 | Valid task | XL | — | test | — | phase-4 | Auth | — |',
     ].join('\n');
     const result = extractSprintTasks({ mdPath: '<inline>', mdContent: md });
     assert.equal(result.ok, false);

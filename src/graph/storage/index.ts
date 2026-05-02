@@ -44,11 +44,42 @@ import type {
   BrandDriftObservationNode,
 } from "../types.js";
 import { hammingDistance } from "../util/dhash.js";
+import { kebab } from "../ids.js";
+
+// ── Cross-slice edge validation ─────────────────────────────────────────
+
+export function validateCrossSliceEdges(graph: GraphFragment): string[] {
+  const nodeIds = new Set(graph.nodes.map((n) => n.id));
+  const warnings: string[] = [];
+  for (const e of graph.edges) {
+    if (!nodeIds.has(e.source)) {
+      warnings.push(`Dangling edge: ${e.relation} from ${e.source} to ${e.target} — source node not found`);
+    }
+    if (!nodeIds.has(e.target)) {
+      warnings.push(`Dangling edge: ${e.relation} from ${e.source} to ${e.target} — target node not found`);
+    }
+  }
+  return warnings;
+}
 
 // ── Path ────────────────────────────────────────────────────────────────
 
 export function graphPath(projectDir: string): string {
   return join(resolve(projectDir), ".buildanything", "graph", "slice-1.json");
+}
+
+// ── Schema validation ───────────────────────────────────────────────────
+
+const SUPPORTED_SCHEMAS: ReadonlySet<string> = new Set([
+  "buildanything-slice-1",
+  "buildanything-slice-2",
+  "buildanything-slice-3",
+  "buildanything-slice-4",
+  "buildanything-slice-5",
+]);
+
+function isSupportedSchema(s: unknown): boolean {
+  return typeof s === "string" && SUPPORTED_SCHEMAS.has(s);
 }
 
 // ── Load ────────────────────────────────────────────────────────────────
@@ -75,7 +106,7 @@ export function loadGraph(projectDir: string): GraphFragment | null {
 
   const obj = parsed as Record<string, unknown>;
   // schema/version guard for forward compat
-  if (obj.version !== 1 || obj.schema !== "buildanything-slice-1") {
+  if (obj.version !== 1 || !isSupportedSchema(obj.schema)) {
     console.error(`graph/storage: unsupported version/schema in ${p}`);
     return null;
   }
@@ -112,6 +143,21 @@ export function saveGraph(projectDir: string, fragment: GraphFragment, targetFil
     } catch { /* best effort */ }
     throw err;
   }
+}
+
+// ── queryFeatureList ─────────────────────────────────────────────────────
+
+export interface FeatureListEntry {
+  id: string;
+  label: string;
+  kebab_anchor: string;
+}
+
+export function queryFeatureList(graph: GraphFragment): FeatureListEntry[] {
+  return graph.nodes
+    .filter((n): n is FeatureNode => n.entity_type === 'feature')
+    .map((n) => ({ id: n.id, label: n.label, kebab_anchor: n.kebab_anchor }))
+    .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
 }
 
 // ── Query types ─────────────────────────────────────────────────────────
@@ -437,7 +483,7 @@ export function loadAllGraphs(projectDir: string): GraphFragment | null {
       const parsed = JSON.parse(readFileSync(p, "utf-8")) as Record<string, unknown>;
       if (
         parsed.version !== 1 ||
-        (parsed.schema !== "buildanything-slice-1" && parsed.schema !== "buildanything-slice-2" && parsed.schema !== "buildanything-slice-3" && parsed.schema !== "buildanything-slice-4" && parsed.schema !== "buildanything-slice-5")
+        !isSupportedSchema(parsed.schema)
       ) {
         console.error(`graph/storage: unsupported version/schema in ${p}`);
         continue;
@@ -451,12 +497,15 @@ export function loadAllGraphs(projectDir: string): GraphFragment | null {
   if (fragments.length === 0) return null;
 
   const nodeMap = new Map<string, GraphNode>();
+  const nodeSource = new Map<string, string>();
   for (const frag of fragments) {
     for (const node of frag.nodes) {
       if (nodeMap.has(node.id)) {
-        console.error(`graph/storage: duplicate node id "${node.id}" across fragments`);
+        const prevSource = nodeSource.get(node.id) ?? "<unknown>";
+        console.error(`graph/storage: duplicate node id "${node.id}" across fragments ${prevSource} and ${frag.source_file}; last wins`);
       }
       nodeMap.set(node.id, node);
+      nodeSource.set(node.id, frag.source_file);
     }
   }
 
@@ -598,10 +647,19 @@ export function queryScreenFull(graph: GraphFragment, screen_id: string): Screen
     .sort((a, b) => a.order - b.order)
     .map((s) => ({ id: s.id, section_name: s.section_name, order: s.order, prose: s.prose }));
 
+  const owningFeatureSet = new Set(owning_features);
+
+  function resolveStateLabel(stateLabel: string): string {
+    for (const s of allStates) {
+      if (kebab(s.label) === stateLabel && owningFeatureSet.has(s.feature_id)) return s.id;
+    }
+    return stateLabel;
+  }
+
   const screen_state_slots = nodesOfType<ScreenStateSlotNode>(graph.nodes, "screen_state_slot")
     .filter((s) => s.screen_id === screen_id)
     .sort(byId)
-    .map((s) => ({ state_id: s.state_id, appearance_text: s.appearance_text }));
+    .map((s) => ({ state_id: resolveStateLabel(s.state_id), appearance_text: s.appearance_text }));
 
   const manifestNodes = nodesOfType<ComponentManifestEntryNode>(graph.nodes, "component_manifest_entry");
   const manifestBySlot = new Map<string, ComponentManifestEntryNode>();
@@ -1059,6 +1117,8 @@ export interface BrandDriftQueryResult {
     id: string;
     prod_screenshot_id: string;
     reference_screenshot_id: string;
+    prod_screenshot: { id: string; image_class: string; perceptual_hash: string } | null;
+    reference_screenshot: { id: string; image_class: string; perceptual_hash: string } | null;
     axis: string;
     score: number;
     verdict: "drift" | "ok" | "needs-review";
@@ -1068,11 +1128,22 @@ export interface BrandDriftQueryResult {
 // ── queryBrandDrift ─────────────────────────────────────────────────────
 
 export function queryBrandDrift(graph: GraphFragment): BrandDriftQueryResult {
+  const screenshotById = new Map<string, ScreenshotNode>();
+  for (const n of nodesOfType<ScreenshotNode>(graph.nodes, "screenshot")) {
+    screenshotById.set(n.id, n);
+  }
+  const resolveShot = (id: string) => {
+    const s = screenshotById.get(id);
+    return s ? { id: s.id, image_class: s.image_class, perceptual_hash: s.perceptual_hash } : null;
+  };
+
   const observations = nodesOfType<BrandDriftObservationNode>(graph.nodes, "brand_drift_observation")
     .map((o) => ({
       id: o.id,
       prod_screenshot_id: o.prod_screenshot_id,
       reference_screenshot_id: o.reference_screenshot_id,
+      prod_screenshot: resolveShot(o.prod_screenshot_id),
+      reference_screenshot: resolveShot(o.reference_screenshot_id),
       axis: o.axis,
       score: o.score,
       verdict: o.verdict,

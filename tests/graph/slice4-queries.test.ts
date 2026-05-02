@@ -133,10 +133,11 @@ describe('queryDependencies -- slice-4', () => {
     const merged = loadAllGraphs(tmp)!;
     const result = queryDependencies(merged, 'feature__order-placement');
     assert.ok(result);
-    assert.equal(result.task_dag.length, 1);
-    assert.equal(result.task_dag[0].task_id, 'T-7');
-    assert.deepStrictEqual(result.task_dag[0].depends_on, ['T-3', 'T-5']);
-    assert.deepStrictEqual(result.task_dag[0].owns_files, ['src/api/orders.ts']);
+    assert.equal(result.task_dag.length, 4);
+    const t7 = result.task_dag.find((t) => t.task_id === 'T-7');
+    assert.ok(t7, 'expected T-7 in task_dag');
+    assert.deepStrictEqual(t7.depends_on, ['T-3', 'T-5']);
+    assert.deepStrictEqual(t7.owns_files, ['src/api/orders.ts']);
   });
 
   it('depends_on_features populated from slice-1 cross-feature edges', () => {
@@ -350,9 +351,10 @@ describe('slice-4 end-to-end: all 4 slices merged', () => {
     const result = queryDependencies(merged, 'feature__order-placement');
     assert.ok(result);
     assert.ok(result.provides.some((p) => p.endpoint === 'POST /api/orders'));
-    assert.equal(result.task_dag.length, 1);
-    assert.equal(result.task_dag[0].task_id, 'T-7');
-    assert.deepStrictEqual(result.task_dag[0].depends_on, ['T-3', 'T-5']);
+    assert.equal(result.task_dag.length, 4);
+    const t7 = result.task_dag.find((t) => t.task_id === 'T-7');
+    assert.ok(t7, 'expected T-7 in task_dag');
+    assert.deepStrictEqual(t7.depends_on, ['T-3', 'T-5']);
   });
 
   it('queryCrossContracts: POST /api/orders has providing_feature order-placement', () => {
@@ -376,9 +378,9 @@ describe('slice-4 end-to-end: all 4 slices merged', () => {
     const { merged } = buildE2eTmp();
     const result = queryDependencies(merged, 'feature__order-placement');
     assert.ok(result);
-    assert.equal(result.task_dag.length, 1);
-    const t7 = result.task_dag[0];
-    assert.equal(t7.task_id, 'T-7');
+    assert.equal(result.task_dag.length, 4);
+    const t7 = result.task_dag.find((t) => t.task_id === 'T-7');
+    assert.ok(t7, 'expected T-7 in task_dag');
     assert.ok(t7.title.includes('Order placement'));
     assert.deepStrictEqual(t7.depends_on, ['T-3', 'T-5']);
   });
@@ -400,18 +402,17 @@ describe('slice-4 edge cases', () => {
     assert.equal(views[0].related_decision, undefined);
   });
 
-  it('orphan task: title matching no FEATURE_RULES has feature_id null and no task_implements_feature edge', () => {
+  it('orphan task: empty Feature column produces feature_id null and no task_implements_feature edge', () => {
     const md = [
-      '| Task ID | Title | Size | Dependencies | Behavioral Test | Owns Files | Implementing Phase |',
-      '|---|---|---|---|---|---|---|',
-      '| T-99 | Setup deployment scripts | S | — | verify deploy works | — | phase-4 |',
+      '| Task ID | Title | Size | Dependencies | Behavioral Test | Owns Files | Implementing Phase | Feature | Screens |',
+      '|---|---|---|---|---|---|---|---|---|',
+      '| T-99 | Setup deployment scripts | S | — | verify deploy works | — | phase-4 | — | — |',
     ].join('\n');
     const result = extractSprintTasks({ mdPath: '<inline>', mdContent: md });
     assert.equal(result.ok, true);
     assert.ok(result.fragment);
     const task = result.fragment.nodes.find((n) => n.id === 'task__t-99') as TaskNode | undefined;
     assert.ok(task);
-    // Orphan task: feature_id is null, no task_implements_feature edge emitted
     assert.equal(task.feature_id, null);
     const featureEdge = result.fragment.edges.find(
       (e) => e.relation === 'task_implements_feature' && e.source === 'task__t-99',

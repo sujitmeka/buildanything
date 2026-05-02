@@ -27,6 +27,12 @@ General simplification is guided by the repo's own patterns, not external framew
 **Forbidden defaults:**
 - Do NOT load `skills/ios/swift-concurrency` (older) — superseded by `swift-concurrency-6-2`.
 
+## Graph Tools (read-only)
+
+The build pipeline indexes the component manifest into a knowledge graph. During cleanup, use this tool to check whether a hand-written component should have been imported from the manifest instead:
+
+- `mcp__plugin_buildanything_graph__graph_query_manifest(slot?)` — look up a component slot's library/variant binding. If `hard_gate: true`, the implementer was required to import the listed library variant — a hand-written replacement is a HARD-GATE violation. Flag it for revert. Call with no argument to get all entries, or pass a slot name for a single lookup. If the tool errors, STOP and report the error to the orchestrator.
+
 ## Principles
 
 1. clarity over cleverness
@@ -60,6 +66,7 @@ General simplification is guided by the repo's own patterns, not external framew
 ## Approach
 
 1. read the changed files
-2. identify simplification opportunities
-3. apply only functionally equivalent changes
-4. verify no behavioral change was introduced
+2. check for manifest HARD-GATE violations: if a changed file defines a component from scratch, call `graph_query_manifest(slot)` to see if a manifest entry exists for that slot. If `hard_gate: true`, flag the file — the implementer must import the library variant, not rebuild it
+3. identify simplification opportunities
+4. apply only functionally equivalent changes
+5. verify no behavioral change was introduced

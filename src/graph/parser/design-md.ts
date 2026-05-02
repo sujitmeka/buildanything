@@ -20,6 +20,10 @@ const PRODUCED_AT_STEP = "3.0";
 const REQUIRED_AXES = ["scope", "density", "character", "material", "motion", "type", "copy"] as const;
 type AxisName = (typeof REQUIRED_AXES)[number];
 const AXIS_SET = new Set<string>(REQUIRED_AXES);
+const AXIS_WORD_REGEXES: ReadonlyArray<{ axis: AxisName; re: RegExp }> = REQUIRED_AXES.map((axis) => ({
+  axis,
+  re: new RegExp(`\\b${axis}\\b`, "i"),
+}));
 
 // --- Line / section helpers (mirrors product-spec.ts) ---
 
@@ -246,8 +250,11 @@ function parseReferences(section: Section | undefined): RefParsed[] {
     }
 
     const urlOrPath = url || label;
-    const lowerRaw = raw.toLowerCase();
-    const exemplifiesAxes = REQUIRED_AXES.filter((a) => lowerRaw.includes(a)).slice().sort();
+    const exemplifiesAxes = AXIS_WORD_REGEXES
+      .filter(({ re }) => re.test(raw))
+      .map(({ axis }) => axis as string)
+      .slice()
+      .sort();
     refs.push({ label, urlOrPath, exemplifiesAxes, line: line.n });
   }
   return refs;
@@ -307,8 +314,7 @@ function classifyGuideline(raw: string): { polarity: "do" | "dont"; text: string
 }
 
 function matchAxisScope(text: string): string | null {
-  const lower = text.toLowerCase();
-  const matches = REQUIRED_AXES.filter((a) => lower.includes(a));
+  const matches = AXIS_WORD_REGEXES.filter(({ re }) => re.test(text)).map(({ axis }) => axis as string);
   return matches.length === 1 ? matches[0] : null;
 }
 

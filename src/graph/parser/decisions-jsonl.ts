@@ -2,7 +2,7 @@
 // Source of truth: docs/graph/09-slice4-schema.md §4.3.
 // No LLM, no I/O — caller passes file path and content.
 
-import { ids, sha256Hex } from "../ids.js";
+import { ids, kebab, sha256Hex } from "../ids.js";
 import type {
   DecisionNode,
   ExtractError,
@@ -17,6 +17,40 @@ const PRODUCED_BY = "orchestrator-scribe";
 const PRODUCED_AT_STEP = "cross-phase";
 const VALID_STATUSES = new Set(["open", "triggered", "resolved"]);
 
+// ---------------------------------------------------------------------------
+// Ref → node ID resolution for decision_drove edges
+// ---------------------------------------------------------------------------
+
+/** Resolve a ref anchor (e.g. "architecture.md#backend/persistence") to a
+ *  target graph node ID. Returns null when the ref cannot be mapped. */
+function resolveRefToNodeId(ref: string): string | null {
+  const hashIdx = ref.indexOf("#");
+  if (hashIdx < 0) return null;
+  const file = ref.slice(0, hashIdx);
+  const anchor = ref.slice(hashIdx + 1);
+  if (!anchor) return null;
+
+  // architecture.md#<module>/<subsection> → module__<module>
+  if (file.endsWith("architecture.md")) {
+    const slashIdx = anchor.indexOf("/");
+    const moduleName = slashIdx >= 0 ? anchor.slice(0, slashIdx) : anchor;
+    return ids.architectureModule(moduleName);
+  }
+
+  // design-doc.md#feature-<name> or product-spec.md#feature-<name> → feature__<name>
+  if (file.endsWith("design-doc.md") || file.endsWith("product-spec.md")) {
+    const featureMatch = anchor.match(/^feature[- ](.+)$/i);
+    if (featureMatch) return ids.feature(featureMatch[1]);
+  }
+
+  // sprint-tasks.md#<task-id> → task__<task-id>
+  if (file.endsWith("sprint-tasks.md")) {
+    return ids.task(anchor);
+  }
+
+  return null;
+}
+
 interface RawRow {
   decision_id: string;
   summary: string;
@@ -27,6 +61,7 @@ interface RawRow {
   phase: string;
   step_id?: string | null;
   at?: string;
+  ref?: string | null;
 }
 
 interface ParsedRow {
@@ -151,6 +186,15 @@ function validateRow(row: unknown, line: number): { ok: true; row: RawRow } | { 
     at = atRaw;
   }
 
+  // ref field: optional, string or null. Points to an architecture/design-doc anchor.
+  let ref: string | null = null;
+  if ("ref" in r && r.ref !== undefined && r.ref !== null) {
+    if (typeof r.ref !== "string") {
+      return { ok: false, error: { line, message: `Line ${line}: 'ref' must be a string or null` } };
+    }
+    ref = r.ref;
+  }
+
   return {
     ok: true,
     row: {
@@ -163,6 +207,7 @@ function validateRow(row: unknown, line: number): { ok: true; row: RawRow } | { 
       phase: r.phase as string,
       step_id: stepId,
       at,
+      ref,
     },
   };
 }
@@ -305,6 +350,7 @@ export function extractDecisionsJsonl(input: { mdPath: string; mdContent: string
       status: r.status,
       phase: r.phase,
       step_id: r.step_id ?? null,
+      ref: r.ref ?? null,
     };
     nodes.push(node);
 
@@ -323,15 +369,28 @@ export function extractDecisionsJsonl(input: { mdPath: string; mdContent: string
       }
       edges.push(makeEdge(nodeId, targetId, relation, mdPath, p.line, r.decided_by));
     }
+
+    // decision_drove: resolve ref anchor to a target node ID
+    if (r.ref) {
+      const droveTarget = resolveRefToNodeId(r.ref);
+      if (droveTarget) {
+        edges.push(makeEdge(nodeId, droveTarget, "decision_drove", mdPath, p.line, r.decided_by));
+      } else {
+        errors.push({ line: p.line, message: `WARNING: ref '${r.ref}' could not be resolved to a graph node` });
+      }
+    }
   }
 
-  // Cycle detection on the related-decision pointer graph. Warning, not failure.
+  // Cycle detection on the related-decision pointer graph. Fail-loud per schema.
   const cycles = detectCycles(parsed);
-  for (const cycle of cycles) {
-    errors.push({
-      line: 0,
-      message: `WARNING: cycle detected in decision relations: ${cycle}`,
-    });
+  if (cycles.length > 0) {
+    return {
+      ok: false,
+      errors: cycles.map((cycle) => ({
+        line: 0,
+        message: `Cycle detected in decision relations: ${cycle}`,
+      })),
+    };
   }
 
   const fragment: GraphFragment = {

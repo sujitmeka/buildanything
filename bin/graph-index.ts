@@ -1,6 +1,6 @@
 #!/usr/bin/env tsx
 
-import { readFileSync, statSync, readdirSync } from "node:fs";
+import { readFileSync, statSync, readdirSync, existsSync, unlinkSync } from "node:fs";
 import { basename, resolve, join, relative, extname } from "node:path";
 import { createHash } from "node:crypto";
 import process from "node:process";
@@ -85,32 +85,48 @@ function indexImageDirectory(absPath: string, imageClass: ImageClass): void {
   const allNodes: GraphFragment["nodes"] = [];
   const allEdges: GraphFragment["edges"] = [];
   const hashChunks: Buffer[] = [];
+  const warnings: string[] = [];
+  let successCount = 0;
 
   for (const filePath of imageFiles) {
     let bytes: Buffer;
     try {
       bytes = readFileSync(filePath);
     } catch (err) {
-      process.stderr.write(`[graph-index] warning: failed to read ${filePath}: ${err instanceof Error ? err.message : String(err)}\n`);
+      const msg = `failed to read ${filePath}: ${err instanceof Error ? err.message : String(err)}`;
+      process.stderr.write(`[graph-index] warning: ${msg}\n`);
+      warnings.push(msg);
       continue;
     }
     hashChunks.push(bytes);
 
-    const result = extractScreenshot({
-      imagePath: relative(process.cwd(), filePath),
-      imageClass,
-      imageBytes: new Uint8Array(bytes.buffer, bytes.byteOffset, bytes.byteLength),
-    });
+    try {
+      const result = extractScreenshot({
+        imagePath: relative(process.cwd(), filePath),
+        imageClass,
+        imageBytes: new Uint8Array(bytes.buffer, bytes.byteOffset, bytes.byteLength),
+      });
 
-    if (!result.ok) {
-      for (const err of result.errors) {
-        process.stderr.write(`[graph-index] ${filePath}: ${err.message}\n`);
+      if (!result.ok) {
+        const msg = `${filePath}: ${result.errors.map((e) => e.message).join("; ")}`;
+        warnings.push(msg);
+        continue;
       }
-      process.stderr.write(`[graph-index] fatal: screenshot extract failed for ${filePath}\n`);
-      process.exit(1);
+      allNodes.push(...result.nodes);
+      allEdges.push(...result.edges);
+      successCount++;
+    } catch (err) {
+      const msg = `${filePath}: ${err instanceof Error ? err.message : String(err)}`;
+      warnings.push(msg);
+      continue;
     }
-    allNodes.push(...result.nodes);
-    allEdges.push(...result.edges);
+  }
+
+  if (imageFiles.length > 0 && successCount === 0) {
+    for (const w of warnings) {
+      process.stderr.write(`[graph-index] warning: ${w}\n`);
+    }
+    process.exit(1);
   }
 
   const combined = Buffer.concat(hashChunks);
@@ -135,6 +151,13 @@ function indexImageDirectory(absPath: string, imageClass: ImageClass): void {
   process.stdout.write(
     `[graph-index] ok — ${fragment.nodes.length} nodes, ${fragment.edges.length} edges → .buildanything/graph/${targetFile}\n`,
   );
+
+  if (imageFiles.length > 0) {
+    for (const w of warnings) {
+      process.stdout.write(`[graph-index] warning: ${w}\n`);
+    }
+    process.stdout.write(`[graph-index] indexed ${successCount}/${imageFiles.length} images; ${warnings.length} warnings\n`);
+  }
 }
 
 const { positional, imageClass: explicitImageClass } = parseArgs(process.argv.slice(2));
@@ -298,6 +321,16 @@ try {
       for (const err of pass2.errors) {
         process.stderr.write(`[graph-index] warning (Pass 2): L${err.line}: ${err.message}\n`);
       }
+    }
+
+    if ((pass2.ok && pass2.fragment!.nodes.length === 0) || !pass2.ok) {
+      const stalePath = join(process.cwd(), ".buildanything", "graph", "slice-3-tokens.json");
+      try {
+        if (existsSync(stalePath)) {
+          unlinkSync(stalePath);
+          process.stdout.write("[graph-index] Pass 2 empty — removed stale slice-3-tokens.json\n");
+        }
+      } catch { /* best-effort */ }
     }
   }
 } catch (e: unknown) {

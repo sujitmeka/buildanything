@@ -59,7 +59,7 @@ The build pipeline indexes Phase 0-3 artifacts into a knowledge graph. As an imp
 - `mcp__plugin_buildanything_graph__graph_query_dna()` — verify DNA constraints when picking a component variant (e.g. confirm Material axis is "Flat" before naming a button `button-primary` vs `button-primary-glass`).
 - `mcp__plugin_buildanything_graph__graph_query_manifest(slot)` — look up library/variant for a slot the brief didn't pre-resolve. If the slot is HARD-GATE, you MUST import the listed library variant — do not write a custom component from scratch.
 
-These are read-only. Do not modify the graph. If a tool returns an error ("not yet indexed"), fall back to reading the source markdown file directly (`docs/plans/product-spec.md`, `DESIGN.md`, `docs/plans/component-manifest.md`, `docs/plans/page-specs/<screen>.md`).
+These are read-only. Do not modify the graph. If a tool returns an error, STOP and report the error to the orchestrator — do not silently fall back to reading source files.
 
 ## 🎨 Your Development Philosophy
 

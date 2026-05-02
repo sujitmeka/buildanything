@@ -1,5 +1,5 @@
-| Task ID | Title | Size | Dependencies | Behavioral Test | Owns Files | Implementing Phase | Feature | Screen |
-|---------|-------|------|--------------|-----------------|------------|-------------------|---------|--------|
+| Task ID | Title | Size | Dependencies | Behavioral Test | Owns Files | Implementing Phase | Feature | Screens |
+|---------|-------|------|--------------|-----------------|------------|-------------------|---------|---------|
 | T-1 | Setup auth scaffolding | M | — | Verify that user can sign up and log in via email and receive a valid session token | src/auth/*.ts, src/api/auth/*.ts | phase-4-backend | Auth | — |
 | T-2 | Implement product listing API | M | T-1 | Verify that GET /api/products returns paginated product list with seller info and respects cursor-based pagination | src/api/products.ts | phase-4-backend | Product Discovery | — |
 | T-3 | Build catalog page UI | L | T-2 | Verify that catalog page shows 24 products in a grid with category and price filters visible in sidebar | src/pages/catalog.tsx, src/components/ProductCard.tsx | phase-4-frontend | Product Discovery | Catalog |

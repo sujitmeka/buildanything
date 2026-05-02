@@ -190,6 +190,27 @@ describe('architecture parser -- feature attribution edges', () => {
     assert.equal(consumes[0].source, 'feature__bar');
   });
 
+  it('explicit annotation: emitted edges are tagged EXTRACTED', () => {
+    const md = [
+      '# Backend',
+      '## API Endpoints',
+      '',
+      '**POST /api/foo** (provides: foo) (consumes: bar)',
+      '- Auth required: no',
+      '',
+    ].join('\n');
+    const result = extractArchitecture({ mdPath: '<inline>', mdContent: md });
+    assert.ok(result.fragment);
+    const provides = result.fragment.edges.filter(
+      (e) => e.relation === 'feature_provides_endpoint',
+    );
+    const consumes = result.fragment.edges.filter(
+      (e) => e.relation === 'feature_consumes_endpoint',
+    );
+    assert.equal(provides[0].confidence, 'EXTRACTED');
+    assert.equal(consumes[0].confidence, 'EXTRACTED');
+  });
+
   it('explicit annotation: comma-separated targets fan out into multiple edges', () => {
     const md = [
       '# Backend',
@@ -209,7 +230,7 @@ describe('architecture parser -- feature attribution edges', () => {
     assert.deepEqual(sources, ['feature__baz', 'feature__foo']);
   });
 
-  it('heuristic: path inference picks first non-stopword segment when no annotation', () => {
+  it('heuristic: path inference picks first non-stopword segment when no annotation, marked INFERRED', () => {
     const md = [
       '# Backend',
       '## API Endpoints',
@@ -223,11 +244,12 @@ describe('architecture parser -- feature attribution edges', () => {
     const provides = result.fragment.edges.filter(
       (e) => e.relation === 'feature_provides_endpoint',
     );
-    const sources = provides.map((e) => e.source);
-    assert.ok(sources.includes('feature__checkout'), `expected feature__checkout in ${sources}`);
+    const checkout = provides.find((e) => e.source === 'feature__checkout');
+    assert.ok(checkout, `expected feature__checkout edge`);
+    assert.equal(checkout.confidence, 'INFERRED', 'path-inferred edges must be INFERRED');
   });
 
-  it('heuristic: path-param placeholders are skipped during inference', () => {
+  it('heuristic: path-param placeholders are skipped during inference, edge marked INFERRED', () => {
     const md = [
       '# Backend',
       '## API Endpoints',
@@ -241,13 +263,15 @@ describe('architecture parser -- feature attribution edges', () => {
     const provides = result.fragment.edges.filter(
       (e) => e.relation === 'feature_provides_endpoint',
     );
+    const inv = provides.find((e) => e.source === 'feature__inventory');
+    assert.ok(inv, `expected feature__inventory edge`);
+    assert.equal(inv.confidence, 'INFERRED');
     const sources = provides.map((e) => e.source);
-    assert.ok(sources.includes('feature__inventory'), `expected feature__inventory in ${sources}`);
     assert.ok(!sources.includes('feature__id'));
     assert.ok(!sources.includes('feature__api'));
   });
 
-  it('heuristic: module-name match emits feature edge for non-generic top-level modules', () => {
+  it('heuristic: module-name match emits INFERRED feature edge for non-generic top-level modules', () => {
     const md = [
       '# Backend',
       'Required module marker.',
@@ -265,8 +289,9 @@ describe('architecture parser -- feature attribution edges', () => {
     const provides = result.fragment.edges.filter(
       (e) => e.relation === 'feature_provides_endpoint',
     );
-    const sources = provides.map((e) => e.source);
-    assert.ok(sources.includes('feature__checkout'), `expected feature__checkout from module match in ${sources.join(', ')}`);
+    const checkout = provides.find((e) => e.source === 'feature__checkout');
+    assert.ok(checkout, `expected feature__checkout from module match`);
+    assert.equal(checkout.confidence, 'INFERRED');
   });
 
   it('heuristic: generic module names (Frontend/Backend/Auth) do not produce module-name edges', () => {
@@ -287,7 +312,7 @@ describe('architecture parser -- feature attribution edges', () => {
     assert.ok(!sources.includes('feature__backend'), 'generic Backend module name should not produce feature edge');
   });
 
-  it('heuristic: prose phrase "consumed by X" emits consumes edge', () => {
+  it('prose phrases like "consumed by X" no longer emit edges (heuristic removed 2026-04-30)', () => {
     const md = [
       '# Backend',
       '## API Endpoints',
@@ -302,8 +327,8 @@ describe('architecture parser -- feature attribution edges', () => {
     const consumes = result.fragment.edges.filter(
       (e) => e.relation === 'feature_consumes_endpoint',
     );
-    const sources = consumes.map((e) => e.source);
-    assert.ok(sources.includes('feature__catalog-and-discovery-features') || sources.includes('feature__catalog'));
+    // No consumes edges should be emitted from prose patterns
+    assert.equal(consumes.length, 0, `expected no consumes edges from prose, got: ${consumes.map(e => e.source).join(', ')}`);
   });
 
   it('explicit annotation takes precedence over heuristics (no path/module fallback when annotation present)', () => {
