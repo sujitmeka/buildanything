@@ -189,7 +189,7 @@ artifacts:
     contributors: [phase-4]
     readers: [phase-6, phase-7]
   - path: docs/plans/evidence/*.md
-    writers: [phase-5, design-brand-guardian]
+    writers: [phase-5, design-brand-guardian, silent-failure-hunter]
     readers: [phase-5, phase-6, phase-7]
     notes: |
       Top-level evidence markdown (fake-data-audit.md, brand-drift findings
@@ -197,6 +197,7 @@ artifacts:
       glob requires an intermediate directory segment.
       design-brand-guardian is named explicitly as the Phase 5.1 writer of
       brand-drift.md (commands/build.md:806, protocols/web-phase-branches.md:251);
+      silent-failure-hunter writes fake-data-audit.md (commands/build.md:984);
       agent-role enforcement fires alongside the phase-5 phase-match.
   - path: docs/plans/evidence/**/*.json
     writers: [phase-4, phase-5, phase-6]
@@ -1061,7 +1062,10 @@ phases:
       - docs/plans/evidence/*.json
       - evidence/fake-data-audit.md
       - evidence/dogfood/classified-findings.json
-      - "evidence/product-reality/*/{tests-generated.md, results.json, findings.json, coverage.json, screenshots/}"
+      - evidence/product-reality/*/tests-generated.md
+      - evidence/product-reality/*/results.json
+      - evidence/product-reality/*/findings.json
+      - evidence/product-reality/*/coverage.json
       - "learnings.jsonl (reality sweep PITFALL/PATTERN rows)"
 
   - id: "6"

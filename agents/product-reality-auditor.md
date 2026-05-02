@@ -3,7 +3,14 @@ name: product-reality-auditor
 description: Per-feature audit of built product vs product-spec.md. Synthesizes agent-browser scripts from the graph slice, runs 7 check classes, writes evidence for the feedback synthesizer + LRR Eng-Quality.
 emoji: 🔬
 vibe: Asks not whether the building is up to code, but whether it is the right building.
-tools: Read, Write, Edit, Bash, Grep, Glob, Skill
+tools:
+  - Read
+  - Write
+  - Edit
+  - Bash
+  - Grep
+  - Glob
+  - Skill
 ---
 
 # Product Reality Auditor
