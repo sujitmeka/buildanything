@@ -1076,14 +1076,30 @@ phases:
           spec_gap_routing: target_phase 1, target_task_or_step "1.6" -> product-spec-writer (re-triggers Track B for affected feature)
     ios_branch:
       replaces: web-6+3
-      mode: three-slash-commands-in-sequence
-      sequence:
-        - /buildanything:verify
-        - /buildanything:ux-review
-        - /buildanything:fix
+      mode: track-a-b-crosscutting
+      protocol: protocols/ios-phase-branches.md §Phase 5
+      track_a:
+        - testing-api-tester (API contract via XcodeBuildMCP test runner)
+        - testing-performance-benchmarker (app launch, memory, binary size, scroll jank)
+        - a11y-architect (swift-accessibility skill, XcodeBuildMCP describe_ui)
+        - engineering-security-engineer (swift-security-expert skill, Keychain/ATS/privacy)
+        - design-brand-guardian (simulator screenshots vs DESIGN.md DNA)
+      track_b:
+        agent: ios-product-reality-auditor
+        execution_surface: XcodeBuildMCP + Maestro
+        check_classes: [screen_reachability, state_coverage, transition_firing, rule_enforcement, happy_path, persona_walkthrough, wiring_manifest]
+      crosscutting:
+        - Maestro E2E (3 iterations, multi-device)
+        - iOS Dogfood (XcodeBuildMCP exploratory via ios-debugger-agent)
+        - iOS Fake-Data Detector (protocols/ios-fake-data-detector.md)
+      shared_steps: Steps 5.4-5.5 in commands/build.md (synthesizer + fix loop)
       required_artifacts:
-        - docs/plans/ios-verify-report.md
-        - docs/plans/ios-ux-review-report.md
+        - "docs/plans/evidence/track-a/*.json (5 files)"
+        - docs/plans/evidence/brand-drift.md
+        - "docs/plans/evidence/product-reality/*/results.json (one per feature)"
+        - docs/plans/evidence/e2e/iter-3-results.json
+        - docs/plans/evidence/dogfood/findings.md
+        - docs/plans/evidence/fake-data-audit.md
         - "maestro/*.yaml (>=1)"
         - "docs/plans/evidence/maestro-runs/*.png (>=1)"
     writes:
