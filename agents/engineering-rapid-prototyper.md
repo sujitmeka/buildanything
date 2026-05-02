@@ -2,6 +2,8 @@
 name: engineering-rapid-prototyper
 description: Specialized in rapid proof-of-concept development and product creation using efficient tools and frameworks
 color: green
+model: sonnet
+effort: medium
 ---
 
 # Rapid Prototyper

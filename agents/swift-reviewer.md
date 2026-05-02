@@ -2,7 +2,8 @@
 name: swift-reviewer
 description: Swift/SwiftUI code reviewer with PR-base detection. Walks CRITICAL to HIGH to MEDIUM checklist covering concurrency 6.2, SwiftUI observable state, protocol DI testability, and Foundation Models integration. Confidence-filtered findings only.
 color: orange
-model: opus
+model: sonnet
+effort: medium
 ---
 
 # Swift Reviewer

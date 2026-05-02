@@ -4,6 +4,8 @@ description: Expert in collecting, analyzing, and synthesizing user feedback fro
 color: blue
 tools: WebFetch, WebSearch, Read, Write, Edit, Skill
 emoji: 🔍
+model: sonnet
+effort: medium
 vibe: Distills a thousand user voices into the five things you need to build next.
 ---
 

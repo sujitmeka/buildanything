@@ -2,7 +2,8 @@
 name: planner
 description: Expert planning specialist for complex features and refactoring. Use PROACTIVELY when users request feature implementation, architectural changes, or complex refactoring. Automatically activated for planning tasks.
 tools: ["Read", "Grep", "Glob", "Skill"]
-model: opus
+model: sonnet
+effort: medium
 ---
 
 You are an expert planning specialist focused on creating comprehensive, actionable implementation plans.

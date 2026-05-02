@@ -3,6 +3,8 @@ name: ios-storekit-specialist
 description: StoreKit 2 in-app purchase reviewer. Enforces transaction verification, transaction finishing, subscription status handling, and correct SwiftUI integration with SubscriptionStoreView and ProductView.
 tools: Read, Edit, Write, Glob, Grep, Skill
 color: green
+model: sonnet
+effort: medium
 dispatch_note: "Routed dynamically via protocols/ios-phase-branches.md when ios_features.storekit feature flag is true. No static subagent_type dispatch."
 ---
 

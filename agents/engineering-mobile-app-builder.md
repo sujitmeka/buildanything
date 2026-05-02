@@ -3,6 +3,8 @@ name: engineering-mobile-app-builder
 description: Specialized mobile application developer with expertise in native iOS/Android development and cross-platform frameworks
 color: purple
 dispatch_note: "Routed dynamically via protocols/ios-phase-branches.md task-sizing table (SwiftUI view / view model / navigation, sizes S/M). No static subagent_type dispatch."
+model: sonnet
+effort: medium
 ---
 
 # Mobile App Builder Agent

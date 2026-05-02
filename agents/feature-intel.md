@@ -2,7 +2,8 @@
 name: feature-intel
 description: Extracts competitor feature matrix for a product concept. Must-haves (table stakes across all rivals) plus stand-outs (unique to individual rivals). Playwright-capable.
 color: yellow
-model: opus
+model: sonnet
+effort: medium
 ---
 
 # Feature Intel

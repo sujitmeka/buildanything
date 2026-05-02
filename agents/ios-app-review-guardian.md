@@ -3,6 +3,8 @@ name: ios-app-review-guardian
 description: App Store Review Guidelines expert. Catches rejection risks before submission — privacy manifests, IAP rules, HIG violations, entitlement issues, metadata problems, and common guideline misinterpretations.
 tools: Read, Edit, Write, Glob, Grep, Skill
 color: red
+model: sonnet
+effort: medium
 ---
 
 # App Review Guardian

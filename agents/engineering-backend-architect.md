@@ -1,6 +1,8 @@
 ---
 name: engineering-backend-architect
 description: Senior backend architect specializing in scalable system design, database architecture, API development, and cloud infrastructure. Builds robust, secure, performant server-side applications and microservices
+model: opus
+effort: xhigh
 color: blue
 emoji: 🏗️
 vibe: Designs the systems that hold everything up — databases, APIs, cloud, scale.

@@ -1,6 +1,8 @@
 ---
 name: design-ux-architect
 description: Technical architecture and UX specialist who provides developers with solid foundations, CSS systems, and clear implementation guidance
+model: opus
+effort: xhigh
 color: purple
 emoji: 📐
 vibe: Gives developers solid foundations, CSS systems, and clear implementation paths.

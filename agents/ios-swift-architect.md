@@ -3,6 +3,7 @@ name: ios-swift-architect
 description: Plan iOS/Swift features with architecture decisions, file structure, and implementation strategy. Read-only planner. Use PROACTIVELY when starting any new Swift feature, before implementation begins.
 tools: Read, Glob, Grep, Bash, Skill, TodoWrite
 model: opus
+effort: xhigh
 color: blue
 ---
 

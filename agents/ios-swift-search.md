@@ -3,6 +3,7 @@ name: ios-swift-search
 description: Isolates expensive Swift code search operations to preserve main context. Delegates all exploratory "where is X", "find Y", "locate Z" queries to prevent 10-50K tokens of grep noise from polluting conversation. Returns only final results with high-confidence locations. Use this agent INSTEAD of running grep/glob directly when you don't know where Swift code is located.
 tools: Grep, Glob, Read, Bash
 model: haiku
+effort: medium
 color: orange
 dispatch_note: "Routed dynamically via protocols/ios-phase-branches.md as supporting agent for exploratory Swift code search. No static subagent_type dispatch."
 ---

@@ -3,6 +3,8 @@ name: ios-foundation-models-specialist
 description: Apple Foundation Models framework expert. Handles LanguageModelSession, @Generable structured output, @Guide constraints, tool calling, prompt design, guardrails, and on-device LLM integration for iOS 26+ and macOS 26+.
 tools: Read, Edit, Write, Glob, Grep, Skill
 color: purple
+model: sonnet
+effort: medium
 ---
 
 # Foundation Models Specialist

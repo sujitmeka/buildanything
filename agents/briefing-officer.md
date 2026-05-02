@@ -3,6 +3,8 @@ name: briefing-officer
 description: Feature lead. Decomposes a feature into tasks, picks agents + skills, writes structured execution specs. Does NOT write code or make product decisions.
 emoji: 📋
 vibe: Knows every agent in the roster and what each one is good at.
+model: sonnet
+effort: medium
 ---
 
 # Briefing Officer

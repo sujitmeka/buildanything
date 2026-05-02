@@ -3,6 +3,8 @@ name: engineering-ai-engineer
 description: Expert AI/ML engineer specializing in machine learning model development, deployment, and integration into production systems. Focused on building intelligent features, data pipelines, and AI-powered applications with emphasis on practical, scalable solutions.
 color: blue
 dispatch_note: "Routed dynamically via protocols/web-phase-branches.md per-task rule (AI/ML tasks). No static subagent_type dispatch."
+model: sonnet
+effort: medium
 ---
 
 # AI Engineer Agent

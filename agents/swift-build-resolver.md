@@ -2,6 +2,8 @@
 name: swift-build-resolver
 description: Parses xcodebuild error output and applies minimal diffs to get Swift builds green. No architectural edits, no dependency changes, no refactors.
 color: orange
+model: sonnet
+effort: medium
 ---
 
 # Swift Build Resolver

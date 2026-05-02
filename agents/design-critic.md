@@ -2,7 +2,8 @@
 name: design-critic
 description: Scores rendered /design-system output against Visual DNA card and design references on 7 DNA axes plus 5 craft dimensions. Default verdict: NEEDS WORK. Never edits code.
 color: red
-model: opus
+model: sonnet
+effort: medium
 ---
 
 # Design Critic

@@ -3,6 +3,7 @@ name: ios-swift-ui-design
 description: At Step 3.2-ios, writes Pass 2 of `DESIGN.md` (YAML tokens + remaining prose; Pass 1 already authored at Step 3.0 by design-brand-guardian). Also READS `DESIGN.md` + user-provided mockups/screenshots to produce SwiftUI implementation plans for impl agents. Use when starting from a visual design or UI description before feature planning.
 tools: [Read, Write, Glob, Grep, Skill]
 model: opus
+effort: xhigh
 color: cyan
 ---
 

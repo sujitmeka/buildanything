@@ -2,6 +2,8 @@
 name: business-model
 description: Light-touch revenue/channels/unit-economics analysis. Surfaces product-impact conclusions only — which features the business model requires, which channels gate the feature set. Not full financial modeling.
 color: green
+model: sonnet
+effort: medium
 ---
 
 # Business Model Analyst

@@ -2,6 +2,8 @@
 name: visual-research
 description: Playwright-driven visual sweep of rival UIs or awards sites. Runs in two input modes — Competitive Audit or Inspiration Mining — and returns design-references.md grouped by DNA axis.
 color: blue
+model: sonnet
+effort: medium
 ---
 
 # Visual Research
