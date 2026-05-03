@@ -69,6 +69,12 @@ The `classified-findings.json` file footer carries:
 - `re_routed_findings: [{finding_id, original_target, new_target, reason}, ...]` — Track B findings whose routing the synthesizer overrode after graph validation failed (empty array if none).
 - `source_counts: {dogfood: N, product_reality: M, track_a: P, e2e: N, fake_data: N}` — count by input stream for downstream visibility.
 
+## Graph Query Batching
+
+Before making graph calls, group all findings by feature_id. Call `graph_query_dependencies` ONCE per unique feature_id, not once per finding. Cache the result and reuse for all findings targeting that feature. This reduces graph calls from O(findings) to O(features).
+
+Similarly, call `graph_query_decisions({status: "open"})` exactly once at the start of classification. Cache the result and match against it for every dogfood finding.
+
 ## Role Definition
 Expert in collecting, analyzing, and synthesizing user feedback from multiple channels to extract actionable product insights. Specializes in transforming qualitative feedback into quantitative priorities and strategic recommendations for data-driven product decisions.
 

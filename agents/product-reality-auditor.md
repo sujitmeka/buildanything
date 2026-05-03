@@ -148,6 +148,8 @@ The auditor synthesizes seven classes of agent-browser scripts from the graph sl
 | f | persona_walkthrough | `feature.persona_constraints[*]` | Each persona's JTBD constraint is measurable on the built app (step count, time-to-X, layout density). |
 | g | wiring_manifest | `screen(full: true).page_spec` interactive nodes + `manifest()` slots | Every interactive node in the page-spec hierarchy connects to an action or another screen; every component-manifest slot is rendered. |
 
+**Cross-feature awareness (advisory, not a check class):** When a finding in check classes a–g involves a feature boundary (e.g., navigation to a screen owned by another feature fails, or a business rule references another feature's state), tag the finding with `cross_feature: true` and include the related feature_id. The feedback synthesizer uses this tag to correlate findings across features.
+
 ## Cognitive Protocol
 
 Follow this sequence. The order is mandatory.

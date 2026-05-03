@@ -400,6 +400,7 @@ export interface GraphEdge {
   source_location?: string;
   produced_by_agent?: string; // forward-compat — Slice 1 sets "product-spec-writer"
   produced_at_step?: string; // forward-compat — Slice 1 sets "1.6"
+  label?: string; // cross-feature rule text, e.g. "user must be authenticated"
 }
 
 export type Schema =

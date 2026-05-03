@@ -123,6 +123,8 @@ Assign skills from the skill catalog that match the task's framework and pattern
   - Tokens: {comma-separated list of token names referenced in the task description (e.g. `colors.primary, spacing.lg`). BO does NOT resolve these — the implementer calls `graph_query_token(name)` at code time to fetch concrete values. Empty when no tokens are referenced.}
   - API: {endpoint shape — route, method, request/response}
   - Error states: {specific failures from product-spec — trigger, message, recovery}
+  - Empty states: {what the user sees when there's no data — specific copy, specific CTA from product-spec}
+  - Loading states: {loading treatment — skeleton, spinner, progressive from product-spec}
   - Business rules: {concrete values — thresholds, limits, validation rules}
   - Persona: {ALL persona constraints for this feature, grouped by persona. One bullet per `(persona_label, constraint_text)` pair from `graph_query_feature.persona_constraints`. Multi-persona features list every persona's constraints — do not pick only the primary. Example: "[Buyer] keep checkout to 3 steps max (from product-spec.md L142); [Seller] show fulfillment SLA + payout timing on confirmation (from product-spec.md L156)"}
 - **Acceptance:** {testable criteria from sprint-tasks + product-spec}

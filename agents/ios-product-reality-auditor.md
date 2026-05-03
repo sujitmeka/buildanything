@@ -162,6 +162,8 @@ The auditor synthesizes seven classes of checks from the graph slice. Each row m
 | f | persona_walkthrough | `feature.persona_constraints[*]` | XcodeBuildMCP | Each persona's JTBD constraint is measurable on the built app. Count XcodeBuildMCP interactions (taps, gestures) per persona JTBD, capture timing between steps, measure against constraint thresholds (step count, time-to-X). |
 | g | wiring_manifest | `screen(full: true)` interactive nodes + `manifest()` slots | XcodeBuildMCP | Every interactive element in the screen's accessibility tree responds to `tap` (no dead buttons). Every component-manifest slot referenced by the feature's screens is rendered and visible in `describe_ui` output. |
 
+**Cross-feature awareness (advisory, not a check class):** When a finding in check classes a–g involves a feature boundary (e.g., navigation to a screen owned by another feature fails, or a business rule references another feature's state), tag the finding with `cross_feature: true` and include the related feature_id. The feedback synthesizer uses this tag to correlate findings across features.
+
 ### Check Class Execution Details
 
 #### a. screen_reachability

@@ -977,7 +977,7 @@ Track B audits the built app against `product-spec.md` on a per-feature basis. E
 
 Call the Agent tool 3 times in one message:
 
-1. Description: "E2E runner" — INTERNAL inline role-string — mode: "bypassPermissions" — Prompt: "Run Playwright E2E test generation, execution, and stability check per `protocols/web-phase-branches.md` Phase 5 E2E steps (generate and run E2E tests for User Journeys, 3 mandatory iterations for flakiness detection). Report results + artifact paths. Records results to `docs/plans/evidence/e2e/iter-3-results.json`. Scope: multi-feature User Journeys ONLY (login → browse → buy, signup → onboarding → first-action). Single-feature happy paths are covered by Track B per-feature auditors at Step 5.2 — do NOT duplicate."
+1. Description: "E2E runner" — INTERNAL inline role-string — mode: "bypassPermissions" — Prompt: "Run Playwright E2E test generation, execution, and stability check per `protocols/web-phase-branches.md` Phase 5 E2E steps (generate and run E2E tests for User Journeys, 3 mandatory iterations for flakiness detection). Report results + artifact paths. Records results to `docs/plans/evidence/e2e/iter-3-results.json`. Scope: multi-feature User Journeys ONLY (login → browse → buy, signup → onboarding → first-action). Single-feature happy paths are covered by Track B per-feature auditors at Step 5.2 — do NOT duplicate. Additionally, read the `## Cross-Feature Interactions` section from `docs/plans/product-spec.md`. For each cross-feature rule (e.g., 'Auth → Checkout: user must be authenticated'), generate a targeted E2E test that verifies the rule holds. These are NOT user journeys — they are specific behavioral contracts between features."
 
 2. Description: "Dogfood the app" — subagent_type: `testing-evidence-collector`
 
@@ -986,6 +986,20 @@ Call the Agent tool 3 times in one message:
 ### Step 5.4 — Feedback Synthesizer
 
 The Dogfood findings used to dead-end. Now route them to fix loops.
+
+**Pre-dispatch: finding count check.**
+Before dispatching the synthesizer, count total findings across all 5 input streams:
+- Count lines in each `evidence/product-reality/*/findings.json`
+- Count findings in `evidence/dogfood/findings.md` (count `### Finding` headings or JSON array length)
+- Count entries in `evidence/track-a/*.json`
+- Count failures in `evidence/e2e/iter-3-results.json`
+- Count findings in `evidence/fake-data-audit.md`
+
+If total findings ≤ 40: dispatch the synthesizer as a single pass (existing behavior below).
+
+If total findings > 40: split into two sequential dispatches:
+- **Pass 1 (mechanical routing):** Track B findings (pre-routed, validate only) + Track A findings (static routing) + E2E failures (route to phase 4) + fake-data findings (route to phase 4). These require minimal graph queries. Output: `docs/plans/evidence/dogfood/classified-findings-pass1.json`.
+- **Pass 2 (graph-heavy classification):** Dogfood findings only (need full graph-based classification). Input includes pass-1 output for dedup. Output: merge pass-1 + pass-2 into final `docs/plans/evidence/dogfood/classified-findings.json`.
 
 Call the Agent tool — description: "Synthesize all findings" — subagent_type: `product-feedback-synthesizer` — Prompt: "[CONTEXT header above] Interpret findings from Track A, Track B, and Cross-cutting streams. Inputs:
 

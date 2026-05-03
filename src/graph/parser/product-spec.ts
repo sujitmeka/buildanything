@@ -25,6 +25,8 @@ const PRODUCED_BY = "product-spec-writer";
 const PRODUCED_AT_STEP = "1.6";
 const META_STATE_NAMES = new Set([
   "loading",
+  "empty",
+  "error",
   "stale",
   "offline",
   "disabled",
@@ -315,6 +317,7 @@ function parseCrossFeature(ctx: Ctx, section: Section): void {
     if (!m) continue;
     const lhs = m[1].trim();
     const rhs = m[2].trim();
+    const ruleText = m[3].trim() || undefined;
     // Strip trailing "(Persona)" annotations from each side; the feature
     // name is what precedes any parenthetical.
     const lhsFeature = lhs.replace(/\s*\([^)]*\)\s*$/u, "").trim();
@@ -335,6 +338,7 @@ function parseCrossFeature(ctx: Ctx, section: Section): void {
         source_location: loc(line.n),
         produced_by_agent: PRODUCED_BY,
         produced_at_step: PRODUCED_AT_STEP,
+        ...(ruleText ? { label: ruleText } : {}),
       });
     }
   }
