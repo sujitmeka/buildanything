@@ -28,7 +28,12 @@ const IOS_MCPS = [
   },
 ];
 
-const isIos = process.argv.includes("--ios");
+const isIosFlag = process.argv.includes("--ios");
+
+function detectExistingIos() {
+  const mcps = run("claude", ["mcp", "list"]) ?? "";
+  return mcps.includes("xcodebuildmcp") || mcps.includes("apple-docs");
+}
 
 function run(command, args) {
   try {
@@ -141,7 +146,6 @@ function ensureSkill(state, skillArgs, skillLabel, report) {
 
 function main() {
   console.log("\n  buildanything — one command to build an entire product\n");
-  if (isIos) console.log("  iOS mode: will also install XcodeBuildMCP, apple-docs-mcp, and Maestro.\n");
 
   const version = run("claude", ["--version"]);
   if (!version) {
@@ -152,6 +156,11 @@ function main() {
     process.exit(1);
   }
   console.log(`  Found Claude Code ${version}`);
+
+  const existingIos = detectExistingIos();
+  const isIos = isIosFlag || existingIos;
+  if (isIosFlag) console.log("  iOS mode: will install XcodeBuildMCP, apple-docs-mcp, and Maestro.\n");
+  else if (existingIos) console.log("  Detected existing iOS setup — will verify iOS tools are current.\n");
 
   const state = snapshotState();
   if (!state.pluginJsonAvailable) {
