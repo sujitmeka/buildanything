@@ -237,16 +237,6 @@ Call the Agent tool once:
 
 Record the score history to `docs/plans/build-log.md` under `## Design Critic Loop`.
 
-### Step 3.7 — A11y Design Review (single agent)
-
-WCAG 2.2 AA runtime check on the rendered style guide plus any key product pages that exist at this point.
-
-Call the Agent tool once:
-
-1. Description: "A11y design review" — agent_type: `a11y-architect` — subagent_type: `a11y-architect` — prompt: "[CONTEXT header above — phase: 3] WCAG 2.2 AA runtime check on the rendered `/design-system` route and any key product pages. Check contrast, focus order, keyboard navigation, screen reader labels, reduced-motion variants, and touch targets (>= 44px). Use Playwright and axe-core. Save findings to `docs/plans/a11y-design-review.md` with severity tags (Critical / Serious / Moderate / Minor)."
-
-Output: `docs/plans/a11y-design-review.md`.
-
 ### Step 3.8 — Autonomous Quality Gate
 
 Log to `docs/plans/build-log.md`: final screenshot paths, Design Critic score history (per-round totals plus per-axis subscores), a11y findings count by severity, a DNA compliance score derived from the critic's 7 DNA-axis subscores, and the DESIGN.md lint result (broken-refs count, warning count, hash). No user pause.
@@ -367,7 +357,7 @@ Call the Agent tool 5 times in one message:
 
 Exceeding the budget by >25% auto-blocks the Phase 6 LRR SRE chapter. Budget violations route back to Phase 3.2 (component mapping — swap a heavy variant for a lighter one) OR Phase 4 (code-splitting, lazy-loading, dynamic imports). Report budget-compliance per Scope axis, with the exact gzipped bundle size and LCP measurement."
 
-3. Description: "Accessibility audit" — agent_type: `a11y-architect` — subagent_type: `a11y-architect` — Prompt: "[CONTEXT header above — phase: 5] WCAG 2.2 AA runtime compliance audit on all interfaces. NFR target: Read `docs/plans/quality-targets.json` via your Read tool for accessibility thresholds. Check screen reader, keyboard nav, contrast, focus order, reduced-motion variants, touch targets >= 44px. Report issues with severity tags (Critical/Serious/Moderate/Minor). This is the same agent that sets constraints at Phase 2 and judges at Phase 6 LRR — keep the standards consistent across all three invocations."
+3. Description: "Accessibility audit" — agent_type: `a11y-architect` — subagent_type: `a11y-architect` — Prompt: "[CONTEXT header above — phase: 5] Light-touch accessibility sweep — flag only Critical and Serious WCAG 2.2 AA violations. Skip Moderate/Minor. WCAG 2.2 AA runtime compliance audit on all interfaces. NFR target: Read `docs/plans/quality-targets.json` via your Read tool for accessibility thresholds. Check screen reader, keyboard nav, contrast, focus order, reduced-motion variants, touch targets >= 44px. Report issues with severity tags (Critical/Serious/Moderate/Minor). This is the same agent that sets constraints at Phase 2 and judges at Phase 6 LRR — keep the standards consistent across all three invocations."
 
 4. Description: "Security audit" — agent_type: `engineering-security-engineer` — subagent_type: `engineering-security-engineer` — Prompt: "[CONTEXT header above — phase: 5] Security review: auth, input validation, data exposure, dependency vulnerabilities. NFR targets: Read `docs/plans/quality-targets.json` via your Read tool for security thresholds. Report findings with severity."
 
