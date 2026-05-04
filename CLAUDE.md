@@ -71,7 +71,7 @@ Applies to 7 writer-agents: `briefing-officer`, `product-feedback-synthesizer`, 
 
 ## Model + Effort Routing
 
-All 48 agents declare `model:` and `effort:` in frontmatter:
+All 48 agents declare `model:` and `effort:` in frontmatter. Claude Code reads these and routes automatically. **The orchestrator MUST NOT pass `model:` on Agent tool calls — doing so overrides the frontmatter and breaks cost routing.**
 
 - **Opus xhigh** (13): backend-architect, security-engineer, code-architect, product-owner, senior-developer, a11y-architect, ux-researcher, code-reviewer, security-reviewer, ui-designer, ux-architect, ios-swift-architect, ios-swift-ui-design.
 - **Opus max** (1): brand-guardian (irreversible DNA lock).

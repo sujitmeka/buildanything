@@ -25,6 +25,12 @@ Missing `subagent_type` on a non-INTERNAL dispatch is a HARD-GATE violation. The
 </HARD-GATE>
 
 <HARD-GATE>
+MODEL ROUTING — DO NOT OVERRIDE.
+
+NEVER pass a `model` parameter on Agent tool calls. Each agent `.md` file declares `model:` in its YAML frontmatter (opus, sonnet, or haiku). Claude Code reads the frontmatter and routes to the correct model automatically. Passing `model:` on the invocation overrides the frontmatter and breaks cost routing. The orchestrator's only job is to pass the correct `agent_type` — the plugin handles model selection.
+</HARD-GATE>
+
+<HARD-GATE>
 ARTIFACT WRITER-OWNER RULE.
 
 Every shared artifact has ONE concurrent writer at any instant. The writer-owner table below defines which phase writes which file. Before any file write, the orchestrator verifies the current phase is the rightful writer. Non-owning phase writes are a HARD-GATE violation. For parallel-batch phases (e.g., Phase 4), intra-phase dispatches MUST NOT race on the same file — writes either target disjoint per-dispatch filenames OR route through an orchestrator-scribe handler (see `decisions.jsonl` handling below).
