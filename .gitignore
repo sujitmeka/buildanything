@@ -6,10 +6,7 @@ eval/.venv/
 
 # Local-only plugin R&D (debate artifacts, internal design docs, session state)
 # These live on the maintainer's machine but don't ship to plugin users.
-docs/plans/
-docs/architecture/
-docs/issues/
-docs/migration/
+docs/
 .claude/
 .buildanything/
 
