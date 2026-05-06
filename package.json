@@ -1,12 +1,14 @@
 {
   "name": "buildanything",
-  "version": "2.2.0",
+  "version": "2.2.1",
   "description": "One command to build an entire product. 44 specialist agents orchestrated into a full engineering pipeline for Claude Code.",
   "bin": {
     "buildanything": "./bin/setup.js",
     "buildanything-runtime": "./bin/buildanything-runtime.js"
   },
   "scripts": {
+    "build": "npx esbuild bin/graph-index.ts --bundle --platform=node --target=node18 --outfile=bin/graph-index.bundle.js --format=cjs",
+    "prepublishOnly": "npm run build",
     "version": "node bin/sync-version.js && git add .claude-plugin/plugin.json .claude-plugin/marketplace.json"
   },
   "keywords": [

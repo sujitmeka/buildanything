@@ -16,7 +16,7 @@ const PRODUCED_BY = "code-architect";
 const PRODUCED_AT_STEP = "2.3.1";
 
 const SKIP_HEADINGS = new Set(["overview", "scope", "out of scope"]);
-const REQUIRED_MODULE_NAMES = ["frontend", "backend", "auth", "data model", "security", "infrastructure"];
+const REQUIRED_MODULE_NAMES = ["frontend", "backend", "auth", "data model", "security", "infrastructure", "api", "client", "server", "database", "ui", "web", "mobile", "storage", "networking"];
 
 const ENDPOINT_RE = /^\*\*(GET|POST|PUT|PATCH|DELETE)\s+(\/[^\s*]+)\*\*(.*)$/;
 
@@ -535,6 +535,13 @@ export function extractArchitecture(input: { mdPath: string; mdContent: string }
       if (moduleMatch) {
         candidates.push({
           name: moduleMatch[1].trim(),
+          startLine: h2.startLine,
+          bodyLines: h2.bodyLines,
+        });
+      } else if (!SKIP_HEADINGS.has(h2.heading.toLowerCase())) {
+        // Accept bare h2 sections as module candidates too
+        candidates.push({
+          name: h2.heading,
           startLine: h2.startLine,
           bodyLines: h2.bodyLines,
         });
