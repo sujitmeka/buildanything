@@ -145,6 +145,41 @@ Increment after each agent returns (parallel dispatch of 6 agents = +6). Reset t
 
 Phase 4 context pressure: With 20+ tasks, compact returns accumulate ~30-40K tokens in the orchestrator's context. The compaction checkpoint (dispatch_count >= 8) is the primary relief valve. If Phase 4 has more than 15 tasks, force a compaction checkpoint after every wave transition regardless of dispatch_count.
 
+### Phase Boundary Eviction (Context Budget Protocol)
+
+At every phase boundary (after gate approval, before starting the next phase):
+
+1. **Write carry-forward summary.** Append to `.build-state.json.phase_summaries[]`:
+   ```jsonc
+   {
+     "phase": <N>,
+     "completed_at": "<ISO timestamp>",
+     "artifacts": ["<paths of files this phase produced>"],
+     "decisions": "<1-2 sentences: key decisions made>",
+     "status": "<approved | approved_with_concerns | auto_approved>",
+     "carry_forward": "<1-2 sentences: user feedback or constraints that affect future phases>"
+   }
+   ```
+   Budget: max 500 tokens for the entire entry. If you can't fit it, you're including too much.
+
+2. **Save state.** Call `state_save`.
+
+3. **Drop prior-phase context.** After saving, you do NOT need to retain in working memory:
+   - Agent dispatch prompts from the completed phase (already sent)
+   - Agent returns from the completed phase (already processed, summary in state)
+   - File contents read to compose prompts (still on disk, re-readable)
+   - Metric loop intermediate scores (final score in state)
+   - Gate presentation text (user already approved)
+
+4. **Re-read for next phase.** Read `.build-state.json` fresh (contains `phase_summaries` — your structured memory of all prior phases). Then read only the input artifacts needed for the next phase:
+   - Entering Phase 3: `architecture.md`, `sprint-tasks.md`, `quality-targets.json`
+   - Entering Phase 4: `feature-delegation-plan.json`, current wave's feature briefs
+   - Entering Phase 5: `quality-targets.json`, feature list from state
+   - Entering Phase 6: Phase 5 findings paths from state, `decisions.jsonl`
+   - Entering Phase 7: LRR verdict from state
+
+The `phase_summaries` array is your memory of prior phases. You do NOT need the raw conversation that produced them. If you need a specific fact from Phase 1 during Phase 5, read the artifact file — don't try to recall it.
+
 **Cumulative-cost banner at phase boundaries:** When announcing a phase transition (e.g. "Phase N complete — proceeding to Phase N+1"), prefix the message with `[Cost so far: $X.XX • Y tokens]`. Source the values from the last-appended entry in `docs/plans/build-log.md`'s token-accounting lines (fields `cumulative_usd=...` plus the sum of `input_tokens=...` + `output_tokens=...`), written by `src/orchestrator/hooks/token-accounting.ts` (see module for exact schema). If the build-log has no token-accounting entries yet, omit the prefix rather than guessing.
 
 Input: $ARGUMENTS

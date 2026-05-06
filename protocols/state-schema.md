@@ -17,6 +17,7 @@
 | 3 | Stage 5 | `lrr_cycle_state` (object; interior fields loose-typed pending Stage 5 iteration — see "Fields added at v3" below) | `BUILDANYTHING_SDK_LRR=false` reverts to markdown aggregator; `lrr_cycle_state` becomes an ignored field on the orchestrator read path (additive-only, no data loss on downgrade) |
 | 4 | Stage 6 | `current_sprint_context_hash` | `BUILDANYTHING_SDK_SPRINT_CONTEXT=false` (web) and/or `BUILDANYTHING_SDK_SPRINT_CONTEXT_IOS=false` (iOS parity gate) reverts Phase 4 to per-task refs re-send; `current_sprint_context_hash` becomes an ignored field on the orchestrator read path (additive-only, no data loss on downgrade) |
 | 5 | Stage 7 | `feature_delegation_plan_path`, `current_wave`, `completed_features`, `feature_acceptance`, `feature_briefs` | Feature-level fields are additive and optional; a Stage 6 runtime reading a Stage 7 state file with `schema_version` downgraded to `4` will ignore these fields without data loss on the read path |
+| 6 | Stage 8 | `phase_summaries` | Additive; ignored by older runtimes (no data loss on downgrade) |
 
 **A7 forward-reject rule.** When `bin/buildanything-runtime.ts` reads `.build-state.json` at session start, if `schema_version > MAX_SUPPORTED_SCHEMA_VERSION`, the runtime refuses to proceed and emits a clear error pointing to the compat matrix (`docs/migration/sdk-host-compat.md`). This is the A7 defense against silent schema drift — an old runtime must never silently ignore fields a newer runtime persisted. See **Task 4.5.2** for the runtime implementation (out of scope for this prose-only update).
 
@@ -82,6 +83,7 @@
 | `verification` | object | yes | `{last_verify_result, last_verify_timestamp}`. `last_verify_result` is one of `"PRODUCTION_READY"`, `"NEEDS_WORK"`, `"BLOCKED"`, or `null`. |
 | `blockers` | array | no | Open blockers. Each: `{id, description, surfaced_at, type}`. Type is `"build"`, `"design"`, `"dep"`, or `"external"`. |
 | `decisions_pruned_at_phase0` | boolean | no | Default `false`. Set to `true` after Phase 0 archives stale decision rows. |
+| `phase_summaries` | array | no | Structured carry-forward summaries from completed phases. Each entry: `{phase, completed_at, artifacts[], decisions, status, carry_forward?}`. Max ~500 tokens per entry. Written at phase boundaries per the Context Budget Protocol. |
 
 ### Decision Log Pruning (Phase 0)
 

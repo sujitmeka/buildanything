@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$comment": "Schema version migration table: schema_version 1 = Stages 1-3; schema_version 2 = Stage 4 (adds backward_routing_count, backward_routing_count_by_target_phase, in_flight_backward_edge, mode_transitions); schema_version 3 = Stage 5 (adds lrr_cycle_state); schema_version 4 = Stage 6 (adds current_sprint_context_hash), schema_version 5 = Stage 7 (adds feature_delegation_plan_path, current_wave, completed_features, feature_acceptance, feature_briefs). --- Runtime validation rules (not encodable in JSON Schema, require code): Rule 5 — step prefix must match current phase number; Rule 6 — mode/autonomous consistency (mode==='autonomous' iff autonomous===true); Rule 7 — iOS fields gating (app_name, bundle_id, xcodeproj_path, ios_features, phase_progress.phase_minus_1 exist iff project_type==='ios'); Rule 10 — pending/in-progress disjoint (in_progress_task.task_id not in pending_tasks or completed_tasks); Rule 11 — resume_point.phase/step must not be ahead of top-level phase/step; Rule 12 — timestamps monotonic (session_last_saved >= session_started).",
+  "$comment": "Schema version migration table: schema_version 1 = Stages 1-3; schema_version 2 = Stage 4 (adds backward_routing_count, backward_routing_count_by_target_phase, in_flight_backward_edge, mode_transitions); schema_version 3 = Stage 5 (adds lrr_cycle_state); schema_version 4 = Stage 6 (adds current_sprint_context_hash), schema_version 5 = Stage 7 (adds feature_delegation_plan_path, current_wave, completed_features, feature_acceptance, feature_briefs), schema_version 6 = Stage 8 (adds phase_summaries). --- Runtime validation rules (not encodable in JSON Schema, require code): Rule 5 — step prefix must match current phase number; Rule 6 — mode/autonomous consistency (mode==='autonomous' iff autonomous===true); Rule 7 — iOS fields gating (app_name, bundle_id, xcodeproj_path, ios_features, phase_progress.phase_minus_1 exist iff project_type==='ios'); Rule 10 — pending/in-progress disjoint (in_progress_task.task_id not in pending_tasks or completed_tasks); Rule 11 — resume_point.phase/step must not be ahead of top-level phase/step; Rule 12 — timestamps monotonic (session_last_saved >= session_started).",
   "title": ".build-state.json",
   "description": "Typed source of truth for BuildAnything build state. Validated by the PreToolUse schema lint hook (W2-2). additionalProperties: false enforces fail-closed per A8 SSOT rule.",
   "type": "object",
@@ -199,6 +199,20 @@
         "session_id": { "type": ["string", "null"] },
         "timestamp":  { "type": "string", "format": "date-time" }
       }
+    },
+
+    "phase_summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["phase", "completed_at", "artifacts", "decisions", "status"],
+      "properties": {
+        "phase": { "type": "integer", "enum": [-1, 0, 1, 2, 3, 4, 5, 6, 7] },
+        "completed_at": { "type": "string", "format": "date-time" },
+        "artifacts": { "type": "array", "items": { "type": "string" } },
+        "decisions": { "type": "string", "maxLength": 300 },
+        "status": { "type": "string", "enum": ["approved", "approved_with_concerns", "auto_approved"] },
+        "carry_forward": { "type": "string", "maxLength": 200 }
+      }
     }
   },
 
@@ -229,7 +243,7 @@
     "schema_version": {
       "type": "integer",
       "minimum": 1,
-      "maximum": 5,
+      "maximum": 6,
       "description": "Currently 5 (Stage 7). Bumped to 2 at Stage 4, 3 at Stage 5, 4 at Stage 6, 5 at Stage 7."
     },
     "project_type": {
@@ -418,6 +432,13 @@
       "additionalProperties": { "type": "string" },
       "$comment": "Stage 7+ (schema_version >= 5). Written by orchestrator after each briefing-officer dispatch (Step 4.2.a).",
       "description": "Stage 7+ (schema_version >= 5). Map of feature name to feature brief file path (docs/plans/feature-briefs/{feature}.md)."
+    },
+
+    "phase_summaries": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/phase_summary" },
+      "$comment": "Stage 8+ (schema_version >= 6). Written by orchestrator at each phase boundary per the Context Budget Protocol.",
+      "description": "Stage 8+ (schema_version >= 6). Structured carry-forward summaries from completed phases. Max ~500 tokens per entry."
     }
   }
 }
