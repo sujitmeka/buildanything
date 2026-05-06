@@ -9435,6 +9435,7 @@ function parseApiContracts(ctx, bodyLines, moduleId, moduleLine, moduleName) {
     if (!isApiContractHeading(sec.heading)) continue;
     parseEndpointsInSection(ctx, sec.bodyLines, moduleId, moduleName);
   }
+  parseEndpointsInSection(ctx, bodyLines, moduleId, moduleName);
 }
 function partitionBodyH2(bodyLines) {
   const sections = [];
@@ -9455,26 +9456,38 @@ function partitionBodyH2(bodyLines) {
   return sections;
 }
 function parseEndpointsInSection(ctx, lines, moduleId, moduleName) {
-  const endpointStarts = [];
+  const emittedEndpoints = new Set(ctx.nodes.filter((n) => n.entity_type === "api_contract").map((n) => n.endpoint));
+  const endpointHits = [];
   for (let i = 0; i < lines.length; i++) {
-    if (ENDPOINT_RE.test(lines[i].text.trim())) endpointStarts.push(i);
+    const text = lines[i].text.trim();
+    const directMatch = text.match(ENDPOINT_RE);
+    if (directMatch) {
+      endpointHits.push({ idx: i, method: directMatch[1], path: directMatch[2], trailing: directMatch[3] ?? "" });
+      continue;
+    }
+    if (text.includes("|")) {
+      const cellRe = /\*\*(GET|POST|PUT|PATCH|DELETE)\s+(\/[^\s*]+)\*\*([^|]*)/g;
+      let cm;
+      while ((cm = cellRe.exec(text)) !== null) {
+        endpointHits.push({ idx: i, method: cm[1], path: cm[2], trailing: cm[3] ?? "" });
+      }
+    }
   }
-  for (let ei = 0; ei < endpointStarts.length; ei++) {
-    const startIdx = endpointStarts[ei];
-    const endIdx = ei + 1 < endpointStarts.length ? endpointStarts[ei + 1] : lines.length;
-    const headLine = lines[startIdx];
-    const m = headLine.text.trim().match(ENDPOINT_RE);
-    const method = m[1];
-    const path = m[2];
-    const trailing = m[3] ?? "";
-    const endpoint = `${method} ${path}`;
-    const block = lines.slice(startIdx + 1, endIdx);
+  for (const hit of endpointHits) {
+    const endpoint = `${hit.method} ${hit.path}`;
+    if (emittedEndpoints.has(endpoint)) continue;
+    emittedEndpoints.add(endpoint);
+    const headLine = lines[hit.idx];
+    const nextHitIdx = endpointHits.findIndex((h) => h.idx > hit.idx);
+    const blockEnd = nextHitIdx >= 0 ? endpointHits[nextHitIdx].idx : Math.min(hit.idx + 15, lines.length);
+    const block = lines.slice(hit.idx + 1, blockEnd);
     let authRequired = false;
     let errorCodes = [];
     let requestSchema = "";
     let responseSchema = "";
     for (const line of block) {
       const t = line.text.trim();
+      if (t.includes("|") && !t.startsWith("-")) break;
       const authMatch = t.match(/^-\s+Auth\s+required\s*:\s*(.+)$/i);
       if (authMatch) {
         authRequired = /yes/i.test(authMatch[1]);
@@ -9496,6 +9509,9 @@ function parseEndpointsInSection(ctx, lines, moduleId, moduleName) {
         continue;
       }
     }
+    if (!authRequired && hit.trailing) {
+      if (/session|auth|role=|moderator|signed.in/i.test(hit.trailing)) authRequired = true;
+    }
     const node = {
       id: ids.apiContract(endpoint),
       label: endpoint,
@@ -9512,10 +9528,10 @@ function parseEndpointsInSection(ctx, lines, moduleId, moduleName) {
     };
     ctx.nodes.push(node);
     ctx.edges.push(makeEdge3(ctx, moduleId, node.id, "module_has_contract", headLine.n));
-    const explicit = parseEndpointAnnotation(trailing);
+    const explicit = parseEndpointAnnotation(hit.trailing);
     const inferred = { provides: [], consumes: [] };
     if (explicit.provides.length === 0 && explicit.consumes.length === 0) {
-      const pathHint = inferFeatureFromPath(path);
+      const pathHint = inferFeatureFromPath(hit.path);
       if (pathHint) inferred.provides.push(pathHint);
       const moduleHint = inferFeatureFromModuleName(moduleName);
       if (moduleHint) inferred.provides.push(moduleHint);
@@ -9525,7 +9541,9 @@ function parseEndpointsInSection(ctx, lines, moduleId, moduleName) {
 }
 function parseDataModels(ctx, bodyLines, moduleId) {
   const entityRe = /^\*\*([A-Za-z][A-Za-z0-9_]*)\*\*\s*$/;
+  const tableEntityRe = /^\*\*([A-Za-z][A-Za-z0-9_]*)\*\*$/;
   const entityStarts = [];
+  const emittedEntities = /* @__PURE__ */ new Set();
   for (let i = 0; i < bodyLines.length; i++) {
     if (entityRe.test(bodyLines[i].text.trim())) entityStarts.push(i);
   }
@@ -9534,6 +9552,8 @@ function parseDataModels(ctx, bodyLines, moduleId) {
     const endIdx = ei + 1 < entityStarts.length ? entityStarts[ei + 1] : bodyLines.length;
     const headLine = bodyLines[startIdx];
     const entityName = headLine.text.trim().match(entityRe)[1];
+    if (emittedEntities.has(entityName.toLowerCase())) continue;
+    emittedEntities.add(entityName.toLowerCase());
     let blockEnd = endIdx;
     for (let j = startIdx + 1; j < endIdx; j++) {
       if (isHeadingAtOrAbove4(bodyLines[j].text, 2)) {
@@ -9548,25 +9568,20 @@ function parseDataModels(ctx, bodyLines, moduleId) {
       const t = line.text.trim();
       const fieldsMatch = t.match(/^-\s+Fields\s*:\s*(.+)$/i);
       if (fieldsMatch) {
-        const raw = fieldsMatch[1];
-        const parts = splitParenAware(raw);
-        fields = parts.map((part) => {
+        fields = splitParenAware(fieldsMatch[1]).map((part) => {
           const colonIdx = part.indexOf(":");
           if (colonIdx < 0) return "";
           const name = part.slice(0, colonIdx).trim();
           let type = part.slice(colonIdx + 1).trim();
           const parenIdx = type.indexOf("(");
           if (parenIdx >= 0) type = type.slice(0, parenIdx).trim();
-          if (!name || !type) return "";
-          return `${name}:${type}`;
+          return name && type ? `${name}:${type}` : "";
         }).filter((s) => s.length > 0);
         continue;
       }
       const indexMatch = t.match(/^-\s+Indexes\s*:\s*(.+)$/i);
       if (indexMatch) {
-        const raw = indexMatch[1];
-        const parts = splitParenAware(raw);
-        indexes = parts.map((part) => {
+        indexes = splitParenAware(indexMatch[1]).map((part) => {
           const parenIdx = part.indexOf("(");
           return (parenIdx >= 0 ? part.slice(0, parenIdx) : part).trim();
         }).filter((s) => s.length > 0);
@@ -9587,6 +9602,59 @@ function parseDataModels(ctx, bodyLines, moduleId) {
     };
     ctx.nodes.push(node);
     ctx.edges.push(makeEdge3(ctx, moduleId, node.id, "module_has_data_model", headLine.n));
+  }
+  for (const line of bodyLines) {
+    const t = line.text.trim();
+    if (!t.includes("|")) continue;
+    let row = t;
+    if (row.startsWith("|")) row = row.slice(1);
+    if (row.endsWith("|")) row = row.slice(0, -1);
+    const cells = row.split("|").map((c) => c.trim());
+    if (cells.length < 2) continue;
+    const firstCell = cells[0];
+    const entityMatch = firstCell.match(tableEntityRe);
+    if (!entityMatch) continue;
+    const entityName = entityMatch[1];
+    if (emittedEntities.has(entityName.toLowerCase())) continue;
+    emittedEntities.add(entityName.toLowerCase());
+    const purpose = cells.length > 1 ? cells[1].replace(/\*\*/g, "").trim() : "";
+    const node = {
+      id: ids.dataModel(entityName),
+      label: entityName,
+      entity_type: "data_model",
+      source_file: ctx.mdPath,
+      source_location: loc5(line.n),
+      confidence: "EXTRACTED",
+      entity_name: entityName,
+      module_id: moduleId,
+      fields: [],
+      indexes: []
+    };
+    ctx.nodes.push(node);
+    ctx.edges.push(makeEdge3(ctx, moduleId, node.id, "module_has_data_model", line.n));
+  }
+}
+function emitCrossModuleEdges(ctx, modules) {
+  const entityOwner = /* @__PURE__ */ new Map();
+  for (const node of ctx.nodes) {
+    if (node.entity_type === "data_model") {
+      const dm = node;
+      entityOwner.set(dm.entity_name.toLowerCase(), dm.module_id);
+    }
+  }
+  if (entityOwner.size === 0) return;
+  const emittedEdges = /* @__PURE__ */ new Set();
+  for (const mod of modules) {
+    const bodyText = mod.bodyLines.map((l) => l.text).join("\n").toLowerCase();
+    for (const [entity, ownerModuleId] of entityOwner) {
+      if (ownerModuleId === mod.id) continue;
+      if (bodyText.includes(entity)) {
+        const edgeKey = `${mod.id}\u2192${ownerModuleId}`;
+        if (emittedEdges.has(edgeKey)) continue;
+        emittedEdges.add(edgeKey);
+        ctx.edges.push(makeEdge3(ctx, mod.id, ownerModuleId, "depends_on", mod.bodyLines[0]?.n ?? 1, "INFERRED"));
+      }
+    }
   }
 }
 function extractArchitecture(input) {
@@ -9653,10 +9721,12 @@ function extractArchitecture(input) {
     };
     ctx.nodes.push(moduleNode);
     parseApiContracts(ctx, cand.bodyLines, moduleId, cand.startLine, cand.name);
-    if (cand.name.toLowerCase().includes("data model")) {
+    const nameLower = cand.name.toLowerCase();
+    if (nameLower.includes("data model") || nameLower.includes("database") || nameLower.includes("data")) {
       parseDataModels(ctx, cand.bodyLines, moduleId);
     }
   }
+  emitCrossModuleEdges(ctx, candidates.map((c) => ({ id: ids.architectureModule(c.name), name: c.name, bodyLines: c.bodyLines })));
   const fragment = {
     version: 1,
     schema: "buildanything-slice-4",

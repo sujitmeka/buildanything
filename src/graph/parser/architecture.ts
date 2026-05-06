@@ -322,11 +322,16 @@ function parseApiContracts(
   moduleLine: number,
   moduleName: string,
 ): void {
+  // Strategy 1: Look in h2 subsections titled "API Contract(s)/Endpoints/API"
   const h2Sections = partitionBodyH2(bodyLines);
   for (const sec of h2Sections) {
     if (!isApiContractHeading(sec.heading)) continue;
     parseEndpointsInSection(ctx, sec.bodyLines, moduleId, moduleName);
   }
+
+  // Strategy 2: Scan ALL body lines (including table cells) for endpoint patterns
+  // This catches endpoints embedded in tables or inline in module body text
+  parseEndpointsInSection(ctx, bodyLines, moduleId, moduleName);
 }
 
 function partitionBodyH2(bodyLines: Line[]): Section[] {
@@ -354,21 +359,39 @@ function parseEndpointsInSection(
   moduleId: string,
   moduleName: string,
 ): void {
-  const endpointStarts: number[] = [];
+  // Track already-emitted endpoints to avoid duplicates when scanning body + subsections
+  const emittedEndpoints = new Set(ctx.nodes.filter(n => n.entity_type === "api_contract").map(n => (n as ApiContractNode).endpoint));
+
+  // Find endpoint patterns both at line start AND inside table cells
+  const endpointHits: { idx: number; method: string; path: string; trailing: string }[] = [];
   for (let i = 0; i < lines.length; i++) {
-    if (ENDPOINT_RE.test(lines[i].text.trim())) endpointStarts.push(i);
+    const text = lines[i].text.trim();
+    // Direct match at line start
+    const directMatch = text.match(ENDPOINT_RE);
+    if (directMatch) {
+      endpointHits.push({ idx: i, method: directMatch[1], path: directMatch[2], trailing: directMatch[3] ?? "" });
+      continue;
+    }
+    // Scan inside table cells for **METHOD /path** patterns
+    if (text.includes("|")) {
+      const cellRe = /\*\*(GET|POST|PUT|PATCH|DELETE)\s+(\/[^\s*]+)\*\*([^|]*)/g;
+      let cm: RegExpExecArray | null;
+      while ((cm = cellRe.exec(text)) !== null) {
+        endpointHits.push({ idx: i, method: cm[1], path: cm[2], trailing: cm[3] ?? "" });
+      }
+    }
   }
 
-  for (let ei = 0; ei < endpointStarts.length; ei++) {
-    const startIdx = endpointStarts[ei];
-    const endIdx = ei + 1 < endpointStarts.length ? endpointStarts[ei + 1] : lines.length;
-    const headLine = lines[startIdx];
-    const m = headLine.text.trim().match(ENDPOINT_RE)!;
-    const method = m[1];
-    const path = m[2];
-    const trailing = m[3] ?? "";
-    const endpoint = `${method} ${path}`;
-    const block = lines.slice(startIdx + 1, endIdx);
+  for (const hit of endpointHits) {
+    const endpoint = `${hit.method} ${hit.path}`;
+    if (emittedEndpoints.has(endpoint)) continue;
+    emittedEndpoints.add(endpoint);
+
+    const headLine = lines[hit.idx];
+    // Scan following non-endpoint lines for metadata (auth, errors, request, response)
+    const nextHitIdx = endpointHits.findIndex(h => h.idx > hit.idx);
+    const blockEnd = nextHitIdx >= 0 ? endpointHits[nextHitIdx].idx : Math.min(hit.idx + 15, lines.length);
+    const block = lines.slice(hit.idx + 1, blockEnd);
 
     let authRequired = false;
     let errorCodes: string[] = [];
@@ -377,26 +400,20 @@ function parseEndpointsInSection(
 
     for (const line of block) {
       const t = line.text.trim();
+      if (t.includes("|") && !t.startsWith("-")) break; // stop at next table row
       const authMatch = t.match(/^-\s+Auth\s+required\s*:\s*(.+)$/i);
-      if (authMatch) {
-        authRequired = /yes/i.test(authMatch[1]);
-        continue;
-      }
+      if (authMatch) { authRequired = /yes/i.test(authMatch[1]); continue; }
       const errorMatch = t.match(/^-\s+Error\s+codes\s*:\s*(.+)$/i);
-      if (errorMatch) {
-        errorCodes = splitParenAware(errorMatch[1]).map((s) => s.trim()).filter((s) => s.length > 0);
-        continue;
-      }
+      if (errorMatch) { errorCodes = splitParenAware(errorMatch[1]).map(s => s.trim()).filter(s => s.length > 0); continue; }
       const reqMatch = t.match(/^-\s+Request\s*:\s*(.+)$/i);
-      if (reqMatch) {
-        requestSchema = reqMatch[1].trim().replace(/^`+|`+$/g, "").trim();
-        continue;
-      }
+      if (reqMatch) { requestSchema = reqMatch[1].trim().replace(/^`+|`+$/g, "").trim(); continue; }
       const resMatch = t.match(/^-\s+Response\s*:\s*(.+)$/i);
-      if (resMatch) {
-        responseSchema = resMatch[1].trim().replace(/^`+|`+$/g, "").trim();
-        continue;
-      }
+      if (resMatch) { responseSchema = resMatch[1].trim().replace(/^`+|`+$/g, "").trim(); continue; }
+    }
+
+    // Detect auth from table cell context (e.g., "session + Origin check", "role=`moderator`")
+    if (!authRequired && hit.trailing) {
+      if (/session|auth|role=|moderator|signed.in/i.test(hit.trailing)) authRequired = true;
     }
 
     const node: ApiContractNode = {
@@ -416,10 +433,10 @@ function parseEndpointsInSection(
     ctx.nodes.push(node);
     ctx.edges.push(makeEdge(ctx, moduleId, node.id, "module_has_contract", headLine.n));
 
-    const explicit = parseEndpointAnnotation(trailing);
+    const explicit = parseEndpointAnnotation(hit.trailing);
     const inferred: EndpointAnnotation = { provides: [], consumes: [] };
     if (explicit.provides.length === 0 && explicit.consumes.length === 0) {
-      const pathHint = inferFeatureFromPath(path);
+      const pathHint = inferFeatureFromPath(hit.path);
       if (pathHint) inferred.provides.push(pathHint);
       const moduleHint = inferFeatureFromModuleName(moduleName);
       if (moduleHint) inferred.provides.push(moduleHint);
@@ -430,7 +447,11 @@ function parseEndpointsInSection(
 
 function parseDataModels(ctx: Ctx, bodyLines: Line[], moduleId: string): void {
   const entityRe = /^\*\*([A-Za-z][A-Za-z0-9_]*)\*\*\s*$/;
+  const tableEntityRe = /^\*\*([A-Za-z][A-Za-z0-9_]*)\*\*$/;
   const entityStarts: number[] = [];
+  const emittedEntities = new Set<string>();
+
+  // Strategy 1: Standalone bold entity names on their own line
   for (let i = 0; i < bodyLines.length; i++) {
     if (entityRe.test(bodyLines[i].text.trim())) entityStarts.push(i);
   }
@@ -440,14 +461,12 @@ function parseDataModels(ctx: Ctx, bodyLines: Line[], moduleId: string): void {
     const endIdx = ei + 1 < entityStarts.length ? entityStarts[ei + 1] : bodyLines.length;
     const headLine = bodyLines[startIdx];
     const entityName = headLine.text.trim().match(entityRe)![1];
+    if (emittedEntities.has(entityName.toLowerCase())) continue;
+    emittedEntities.add(entityName.toLowerCase());
 
-    // Scan until next entity, h2, or h1
     let blockEnd = endIdx;
     for (let j = startIdx + 1; j < endIdx; j++) {
-      if (isHeadingAtOrAbove(bodyLines[j].text, 2)) {
-        blockEnd = j;
-        break;
-      }
+      if (isHeadingAtOrAbove(bodyLines[j].text, 2)) { blockEnd = j; break; }
     }
     const block = bodyLines.slice(startIdx + 1, blockEnd);
 
@@ -458,32 +477,23 @@ function parseDataModels(ctx: Ctx, bodyLines: Line[], moduleId: string): void {
       const t = line.text.trim();
       const fieldsMatch = t.match(/^-\s+Fields\s*:\s*(.+)$/i);
       if (fieldsMatch) {
-        const raw = fieldsMatch[1];
-        const parts = splitParenAware(raw);
-        fields = parts
-          .map((part) => {
-            const colonIdx = part.indexOf(":");
-            if (colonIdx < 0) return "";
-            const name = part.slice(0, colonIdx).trim();
-            let type = part.slice(colonIdx + 1).trim();
-            const parenIdx = type.indexOf("(");
-            if (parenIdx >= 0) type = type.slice(0, parenIdx).trim();
-            if (!name || !type) return "";
-            return `${name}:${type}`;
-          })
-          .filter((s) => s.length > 0);
+        fields = splitParenAware(fieldsMatch[1]).map(part => {
+          const colonIdx = part.indexOf(":");
+          if (colonIdx < 0) return "";
+          const name = part.slice(0, colonIdx).trim();
+          let type = part.slice(colonIdx + 1).trim();
+          const parenIdx = type.indexOf("(");
+          if (parenIdx >= 0) type = type.slice(0, parenIdx).trim();
+          return name && type ? `${name}:${type}` : "";
+        }).filter(s => s.length > 0);
         continue;
       }
       const indexMatch = t.match(/^-\s+Indexes\s*:\s*(.+)$/i);
       if (indexMatch) {
-        const raw = indexMatch[1];
-        const parts = splitParenAware(raw);
-        indexes = parts
-          .map((part) => {
-            const parenIdx = part.indexOf("(");
-            return (parenIdx >= 0 ? part.slice(0, parenIdx) : part).trim();
-          })
-          .filter((s) => s.length > 0);
+        indexes = splitParenAware(indexMatch[1]).map(part => {
+          const parenIdx = part.indexOf("(");
+          return (parenIdx >= 0 ? part.slice(0, parenIdx) : part).trim();
+        }).filter(s => s.length > 0);
         continue;
       }
     }
@@ -502,6 +512,73 @@ function parseDataModels(ctx: Ctx, bodyLines: Line[], moduleId: string): void {
     };
     ctx.nodes.push(node);
     ctx.edges.push(makeEdge(ctx, moduleId, node.id, "module_has_data_model", headLine.n));
+  }
+
+  // Strategy 2: Table rows where first cell is **EntityName**
+  for (const line of bodyLines) {
+    const t = line.text.trim();
+    if (!t.includes("|")) continue;
+    // Split table row and check first cell for bold entity name
+    let row = t;
+    if (row.startsWith("|")) row = row.slice(1);
+    if (row.endsWith("|")) row = row.slice(0, -1);
+    const cells = row.split("|").map(c => c.trim());
+    if (cells.length < 2) continue;
+    const firstCell = cells[0];
+    const entityMatch = firstCell.match(tableEntityRe);
+    if (!entityMatch) continue;
+    const entityName = entityMatch[1];
+    if (emittedEntities.has(entityName.toLowerCase())) continue;
+    emittedEntities.add(entityName.toLowerCase());
+
+    // Extract purpose from second cell if available
+    const purpose = cells.length > 1 ? cells[1].replace(/\*\*/g, "").trim() : "";
+
+    const node: DataModelNode = {
+      id: ids.dataModel(entityName),
+      label: entityName,
+      entity_type: "data_model",
+      source_file: ctx.mdPath,
+      source_location: loc(line.n),
+      confidence: "EXTRACTED",
+      entity_name: entityName,
+      module_id: moduleId,
+      fields: [],
+      indexes: [],
+    };
+    ctx.nodes.push(node);
+    ctx.edges.push(makeEdge(ctx, moduleId, node.id, "module_has_data_model", line.n));
+  }
+}
+
+function emitCrossModuleEdges(
+  ctx: Ctx,
+  modules: { id: string; name: string; bodyLines: Line[] }[],
+): void {
+  // Build a map of data model entity names → owning module ID
+  const entityOwner = new Map<string, string>();
+  for (const node of ctx.nodes) {
+    if (node.entity_type === "data_model") {
+      const dm = node as DataModelNode;
+      entityOwner.set(dm.entity_name.toLowerCase(), dm.module_id);
+    }
+  }
+  if (entityOwner.size === 0) return;
+
+  // For each module, scan its body for references to entities owned by other modules
+  const emittedEdges = new Set<string>();
+  for (const mod of modules) {
+    const bodyText = mod.bodyLines.map(l => l.text).join("\n").toLowerCase();
+    for (const [entity, ownerModuleId] of entityOwner) {
+      if (ownerModuleId === mod.id) continue; // skip self-references
+      // Check if this module's body text mentions the entity
+      if (bodyText.includes(entity)) {
+        const edgeKey = `${mod.id}→${ownerModuleId}`;
+        if (emittedEdges.has(edgeKey)) continue;
+        emittedEdges.add(edgeKey);
+        ctx.edges.push(makeEdge(ctx, mod.id, ownerModuleId, "depends_on", mod.bodyLines[0]?.n ?? 1, "INFERRED"));
+      }
+    }
   }
 }
 
@@ -591,11 +668,16 @@ export function extractArchitecture(input: { mdPath: string; mdContent: string }
     // Parse API contracts within this module
     parseApiContracts(ctx, cand.bodyLines, moduleId, cand.startLine, cand.name);
 
-    // Parse data models if this is the Data Model module
-    if (cand.name.toLowerCase().includes("data model")) {
+    // Parse data models if this module likely contains them
+    const nameLower = cand.name.toLowerCase();
+    if (nameLower.includes("data model") || nameLower.includes("database") || nameLower.includes("data")) {
       parseDataModels(ctx, cand.bodyLines, moduleId);
     }
   }
+
+  // Emit cross-module dependency edges
+  // If module A has an endpoint that references a data model entity owned by module B, emit A depends_on B
+  emitCrossModuleEdges(ctx, candidates.map(c => ({ id: ids.architectureModule(c.name), name: c.name, bodyLines: c.bodyLines })));
 
   const fragment: GraphFragment = {
     version: 1,
