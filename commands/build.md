@@ -3,6 +3,8 @@ description: "Full product build pipeline — orchestrates specialist agents thr
 argument-hint: "Describe what to build, or path to a design doc. --autonomous for unattended mode. --resume to continue a previous build."
 ---
 
+# /build
+
 <HARD-GATE>
 YOU ARE AN ORCHESTRATOR. YOU COORDINATE AGENTS. YOU DO NOT WRITE CODE.
 

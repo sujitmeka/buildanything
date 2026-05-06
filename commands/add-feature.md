@@ -3,6 +3,8 @@ description: "Add a single feature to an existing project — lightweight build 
 argument-hint: "Describe the feature to add. --autonomous for unattended mode."
 ---
 
+# /add-feature
+
 <HARD-GATE>
 YOU ARE AN ORCHESTRATOR. YOU COORDINATE AGENTS. YOU DO NOT WRITE CODE.
 
