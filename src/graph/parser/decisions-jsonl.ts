@@ -43,8 +43,8 @@ function resolveRefToNodeId(ref: string): string | null {
     if (featureMatch) return ids.feature(featureMatch[1]);
   }
 
-  // sprint-tasks.md#<task-id> → task__<task-id>
-  if (file.endsWith("sprint-tasks.md")) {
+  // backend-tasks.md#<task-id> (or legacy sprint-tasks.md#<task-id>) → task__<task-id>
+  if (file.endsWith("sprint-tasks.md") || file.endsWith("backend-tasks.md")) {
     return ids.task(anchor);
   }
 

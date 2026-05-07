@@ -41,7 +41,7 @@ The agent runs these checks in order, stopping on the first FAIL:
 | 4 | Test | All tests pass |
 | 5 | Security | No known vulnerabilities in deps |
 | 6 | Diff Review | `git diff` of uncommitted changes — no debug code, no secrets, no obvious regressions |
-| 7 | Behavioral | Acceptance tests pass against running app. Verify the test directory matches the project mode: web requires `tests/e2e/acceptance/`, iOS requires `cap*Tests/` or named test target with non-stub bodies (per `protocols/verify.md` Step 2 stub detector). If no test directory exists in either path AND `sprint-tasks.md` has any non-N/A Behavioral Test fields, FAIL with directive: "Behavioral Test fields are declared but no test directory exists. Either implement the tests or downgrade the fields to N/A." |
+| 7 | Behavioral | Acceptance tests pass against running app. Verify the test directory matches the project mode: web requires `tests/e2e/acceptance/`, iOS requires `cap*Tests/` or named test target with non-stub bodies (per `protocols/verify.md` Step 2 stub detector). If no test directory exists in either path AND `backend-tasks.md` has any non-N/A Behavioral Test fields, FAIL with directive: "Behavioral Test fields are declared but no test directory exists. Either implement the tests or downgrade the fields to N/A." |
 
 <HARD-GATE>
 ONE AGENT, ONE PASS: The orchestrator spawns exactly ONE agent for the entire verification. This is a single Agent tool call, not 6 separate agents. The agent runs each check as a sequential shell command and evaluates the result before proceeding.
@@ -61,6 +61,7 @@ ONE AGENT, ONE PASS: The orchestrator spawns exactly ONE agent for the entire ve
 | `behavioral` | Check 7 only |
 | `static` | Checks 1, 2, 3, 6 (build, types, lint, diff — no test/security/behavioral) |
 | `ci` | Checks 1, 2, 3, 4 (build, types, lint, test — no security/diff/behavioral) |
+| `wave_gate` | Checks 1, 2, 3, 6 + production-mode build flag (`NODE_ENV=production`). Runs at Phase 4 Step 4.3.5 wave-end. Production mode catches lint-only-in-prod errors and integration-level type drift across feature boundaries that per-task verify cannot see. iOS equivalent: `xcodebuild -scheme <S> build` in release config. |
 
 The `static` macro is the standard Phase 6 post-metric-loop scope — the metric loop owns behavioral evaluation, so Phase 6 verify skips checks 4 (test), 5 (security), and 7 (behavioral).
 
@@ -118,7 +119,7 @@ exit $EXIT
 
 **Behavior on stub detection:**
 
-- Spawn a fix agent with the SPECIFIC directive: "Test stub detected at [file_path]. The corresponding spec field in `sprint-tasks.md` is [Behavioral Test field]. Implement the test body — write the named test, no other changes. Do not modify production code. Do not modify other test files. Return when the stub detector passes for this file."
+- Spawn a fix agent with the SPECIFIC directive: "Test stub detected at [file_path]. The corresponding spec field in `backend-tasks.md` is [Behavioral Test field]. Implement the test body — write the named test, no other changes. Do not modify production code. Do not modify other test files. Return when the stub detector passes for this file."
 - Re-run the stub detector after the fix agent returns.
 - MAX 2 fix attempts per stub file. If still a stub after 2 attempts, FAIL the verification with a hard directive to the user that the spec declared a Behavioral Test the implementer agent could not implement.
 

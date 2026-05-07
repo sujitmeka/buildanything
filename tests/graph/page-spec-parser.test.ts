@@ -139,6 +139,40 @@ describe('page-spec parser — malformed', () => {
     const hasWireframeError = result.errors.some((e) => e.message.includes('ASCII Wireframe'));
     assert.ok(hasWireframeError, 'expected error mentioning ASCII Wireframe');
   });
+
+  it('malformed-h2-drift.md (## Layout instead of ## ASCII Wireframe) returns ok=false with rename hint', () => {
+    const result = parsePageSpec('malformed-h2-drift.md');
+    assert.equal(result.ok, false);
+    assert.ok(result.errors.length > 0);
+    const msg = result.errors[0].message;
+    assert.ok(
+      msg.includes('## ASCII Wireframe'),
+      `expected error mentioning '## ASCII Wireframe', got: ${msg}`,
+    );
+    assert.ok(
+      msg.includes('## Layout'),
+      `expected error to suggest renaming '## Layout', got: ${msg}`,
+    );
+    assert.ok(
+      msg.includes('protocols/page-spec-schema.md'),
+      `expected error to reference the schema doc, got: ${msg}`,
+    );
+  });
+
+  it('malformed-h1-format.md (h1 not in `# Page: <name>` form) returns ok=false with format hint', () => {
+    const result = parsePageSpec('malformed-h1-format.md');
+    assert.equal(result.ok, false);
+    assert.ok(result.errors.length > 0);
+    const msg = result.errors[0].message;
+    assert.ok(
+      msg.includes('# Page:'),
+      `expected error mentioning '# Page:' h1 format, got: ${msg}`,
+    );
+    assert.ok(
+      msg.includes('Found:'),
+      `expected error to quote what was found, got: ${msg}`,
+    );
+  });
 });
 
 describe('page-spec parser — determinism', () => {

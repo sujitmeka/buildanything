@@ -9,6 +9,7 @@ export { extractPageSpec } from "./parser/page-spec.js";
 export { extractDesignMdTokens } from "./parser/design-md-pass2.js";
 export { extractArchitecture } from "./parser/architecture.js";
 export { extractSprintTasks } from "./parser/sprint-tasks.js";
+export { extractBackendTasks } from "./parser/backend-tasks.js";
 export { extractDecisionsJsonl } from "./parser/decisions-jsonl.js";
 export { extractScreenshot } from "./parser/screenshot.js";
 export {

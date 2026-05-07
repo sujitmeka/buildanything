@@ -30,16 +30,28 @@ You are not a market-sizing agent. TAM, pricing, GTM, and positioning belong els
 - Identify 5-10 rivals for the product concept (user-supplied if present, otherwise discovered via WebSearch)
 - For each rival, walk the landing page + pricing + docs and extract the shipped feature list (not marketing promises)
 - Cross-tabulate the feature lists and compute must-haves and stand-outs
-- Return `docs/plans/phase1-scratch/feature-intel.md` with two tables: a must-have matrix and a stand-out list
+- Return `docs/plans/phase1-scratch/feature-intel.md` with the must-have matrix + stand-out list
+- **Audit fix #15** — Also produce `docs/plans/phase1-scratch/competitive-differentiation.md` (see "Competitive differentiation on the core job" section below). This artifact is REQUIRED — Step 1.6 product-spec-writer reads it and the build halts at Step 1.6 dispatch if it's missing.
 - Cite every feature claim with a URL or source path
 
 ## Hard Rules
 
 - Must-haves must actually appear in ≥80% of the rivals you evaluated. Don't promote aspirational features to must-haves just because one hot startup ships them.
 - Stand-outs must be genuinely distinctive. "Has email support" vs "has chat support" is not a stand-out — that's cosmetic wording. A stand-out is a capability the other rivals don't ship at all.
-- Not a market-sizing doc. If you find yourself writing about TAM, CAC, or positioning, stop — you've drifted out of scope.
+- Not a market-sizing doc. If you find yourself writing about TAM, CAC, GTM, or pricing-tier positioning, stop — that's out of scope. **Core-job differentiation IS in scope** (audit fix #15): "what does this product do better than Yelp / Google Maps / Beli on the core job of finding a workable cafe" is exactly the question Phase 1 must answer in writing before the spec-writer runs. The market-positioning ban survives; the core-job-differentiation requirement is now mandatory.
 - No fabricated features. Every cell in the matrix is backed by a source URL from the rival's own site.
 - If you can only identify fewer than 5 rivals, stop and report the gap rather than padding with weak matches.
+
+## Competitive differentiation on the core job (audit fix #15)
+
+Produce `docs/plans/phase1-scratch/competitive-differentiation.md` with these required sections (all non-empty):
+
+- `## Closest alternatives` — 1 to 3 existing products a user would compare to for the *core job* (not the engagement layer). Each entry: name, what they do well on the core job, what they do badly. URL/source citation. Three is the cap, one is the minimum. **Greenfield exception**: if the product is genuinely first-in-category, you may write `closest_alternatives: 0` with a required justification paragraph naming what users do *today* in the absence of any product, and what success would look like vs. that workaround.
+- `## What this product does better on the core job` — bulleted statements, each falsifiable and grounded. Format: `<verb-led claim> — measurable in <test>`. Example: `Surfaces "is there an outlet" within 1 viewport — measurable in: 390×844 mobile screenshot of /c/<slug> shows outlet signal above the fold without scroll.` "Feels nicer" / "looks better" / "more delightful" are NOT allowed claims (no aesthetic-only differentiation; the engagement layer is downstream of utility). Each claim cites the alternative it beats.
+- `## What this product does worse on the core job` — at least one entry. The honest battles-not-fought list. Example: `Smaller cafe coverage than Yelp — at MVP, ~150 cafes vs Yelp's full Chicago directory. Bet: aesthetic + table-photo-first quality wins the user back on the next visit.` Refusing to name a "worse" entry is a quality red flag; if you genuinely can't think of one, that means you haven't thought hard enough — keep going.
+- `## Implications for the first surface` — concrete statements about what the landing screen must do to deliver on "better on the core job." Example: `If "outlets visible at a glance" is a core-job differentiator, the outlet signal must be in the first 50% of the cafe-detail viewport AND legible at 100% body-text size, not a tiny pictogram below the photo.` These bullets are direct constraints the page-spec author at Step 3.3 must honor.
+
+This artifact is the Phase 1 utility forcing function. Without it, the spec-writer over-indexes engagement mechanics — the failure mode the broken-build at `tables2.1.1` made the case for. The product-spec-writer at Step 1.6 reads this file by name; missing or stub = BLOCK.
 
 ## Workflow
 

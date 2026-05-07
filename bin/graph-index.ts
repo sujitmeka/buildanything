@@ -4,7 +4,7 @@ import { readFileSync, statSync, readdirSync, existsSync, unlinkSync } from "nod
 import { basename, resolve, join, relative, extname } from "node:path";
 import { createHash } from "node:crypto";
 import process from "node:process";
-import { extractProductSpec, extractDesignMd, extractDesignMdTokens, extractComponentManifest, extractPageSpec, extractArchitecture, extractSprintTasks, extractDecisionsJsonl, extractScreenshot, saveGraph } from "../src/graph/index.js";
+import { extractProductSpec, extractDesignMd, extractDesignMdTokens, extractComponentManifest, extractPageSpec, extractArchitecture, extractSprintTasks, extractBackendTasks, extractDecisionsJsonl, extractScreenshot, saveGraph } from "../src/graph/index.js";
 import type { GraphFragment } from "../src/graph/types.js";
 
 type ImageClass = "reference" | "brand_drift" | "dogfood";
@@ -166,7 +166,7 @@ const target = positional[0];
 if (!target) {
   process.stderr.write(
     "Usage: graph-index <path> [--image-class=reference|brand_drift|dogfood]\n" +
-    "  Recognized basenames: product-spec.md, DESIGN.md, component-manifest.md, architecture.md, sprint-tasks.md, decisions.jsonl\n" +
+    "  Recognized basenames: product-spec.md, DESIGN.md, component-manifest.md, architecture.md, sprint-tasks.md (legacy), backend-tasks.md, decisions.jsonl\n" +
     "  Directory mode: page-specs/ → indexes all *.md files inside\n" +
     "  Image directory mode: design-references/ | evidence/brand-drift/ | evidence/dogfood/ → indexes all images\n" +
     "  DESIGN.md produces both slice-2-dna.json (Pass 1) and slice-3-tokens.json (Pass 2, if tokens found)\n",
@@ -260,7 +260,7 @@ try {
   if (!(() => { try { readFileSync(absPath); return true; } catch { return false; } })()) {
     process.stderr.write(
       "Usage: graph-index <path>\n" +
-      "  Recognized basenames: product-spec.md, DESIGN.md, component-manifest.md, architecture.md, sprint-tasks.md, decisions.jsonl\n" +
+      "  Recognized basenames: product-spec.md, DESIGN.md, component-manifest.md, architecture.md, sprint-tasks.md (legacy), backend-tasks.md, decisions.jsonl\n" +
       "  Directory mode: pass a page-specs/ directory to index all *.md files inside\n",
     );
     process.exit(64);
@@ -286,12 +286,15 @@ try {
   } else if (base === "sprint-tasks.md") {
     result = extractSprintTasks({ mdPath: absPath, mdContent });
     targetFile = "slice-4-tasks.json";
+  } else if (base === "backend-tasks.md") {
+    result = extractBackendTasks({ mdPath: absPath, mdContent });
+    targetFile = "slice-4-backend-tasks.json";
   } else if (base === "decisions.jsonl") {
     result = extractDecisionsJsonl({ mdPath: absPath, mdContent });
     targetFile = "slice-4-decisions.json";
   } else {
     process.stderr.write(
-      `Usage: graph-index <path>\n  Recognized basenames: product-spec.md, DESIGN.md, component-manifest.md, architecture.md, sprint-tasks.md, decisions.jsonl\n  Directory mode: pass a page-specs/ directory to index all *.md files inside\n  Got: ${base}\n`,
+      `Usage: graph-index <path>\n  Recognized basenames: product-spec.md, DESIGN.md, component-manifest.md, architecture.md, sprint-tasks.md (legacy), backend-tasks.md, decisions.jsonl\n  Directory mode: pass a page-specs/ directory to index all *.md files inside\n  Got: ${base}\n`,
     );
     process.exit(64);
   }

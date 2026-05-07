@@ -12,7 +12,7 @@ const TABLE: Record<string, string> = {
   'CLAUDE.md': 'phase-1',
   'design-doc.md': 'phase-1',
   'architecture.md': 'phase-2',
-  'sprint-tasks.md': 'phase-2',
+  'backend-tasks.md': 'phase-2',
   'quality-targets.json': 'phase-2',
   'visual-design-spec.md': 'phase-3',
   'refs.json': 'phase-2',

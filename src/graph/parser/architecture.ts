@@ -598,14 +598,25 @@ export function extractArchitecture(input: { mdPath: string; mdContent: string }
   }
   const candidates: ModuleCandidate[] = [];
 
+  // Track which h1 sections produced an h1-module candidate so we don't also
+  // promote their h2 children to peer modules. Two doc styles must both work:
+  //   Style A: `# Frontend / ## Layout / ## Components` — h1 is the module,
+  //            h2s are subsections. Do NOT scan h2 children.
+  //   Style B: `# Architecture / ## Frontend / ## Backend` — h1 is a meta
+  //            heading (not a module), h2s are the modules. DO scan h2 children.
+  // Discriminator: did the h1 itself become a module candidate?
+  const h1IsModule = new Set<number>();
   for (const sec of h1Sections) {
     if (isTitleHeading(sec.heading)) continue;
     if (SKIP_HEADINGS.has(sec.heading.toLowerCase())) continue;
     candidates.push({ name: sec.heading, startLine: sec.startLine, bodyLines: sec.bodyLines });
+    h1IsModule.add(sec.startLine);
   }
 
-  // Also scan for ## Module: Foo
+  // Scan h2 children only when the parent h1 did NOT itself become a module.
+  // Always honor `## Module: Foo` opt-in regardless of parent.
   for (const sec of h1Sections) {
+    const parentIsModule = h1IsModule.has(sec.startLine);
     const h2s = partitionBodyH2(sec.bodyLines);
     for (const h2 of h2s) {
       const moduleMatch = h2.heading.match(/^Module\s*:\s*(.+)$/i);
@@ -615,8 +626,10 @@ export function extractArchitecture(input: { mdPath: string; mdContent: string }
           startLine: h2.startLine,
           bodyLines: h2.bodyLines,
         });
-      } else if (!SKIP_HEADINGS.has(h2.heading.toLowerCase())) {
-        // Accept bare h2 sections as module candidates too
+      } else if (!parentIsModule && !SKIP_HEADINGS.has(h2.heading.toLowerCase())) {
+        // Style B fallback: parent h1 was meta (e.g., "Architecture"); promote
+        // its h2 children. Skip when parent already became a module to avoid
+        // exploding `## Layout` etc. into peer modules of `# Frontend`.
         candidates.push({
           name: h2.heading,
           startLine: h2.startLine,

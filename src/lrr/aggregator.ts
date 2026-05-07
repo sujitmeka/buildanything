@@ -29,7 +29,24 @@ export interface AggregateResult {
   routing_warnings?: string[];
 }
 
+const VALID_CHAPTER_VERDICTS: readonly Verdict[] = ['PASS', 'CONCERNS', 'BLOCK'];
+const VALID_COMBINED_VERDICTS: readonly AggregateResult['combined_verdict'][] = ['PRODUCTION READY', 'NEEDS WORK', 'BLOCKED'];
+
+/**
+ * @deprecated v2.4-fix replaced the 5-chapter LRR with a single Customer Reality
+ * Judge. The chapter-aggregation logic below is no longer called from the
+ * orchestrator at Phase 6. Kept temporarily for the legacy test fixtures and
+ * for rollback safety; remove after one production cycle confirms the new flow
+ * is stable. See `docs/specs/v2.4-fix/lrr-replacement.md`.
+ */
 export function aggregate(chapters: ChapterResult[]): AggregateResult {
+  // Input validation: reject unknown chapter verdicts
+  for (const c of chapters) {
+    if (!VALID_CHAPTER_VERDICTS.includes(c.verdict)) {
+      throw new Error(`Invalid chapter verdict "${c.verdict}" from chapter "${c.chapter}". Must be one of: ${VALID_CHAPTER_VERDICTS.join(', ')}`);
+    }
+  }
+
   // Rule 1: ANY override_blocks_launch → BLOCKED
   if (chapters.some(c => c.override_blocks_launch))
     return { combined_verdict: 'BLOCKED', triggered_rule: 1, chapters };
@@ -173,3 +190,25 @@ export async function resolveRoutingTargets(
     ...(warnings.length > 0 ? { routing_warnings: warnings } : {}),
   };
 }
+
+/**
+ * Validate an aggregate result (e.g. parsed from LLM agent output).
+ * Rejects any combined_verdict not in the allowed set.
+ * Rejects softening: if any chapter has verdict BLOCK, combined_verdict
+ * MUST be NEEDS WORK or BLOCKED — never PRODUCTION READY.
+ */
+export function validateAggregateResult(result: AggregateResult): void {
+  if (!VALID_COMBINED_VERDICTS.includes(result.combined_verdict)) {
+    throw new Error(
+      `Invalid combined_verdict "${result.combined_verdict}". Must be one of: ${VALID_COMBINED_VERDICTS.join(', ')}`,
+    );
+  }
+  const hasBlock = result.chapters.some(c => c.verdict === 'BLOCK');
+  if (hasBlock && result.combined_verdict === 'PRODUCTION READY') {
+    throw new Error(
+      'Verdict integrity violation: chapter(s) returned BLOCK but combined_verdict is PRODUCTION READY. BLOCK cannot be softened.',
+    );
+  }
+}
+
+export { VALID_CHAPTER_VERDICTS, VALID_COMBINED_VERDICTS };

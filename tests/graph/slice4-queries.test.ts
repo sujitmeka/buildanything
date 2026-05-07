@@ -10,7 +10,7 @@ import { extractDesignMdTokens } from '../../src/graph/parser/design-md-pass2.js
 import { extractComponentManifest } from '../../src/graph/parser/component-manifest.js';
 import { extractPageSpec } from '../../src/graph/parser/page-spec.js';
 import { extractArchitecture } from '../../src/graph/parser/architecture.js';
-import { extractSprintTasks } from '../../src/graph/parser/sprint-tasks.js';
+import { extractBackendTasks } from '../../src/graph/parser/backend-tasks.js';
 import { extractDecisionsJsonl } from '../../src/graph/parser/decisions-jsonl.js';
 import { ids } from '../../src/graph/ids.js';
 import {
@@ -128,7 +128,7 @@ describe('queryDependencies -- slice-4', () => {
     const tmp = newTmp();
     const slice1 = parseFixture('marketplace-product-spec.md', extractProductSpec);
     saveGraph(tmp, slice1, 'slice-1.json');
-    const tasks = parseFixture('sprint-tasks-marketplace.md', extractSprintTasks);
+    const tasks = parseFixture('backend-tasks-marketplace.md', extractBackendTasks);
     saveGraph(tmp, tasks, 'slice-4-tasks.json');
     const merged = loadAllGraphs(tmp)!;
     const result = queryDependencies(merged, 'feature__order-placement');
@@ -314,8 +314,8 @@ describe('slice-4 end-to-end: all 4 slices merged', () => {
     const arch = parseFixture('architecture-marketplace.md', extractArchitecture);
     saveGraph(tmp, arch, 'slice-4-architecture.json');
 
-    // Slice 4: sprint-tasks
-    const tasks = parseFixture('sprint-tasks-marketplace.md', extractSprintTasks);
+    // Slice 4: backend-tasks
+    const tasks = parseFixture('backend-tasks-marketplace.md', extractBackendTasks);
     saveGraph(tmp, tasks, 'slice-4-tasks.json');
 
     // Slice 4: decisions (inline 3-row)
@@ -408,7 +408,7 @@ describe('slice-4 edge cases', () => {
       '|---|---|---|---|---|---|---|---|---|',
       '| T-99 | Setup deployment scripts | S | — | verify deploy works | — | phase-4 | — | — |',
     ].join('\n');
-    const result = extractSprintTasks({ mdPath: '<inline>', mdContent: md });
+    const result = extractBackendTasks({ mdPath: '<inline>', mdContent: md });
     assert.equal(result.ok, true);
     assert.ok(result.fragment);
     const task = result.fragment.nodes.find((n) => n.id === 'task__t-99') as TaskNode | undefined;
@@ -420,3 +420,4 @@ describe('slice-4 edge cases', () => {
     assert.equal(featureEdge, undefined, 'no task_implements_feature edge for orphan task');
   });
 });
+;

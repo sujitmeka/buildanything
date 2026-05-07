@@ -322,7 +322,7 @@ function registerTools(server: McpServer): void {
     "graph_query_dependencies",
     {
       description:
-        "Returns the full dependency closure for one feature: API endpoints provided + consumed (with module + auth_required), feature-level depends_on / depended_on_by, and the per-feature task DAG (each task with size, depends_on, behavioral_test, assigned_phase). Sourced from architecture.md + sprint-tasks.md via the Slice 4 indexer (Steps 2.3.1, 2.3.2). Primary call for the Product Owner's wave grouping.",
+        "Returns the full dependency closure for one feature: API endpoints provided + consumed (with module + auth_required), feature-level depends_on / depended_on_by, and the per-feature task DAG (each task with size, depends_on, behavioral_test, assigned_phase). Sourced from architecture.md + backend-tasks.md via the Slice 4 indexer (Steps 2.3.1, 2.3.2). Primary call for the Product Owner's wave grouping.",
       inputSchema: queryDependenciesShape,
     },
     async ({ feature_id }) => {
@@ -333,7 +333,7 @@ function registerTools(server: McpServer): void {
         if (!result) {
           return errResult(
             "graph_query_dependencies",
-            `Feature '${feature_id}' not found, OR Slice 4 (architecture/sprint-tasks) not yet indexed at ${process.cwd()}/.buildanything/graph/.`,
+            `Feature '${feature_id}' not found, OR Slice 4 (architecture/backend-tasks) not yet indexed at ${process.cwd()}/.buildanything/graph/.`,
           );
         }
         return okResult(result);

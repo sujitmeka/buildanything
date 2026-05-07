@@ -358,9 +358,11 @@ describe('architecture parser -- inline fixtures', () => {
     assert.ok(result.errors[0].message.includes('no recognizable module sections'));
   });
 
-  // Documented current behavior: duplicate method+path within one module produces
-  // two nodes sharing one id. This is NOT an endorsement of this behavior.
-  it('documents current behavior: duplicate method+path within one module produces two nodes sharing one id', () => {
+  // Duplicate method+path within one module dedupes to a single node (the
+  // module-scoping fix: when `## API Endpoints` is a subsection of `# Backend`,
+  // the endpoints are scanned within Backend's body and deduplicated by id,
+  // rather than `## API Endpoints` becoming its own peer module).
+  it('duplicate method+path within one module produces a single deduplicated node', () => {
     const md = [
       '# Backend',
       '## API Endpoints',
@@ -376,7 +378,10 @@ describe('architecture parser -- inline fixtures', () => {
     assert.equal(result.ok, true);
     assert.ok(result.fragment);
     const contracts = nodesOfType<ApiContractNode>(result.fragment, 'api_contract');
-    assert.equal(contracts.length, 2, 'both duplicate endpoints should be present as nodes');
-    assert.equal(contracts[0].id, contracts[1].id, 'both nodes share the same id');
+    assert.equal(contracts.length, 1, 'duplicate endpoints in one module dedupe to a single node');
+    assert.equal(contracts[0].id, 'api_contract__get-api-foo');
+    const modules = nodesOfType<ArchitectureModuleNode>(result.fragment, 'architecture_module');
+    assert.equal(modules.length, 1, 'h2 subsection should not become a peer module of its h1 parent');
+    assert.equal(modules[0].name, 'Backend');
   });
 });

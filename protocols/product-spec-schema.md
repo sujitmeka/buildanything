@@ -12,6 +12,7 @@ The product spec MUST contain these top-level headings, in this order:
 - `## App Overview`
 - `## Screen Inventory`
 - `## Permissions & Roles`
+- `## First 60 Seconds` *(audit fix #16 — required)*
 - `## Cross-Feature Interactions`
 
 Then, one `## Feature: {Name}` section per feature in the PRD scope.
@@ -71,6 +72,32 @@ Define every role in the system and what each can access. Format:
 ```
 
 If the product has no roles beyond "authenticated user," say so explicitly: "Single role: authenticated user. No admin or public access."
+
+### First 60 Seconds
+
+*(Audit fix #16 — required section. Closes the gap where no agent at any phase was forced to articulate what a first-time user gains from this product that they could not from the closest alternative. Intentionally minimal — one field per persona — to force a single sharp answer rather than form-filling. The structural force comes from the comparison-marker requirement, which makes this section a downstream constraint on `competitive-differentiation.md` rather than free-floating.)*
+
+One subsection per persona in the persona table. Persona names must match the App Overview persona table exactly (including the `(primary)` flag where present).
+
+Format:
+
+```markdown
+### Persona: {Name}
+
+**First-encounter promise**: <one sentence — what does this persona learn, feel, or become capable of in their first encounter that they could not from {closest_alternative} from `competitive-differentiation.md`? Cite the alternative explicitly. The sentence MUST contain at least one comparison marker: "vs", "than", "compared to", "instead of", "rather than", or "unlike".>
+```
+
+That's it. One field. The comparison marker is the structural enforcement: a writer cannot satisfy the rule with "Maya browses cafes" — the parser will reject. They have to write something like "Maya finds an outlet at a glance, faster than Yelp's amenity-checklist UI."
+
+Validation rules (mechanical — enforced at Slice 1 graph index):
+
+1. Section `## First 60 Seconds` exists.
+2. One `### Persona: {Name}` subsection per row in the App Overview persona table; persona names match exactly.
+3. Each persona subsection contains the `**First-encounter promise**:` field.
+4. The field has at least 50 chars of content (stub-prevention floor — higher than other floors because there's only one field carrying the section's weight).
+5. The field contains at least one comparison marker: `vs`, `than`, `compared to`, `instead of`, `rather than`, or `unlike` (case-insensitive). This forces the writer to reference an external alternative — typically one named in `competitive-differentiation.md`. A field with no comparison is a stub by definition.
+
+Failure on any rule = parser exit non-zero, BLOCK at Step 1.6.idx with the specific rule + persona that failed; product-spec-writer re-dispatches to fill the gap.
 
 ### Cross-Feature Interactions
 

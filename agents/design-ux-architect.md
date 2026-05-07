@@ -49,6 +49,25 @@ DESIGN.md Pass 2 (exact spacing values, typography ramp, color tokens, component
 
 You write `docs/plans/ux-architecture.md` and `docs/plans/page-specs/*.md` (one file per screen from `docs/plans/product-spec.md` Screen Inventory, following `protocols/page-spec-schema.md`).
 
+### Page-spec h1/h2 schema is parser-checked — names are matched verbatim
+
+Each page-spec file is parsed by `src/graph/parser/page-spec.ts` at Step 3.3.idx into Slice 3 of the build graph. The parser matches the following names **verbatim**. Renaming these breaks the indexer silently from your perspective — you'll see no error, but the Briefing Officer at Step 4.2.a will get a null payload and the build will halt.
+
+**Required h1** (first line of file, exact format):
+- `# Page: {Screen Name}` — must match the screen name from `product-spec.md` Screen Inventory exactly. NOT `# 01 — Map Browse`. NOT `# Map Browse`. The literal prefix `# Page: ` is mandatory.
+
+**Required h2 sections** (these names exactly):
+- `## ASCII Wireframe` — fenced code block(s) with the wireframe. NOT `## Layout`. NOT `## Wireframe`. NOT `## Layouts`.
+- `## Content Hierarchy` — markdown table with columns `# | Section | Data Shown | Component | Data Source | Weight`. NOT `## Component inventory`. NOT `## Components`. NOT `## Sections`.
+- `## Key Copy` — bulleted list of `**"copy string"** — placement: ...`. NOT `## Copy`. NOT `## Strings`. NOT `## Microcopy`.
+
+**Optional h2 sections** (use these names exactly when present):
+- `## Route` — markdown code-fence containing the route path.
+- `## States` — table of state name and appearance, OR bullet list with dash separators.
+- `## Component Picks` — table mapping section → role → manifest slot.
+
+If you must communicate something the schema doesn't have a section for (e.g. "Purpose", "Screen Overview", "Responsive Behavior", "Data Loading"), add it as an additional h2 — the parser ignores unrecognized sections, but the four REQUIRED ones above MUST be present and named exactly as listed.
+
 ## 🎯 Your Core Mission
 
 ### Create Developer-Ready Foundations

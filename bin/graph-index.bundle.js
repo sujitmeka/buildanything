@@ -4435,7 +4435,7 @@ var require_resolve_block_scalar = __commonJS({
       if (!header)
         return { value: "", type: null, comment: "", range: [start, start, start] };
       const type = header.mode === ">" ? Scalar.Scalar.BLOCK_FOLDED : Scalar.Scalar.BLOCK_LITERAL;
-      const lines = scalar.source ? splitLines7(scalar.source) : [];
+      const lines = scalar.source ? splitLines8(scalar.source) : [];
       let chompStart = lines.length;
       for (let i = lines.length - 1; i >= 0; --i) {
         const content = lines[i][1];
@@ -4593,7 +4593,7 @@ var require_resolve_block_scalar = __commonJS({
       }
       return { mode, indent, chomp, comment, length };
     }
-    function splitLines7(source) {
+    function splitLines8(source) {
       const split = source.split(/\n( *)/);
       const first = split[0];
       const m = first.match(/^( *)/);
@@ -8055,6 +8055,77 @@ function sortEdges(edges) {
     return ka < kb ? -1 : ka > kb ? 1 : 0;
   });
 }
+var FIRST_60_PROMISE_PATTERN = /^\*\*First-encounter promise\*\*\s*:/i;
+var FIRST_60_MIN_FIELD_CHARS = 50;
+var FIRST_60_COMPARISON_MARKERS = [
+  /\bvs\b/i,
+  /\bthan\b/i,
+  /\bcompared to\b/i,
+  /\binstead of\b/i,
+  /\brather than\b/i,
+  /\bunlike\b/i
+];
+function parseFirst60Seconds(ctx, section, _screenInfos) {
+  const personaSubsections = partitionSections(section.bodyLines, 3, 0, section.bodyLines.length);
+  const personaKeys = new Set(ctx.personasByKey.keys());
+  const seenPersonas = /* @__PURE__ */ new Set();
+  for (const sub of personaSubsections) {
+    const m = sub.heading.match(/^Persona\s*:\s*(.+)$/i);
+    if (!m) continue;
+    const rawLabel = m[1].replace(/\(primary\)/gi, "").trim();
+    const key = rawLabel.toLowerCase();
+    if (!personaKeys.has(key)) {
+      pushError(
+        ctx,
+        sub.startLine,
+        `First 60 Seconds: persona "${rawLabel}" does not appear in the App Overview persona table. Persona names must match exactly.`
+      );
+      continue;
+    }
+    seenPersonas.add(key);
+    const matchLine = sub.bodyLines.find((l) => FIRST_60_PROMISE_PATTERN.test(l.text));
+    if (!matchLine) {
+      pushError(
+        ctx,
+        sub.startLine,
+        `First 60 Seconds [${rawLabel}]: missing required field **First-encounter promise**:`
+      );
+      continue;
+    }
+    const colonIdx = matchLine.text.indexOf(":");
+    const content = matchLine.text.slice(colonIdx + 1).trim();
+    if (content.length < FIRST_60_MIN_FIELD_CHARS) {
+      pushError(
+        ctx,
+        matchLine.n,
+        `First 60 Seconds [${rawLabel}]: **First-encounter promise** has < ${FIRST_60_MIN_FIELD_CHARS} chars of content (got ${content.length}). Stub bullets are not accepted \u2014 describe concretely.`
+      );
+      continue;
+    }
+    const hasComparison = FIRST_60_COMPARISON_MARKERS.some((re) => re.test(content));
+    if (!hasComparison) {
+      pushError(
+        ctx,
+        matchLine.n,
+        `First 60 Seconds [${rawLabel}]: **First-encounter promise** has no comparison marker. The sentence must reference an external alternative via one of: "vs", "than", "compared to", "instead of", "rather than", "unlike". A first-encounter promise without a comparison is a stub \u2014 what is the persona getting that they couldn't from the closest alternative in competitive-differentiation.md?`
+      );
+    }
+  }
+  const missingPersonas = [];
+  for (const key of personaKeys) {
+    if (!seenPersonas.has(key)) {
+      const node = ctx.personasByKey.get(key);
+      missingPersonas.push(node.label);
+    }
+  }
+  if (missingPersonas.length > 0) {
+    pushError(
+      ctx,
+      section.startLine,
+      `First 60 Seconds: missing required \`### Persona: <name>\` subsection(s) for: ${missingPersonas.join(", ")}. One subsection required per persona table row.`
+    );
+  }
+}
 function extractProductSpec(input) {
   const { mdPath, mdContent } = input;
   const lines = splitLines(mdContent);
@@ -8067,7 +8138,7 @@ function extractProductSpec(input) {
   };
   const topSections = partitionSections(lines, 2, 0, lines.length);
   const byHeading = (name) => topSections.find((s) => s.heading.trim().toLowerCase() === name.toLowerCase());
-  const required = ["App Overview", "Screen Inventory", "Cross-Feature Interactions"];
+  const required = ["App Overview", "Screen Inventory", "First 60 Seconds", "Cross-Feature Interactions"];
   for (const r of required) {
     if (!byHeading(r)) {
       pushError(ctx, 1, `Missing required top-level section: "## ${r}"`);
@@ -8083,8 +8154,9 @@ function extractProductSpec(input) {
     pushError(ctx, 1, "No `## Feature: ...` sections found");
   }
   for (const fs of featureSections) parseFeature(ctx, fs);
-  parseScreenInventory(ctx, byHeading("Screen Inventory"));
+  const screenInfos = parseScreenInventory(ctx, byHeading("Screen Inventory"));
   parseCrossFeature(ctx, byHeading("Cross-Feature Interactions"));
+  parseFirst60Seconds(ctx, byHeading("First 60 Seconds"), screenInfos);
   if (ctx.errors.length > 0) {
     return { ok: false, errors: ctx.errors };
   }
@@ -8982,7 +9054,12 @@ function extractPageSpec(input) {
   const h1 = lines.find((l) => isHeadingAtLevel3(l.text, 1));
   const h1Match = h1?.text.match(/^#\s+Page:\s+(.+)$/);
   if (!h1 || !h1Match) {
-    pushError4(ctx, h1?.n ?? 1, "Missing required h1: '# Page: <Screen Name>'");
+    const found = h1 ? `Found: '${h1.text}'.` : "No h1 found.";
+    pushError4(
+      ctx,
+      h1?.n ?? 1,
+      `Missing required h1 '# Page: <Screen Name>'. ${found} The first line of a page-spec must match this format exactly. See protocols/page-spec-schema.md \xA7Required Sections.`
+    );
     return { ok: false, errors: ctx.errors };
   }
   const screenName = h1Match[1].trim();
@@ -8992,14 +9069,22 @@ function extractPageSpec(input) {
   const route = parseRoute(findH2(h2Sections, "Route"));
   const wireframeSec = findH2(h2Sections, "ASCII Wireframe");
   if (!wireframeSec) {
-    pushError4(ctx, 1, "Missing required section: '## ASCII Wireframe'");
+    pushError4(
+      ctx,
+      1,
+      "Missing required section '## ASCII Wireframe'. If the file uses '## Layout', '## Wireframe', or '## Layouts', rename to '## ASCII Wireframe'. See protocols/page-spec-schema.md \xA7Required Sections."
+    );
     return { ok: false, errors: ctx.errors };
   }
   const wireframeText = parseWireframe(ctx, wireframeSec, screenName, pageSpecId);
   if (wireframeText === null) return { ok: false, errors: ctx.errors };
   const hierarchySec = findH2(h2Sections, "Content Hierarchy");
   if (!hierarchySec) {
-    pushError4(ctx, 1, "Missing required section: '## Content Hierarchy'");
+    pushError4(
+      ctx,
+      1,
+      "Missing required section '## Content Hierarchy'. If the file uses '## Component inventory', '## Components', or '## Sections', rename to '## Content Hierarchy'. See protocols/page-spec-schema.md \xA7Required Sections."
+    );
     return { ok: false, errors: ctx.errors };
   }
   const contentHierarchy = parseContentHierarchy(ctx, hierarchySec);
@@ -9008,7 +9093,11 @@ function extractPageSpec(input) {
   if (statesSec) parseStates2(ctx, statesSec, screenName, screenId, pageSpecId);
   const keyCopySec = findH2(h2Sections, "Key Copy");
   if (!keyCopySec) {
-    pushError4(ctx, 1, "Missing required section: '## Key Copy'");
+    pushError4(
+      ctx,
+      1,
+      "Missing required section '## Key Copy'. If the file uses '## Copy', '## Strings', or '## Microcopy', rename to '## Key Copy'. See protocols/page-spec-schema.md \xA7Required Sections."
+    );
     return { ok: false, errors: ctx.errors };
   }
   if (!parseKeyCopy(ctx, keyCopySec, screenName, screenId, pageSpecId)) {
@@ -9663,12 +9752,15 @@ function extractArchitecture(input) {
   const ctx = { mdPath, errors: [], nodes: [], edges: [] };
   const h1Sections = partitionSections4(lines, 1, 0, lines.length);
   const candidates = [];
+  const h1IsModule = /* @__PURE__ */ new Set();
   for (const sec of h1Sections) {
     if (isTitleHeading(sec.heading)) continue;
     if (SKIP_HEADINGS.has(sec.heading.toLowerCase())) continue;
     candidates.push({ name: sec.heading, startLine: sec.startLine, bodyLines: sec.bodyLines });
+    h1IsModule.add(sec.startLine);
   }
   for (const sec of h1Sections) {
+    const parentIsModule = h1IsModule.has(sec.startLine);
     const h2s = partitionBodyH2(sec.bodyLines);
     for (const h2 of h2s) {
       const moduleMatch = h2.heading.match(/^Module\s*:\s*(.+)$/i);
@@ -9678,7 +9770,7 @@ function extractArchitecture(input) {
           startLine: h2.startLine,
           bodyLines: h2.bodyLines
         });
-      } else if (!SKIP_HEADINGS.has(h2.heading.toLowerCase())) {
+      } else if (!parentIsModule && !SKIP_HEADINGS.has(h2.heading.toLowerCase())) {
         candidates.push({
           name: h2.heading,
           startLine: h2.startLine,
@@ -9953,9 +10045,222 @@ function extractSprintTasks(input) {
   return { ok: true, fragment, errors: [] };
 }
 
+// src/graph/parser/backend-tasks.ts
+var PRODUCED_BY7 = "planner";
+var PRODUCED_AT_STEP7 = "2.3.2";
+function loc7(line) {
+  return `L${line}`;
+}
+function pushError6(ctx, line, message) {
+  ctx.errors.push({ line, message });
+}
+function splitLines7(content) {
+  return content.split(/\r?\n/).map((text, i) => ({ n: i + 1, text }));
+}
+function splitRow5(text) {
+  let s = text.trim();
+  if (s.startsWith("|")) s = s.slice(1);
+  if (s.endsWith("|")) s = s.slice(0, -1);
+  return s.split("|").map((c) => c.trim());
+}
+var SEP_RE3 = /^\s*\|?\s*[-:| ]+\s*\|?\s*$/;
+function findTables3(lines) {
+  const tables = [];
+  let i = 0;
+  while (i < lines.length - 1) {
+    const cur = lines[i];
+    const next = lines[i + 1];
+    if (cur.text.includes("|") && next.text.includes("|") && SEP_RE3.test(next.text)) {
+      const headers = splitRow5(cur.text).map((h) => h.toLowerCase().trim());
+      const rows = [];
+      let j = i + 2;
+      while (j < lines.length) {
+        const ln = lines[j];
+        if (!ln.text.includes("|")) break;
+        if (SEP_RE3.test(ln.text)) {
+          j++;
+          continue;
+        }
+        const cells = splitRow5(ln.text);
+        if (cells.every((c) => c === "")) {
+          j++;
+          continue;
+        }
+        const row = {};
+        for (let c = 0; c < headers.length; c++) {
+          row[headers[c]] = (cells[c] ?? "").trim();
+        }
+        rows.push({ cells: row, line: ln.n });
+        j++;
+      }
+      tables.push({ headerLine: cur.n, headers, rows });
+      i = j;
+    } else {
+      i++;
+    }
+  }
+  return tables;
+}
+function isEmptyRef3(s) {
+  const t = s.trim();
+  return t === "" || t === "\u2014" || t === "-" || t === "\u2013";
+}
+function sortNodes7(nodes) {
+  return [...nodes].sort((a, b) => a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
+}
+function sortEdges7(edges) {
+  return [...edges].sort((a, b) => {
+    const k = (e) => `${e.relation} ${e.source} ${e.target}`;
+    return k(a) < k(b) ? -1 : k(a) > k(b) ? 1 : 0;
+  });
+}
+function makeEdge5(ctx, source, target2, relation, line) {
+  return {
+    source,
+    target: target2,
+    relation,
+    confidence: "EXTRACTED",
+    source_file: ctx.mdPath,
+    source_location: loc7(line),
+    produced_by_agent: PRODUCED_BY7,
+    produced_at_step: PRODUCED_AT_STEP7
+  };
+}
+function parseOwnsFiles2(raw) {
+  if (isEmptyRef3(raw)) return [];
+  return raw.split(",").map((s) => s.trim()).filter((s) => s.length > 0);
+}
+var REQUIRED_COLUMNS2 = [
+  "task id",
+  "title",
+  "size",
+  "dependencies",
+  "behavioral test",
+  "owns files",
+  "implementing phase",
+  "feature"
+];
+var VALID_SIZES2 = /* @__PURE__ */ new Set(["S", "M", "L"]);
+function extractBackendTasks(input) {
+  const { mdPath, mdContent } = input;
+  const lines = splitLines7(mdContent);
+  const ctx = { mdPath, errors: [], nodes: [], edges: [] };
+  const tables = findTables3(lines);
+  if (tables.length === 0) {
+    return {
+      ok: false,
+      errors: [{ line: 0, message: "No pipe tables found in backend-tasks.md" }]
+    };
+  }
+  const allRows = [];
+  for (const table of tables) {
+    if (table.headers.length < 8) {
+      pushError6(
+        ctx,
+        table.headerLine,
+        `Table has fewer than 8 columns (got ${table.headers.length})`
+      );
+      continue;
+    }
+    for (const col of REQUIRED_COLUMNS2) {
+      if (!table.headers.includes(col)) {
+        const displayName = col.split(" ").map((w) => w[0].toUpperCase() + w.slice(1)).join(" ");
+        pushError6(ctx, table.headerLine, `Missing required column: '${displayName}'`);
+      }
+    }
+    if (ctx.errors.length > 0) continue;
+    for (const row of table.rows) {
+      allRows.push({ row, headers: table.headers, headerLine: table.headerLine });
+    }
+  }
+  if (ctx.errors.length > 0) {
+    return { ok: false, errors: ctx.errors };
+  }
+  const taskIdSeen = /* @__PURE__ */ new Map();
+  for (const { row } of allRows) {
+    const rawTaskId = row.cells["task id"] ?? "";
+    if (rawTaskId.trim() === "") {
+      pushError6(ctx, row.line, `Anonymous task at L${row.line} \u2014 Task ID is required`);
+      continue;
+    }
+    const taskIdLower = rawTaskId.toLowerCase();
+    const prev = taskIdSeen.get(taskIdLower);
+    if (prev !== void 0) {
+      pushError6(
+        ctx,
+        row.line,
+        `Duplicate Task ID '${rawTaskId}' at L${prev} and L${row.line}`
+      );
+      continue;
+    }
+    taskIdSeen.set(taskIdLower, row.line);
+    const size = (row.cells["size"] ?? "").trim().toUpperCase();
+    if (!VALID_SIZES2.has(size)) {
+      pushError6(
+        ctx,
+        row.line,
+        `Invalid Size '${(row.cells["size"] ?? "").trim()}' at L${row.line} \u2014 must be S, M, or L`
+      );
+      continue;
+    }
+    const taskId = rawTaskId.trim();
+    const title = (row.cells["title"] ?? "").trim();
+    const behavioralTest = (row.cells["behavioral test"] ?? "").trim();
+    const implementingPhase = (row.cells["implementing phase"] ?? "").trim();
+    const ownsFiles = parseOwnsFiles2(row.cells["owns files"] ?? "");
+    const featureRaw = (row.cells["feature"] ?? "").trim();
+    const featureId = isEmptyRef3(featureRaw) ? null : ids.feature(featureRaw);
+    const screensRaw = (row.cells["screens"] ?? "").trim();
+    const screenIds = isEmptyRef3(screensRaw) ? [] : screensRaw.split(",").map((s) => s.trim()).filter((s) => s.length > 0).map((name) => ids.screen(name));
+    const node = {
+      id: ids.task(taskId),
+      label: title,
+      entity_type: "task",
+      source_file: mdPath,
+      source_location: loc7(row.line),
+      confidence: "EXTRACTED",
+      task_id: taskId,
+      title,
+      size,
+      behavioral_test: behavioralTest,
+      assigned_phase: implementingPhase,
+      feature_id: featureId,
+      screen_ids: screenIds,
+      owns_files: ownsFiles
+    };
+    ctx.nodes.push(node);
+    if (featureId) {
+      ctx.edges.push(makeEdge5(ctx, node.id, featureId, "task_implements_feature", row.line));
+    }
+    for (const screenId of screenIds) {
+      ctx.edges.push(makeEdge5(ctx, node.id, screenId, "task_touches_screen", row.line));
+    }
+    const depsRaw = (row.cells["dependencies"] ?? "").trim();
+    if (!isEmptyRef3(depsRaw)) {
+      const deps = depsRaw.split(",").map((d) => d.trim()).filter((d) => d.length > 0);
+      for (const dep of deps) {
+        ctx.edges.push(makeEdge5(ctx, node.id, ids.task(dep), "task_depends_on", row.line));
+      }
+    }
+  }
+  if (ctx.errors.length > 0) {
+    return { ok: false, errors: ctx.errors };
+  }
+  const fragment = {
+    version: 1,
+    schema: "buildanything-slice-4",
+    source_file: mdPath,
+    source_sha: sha256Hex(mdContent),
+    produced_at: (/* @__PURE__ */ new Date()).toISOString(),
+    nodes: sortNodes7(ctx.nodes),
+    edges: sortEdges7(ctx.edges)
+  };
+  return { ok: true, fragment, errors: [] };
+}
+
 // src/graph/parser/decisions-jsonl.ts
-var PRODUCED_BY7 = "orchestrator-scribe";
-var PRODUCED_AT_STEP7 = "cross-phase";
+var PRODUCED_BY8 = "orchestrator-scribe";
+var PRODUCED_AT_STEP8 = "cross-phase";
 var VALID_STATUSES = /* @__PURE__ */ new Set(["open", "triggered", "resolved"]);
 function resolveRefToNodeId(ref) {
   const hashIdx = ref.indexOf("#");
@@ -9972,24 +10277,24 @@ function resolveRefToNodeId(ref) {
     const featureMatch = anchor.match(/^feature[- ](.+)$/i);
     if (featureMatch) return ids.feature(featureMatch[1]);
   }
-  if (file.endsWith("sprint-tasks.md")) {
+  if (file.endsWith("sprint-tasks.md") || file.endsWith("backend-tasks.md")) {
     return ids.task(anchor);
   }
   return null;
 }
-function loc7(line) {
+function loc8(line) {
   return `L${line}`;
 }
-function makeEdge5(source, target2, relation, sourceFile, line, decidedBy) {
+function makeEdge6(source, target2, relation, sourceFile, line, decidedBy) {
   return {
     source,
     target: target2,
     relation,
     confidence: "EXTRACTED",
     source_file: sourceFile,
-    source_location: loc7(line),
-    produced_by_agent: decidedBy || PRODUCED_BY7,
-    produced_at_step: PRODUCED_AT_STEP7
+    source_location: loc8(line),
+    produced_by_agent: decidedBy || PRODUCED_BY8,
+    produced_at_step: PRODUCED_AT_STEP8
   };
 }
 function isCommentOrBlank(line) {
@@ -10139,10 +10444,10 @@ function compareRows(a, b) {
   }
   return a.raw.decision_id < b.raw.decision_id ? -1 : a.raw.decision_id > b.raw.decision_id ? 1 : 0;
 }
-function sortNodes7(nodes) {
+function sortNodes8(nodes) {
   return [...nodes].sort((a, b) => a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
 }
-function sortEdges7(edges) {
+function sortEdges8(edges) {
   return [...edges].sort((a, b) => {
     const k = (e) => `${e.relation} ${e.source} ${e.target} ${e.source_location ?? ""}`;
     return k(a) < k(b) ? -1 : k(a) > k(b) ? 1 : 0;
@@ -10197,7 +10502,7 @@ function extractDecisionsJsonl(input) {
       label: r.decision_id,
       entity_type: "decision",
       source_file: mdPath,
-      source_location: loc7(p.line),
+      source_location: loc8(p.line),
       confidence: "EXTRACTED",
       decision_id: r.decision_id,
       summary: r.summary,
@@ -10217,12 +10522,12 @@ function extractDecisionsJsonl(input) {
       if (r.status === "resolved" && parent !== void 0 && (parent.raw.status === "open" || parent.raw.status === "triggered")) {
         relation = "decision_supersedes";
       }
-      edges.push(makeEdge5(nodeId, targetId, relation, mdPath, p.line, r.decided_by));
+      edges.push(makeEdge6(nodeId, targetId, relation, mdPath, p.line, r.decided_by));
     }
     if (r.ref) {
       const droveTarget = resolveRefToNodeId(r.ref);
       if (droveTarget) {
-        edges.push(makeEdge5(nodeId, droveTarget, "decision_drove", mdPath, p.line, r.decided_by));
+        edges.push(makeEdge6(nodeId, droveTarget, "decision_drove", mdPath, p.line, r.decided_by));
       } else {
         errors.push({ line: p.line, message: `WARNING: ref '${r.ref}' could not be resolved to a graph node` });
       }
@@ -10244,8 +10549,8 @@ function extractDecisionsJsonl(input) {
     source_file: mdPath,
     source_sha: sha256Hex(input.mdContent),
     produced_at: (/* @__PURE__ */ new Date()).toISOString(),
-    nodes: sortNodes7(nodes),
-    edges: sortEdges7(edges)
+    nodes: sortNodes8(nodes),
+    edges: sortEdges8(edges)
   };
   return { ok: true, fragment, errors };
 }
@@ -10280,7 +10585,7 @@ function dhash(bytes) {
 
 // src/graph/parser/screenshot.ts
 var PRODUCED_BY_AGENT = "screenshot-extractor-stub";
-var PRODUCED_AT_STEP8 = "varies";
+var PRODUCED_AT_STEP9 = "varies";
 var SCREENSHOT_STUB_CONFIDENCE = "INFERRED";
 var VALID_IMAGE_CLASSES = /* @__PURE__ */ new Set(["reference", "brand_drift", "dogfood"]);
 var DNA_AXIS_KEYWORDS = [
@@ -10292,7 +10597,7 @@ var DNA_AXIS_KEYWORDS = [
   "type",
   "copy"
 ];
-function makeEdge6(source, target2, relation, sourceFile) {
+function makeEdge7(source, target2, relation, sourceFile) {
   return {
     source,
     target: target2,
@@ -10301,7 +10606,7 @@ function makeEdge6(source, target2, relation, sourceFile) {
     source_file: sourceFile,
     source_location: "L0",
     produced_by_agent: PRODUCED_BY_AGENT,
-    produced_at_step: PRODUCED_AT_STEP8
+    produced_at_step: PRODUCED_AT_STEP9
   };
 }
 function basenameNoExt(filePath) {
@@ -10401,17 +10706,17 @@ function extractScreenshot(input) {
     };
     nodes.push(detectionNode);
     edges.push(
-      makeEdge6(screenshotId, detectionId, "image_has_component_detection", input.imagePath)
+      makeEdge7(screenshotId, detectionId, "image_has_component_detection", input.imagePath)
     );
   }
   if (input.linkedScreenId && input.linkedScreenId.trim()) {
     edges.push(
-      makeEdge6(screenshotId, input.linkedScreenId, "screenshot_depicts_screen", input.imagePath)
+      makeEdge7(screenshotId, input.linkedScreenId, "screenshot_depicts_screen", input.imagePath)
     );
   }
   if (isDogfoodWithFinding) {
     edges.push(
-      makeEdge6(screenshotId, resolvedFindingId, "screenshot_evidences_finding", input.imagePath)
+      makeEdge7(screenshotId, resolvedFindingId, "screenshot_evidences_finding", input.imagePath)
     );
   }
   return { ok: true, nodes, edges, errors };
@@ -10586,7 +10891,7 @@ var { positional, imageClass: explicitImageClass } = parseArgs(import_node_proce
 var target = positional[0];
 if (!target) {
   import_node_process.default.stderr.write(
-    "Usage: graph-index <path> [--image-class=reference|brand_drift|dogfood]\n  Recognized basenames: product-spec.md, DESIGN.md, component-manifest.md, architecture.md, sprint-tasks.md, decisions.jsonl\n  Directory mode: page-specs/ \u2192 indexes all *.md files inside\n  Image directory mode: design-references/ | evidence/brand-drift/ | evidence/dogfood/ \u2192 indexes all images\n  DESIGN.md produces both slice-2-dna.json (Pass 1) and slice-3-tokens.json (Pass 2, if tokens found)\n"
+    "Usage: graph-index <path> [--image-class=reference|brand_drift|dogfood]\n  Recognized basenames: product-spec.md, DESIGN.md, component-manifest.md, architecture.md, sprint-tasks.md (legacy), backend-tasks.md, decisions.jsonl\n  Directory mode: page-specs/ \u2192 indexes all *.md files inside\n  Image directory mode: design-references/ | evidence/brand-drift/ | evidence/dogfood/ \u2192 indexes all images\n  DESIGN.md produces both slice-2-dna.json (Pass 1) and slice-3-tokens.json (Pass 2, if tokens found)\n"
   );
   import_node_process.default.exit(64);
 }
@@ -10672,7 +10977,7 @@ try {
     }
   })()) {
     import_node_process.default.stderr.write(
-      "Usage: graph-index <path>\n  Recognized basenames: product-spec.md, DESIGN.md, component-manifest.md, architecture.md, sprint-tasks.md, decisions.jsonl\n  Directory mode: pass a page-specs/ directory to index all *.md files inside\n"
+      "Usage: graph-index <path>\n  Recognized basenames: product-spec.md, DESIGN.md, component-manifest.md, architecture.md, sprint-tasks.md (legacy), backend-tasks.md, decisions.jsonl\n  Directory mode: pass a page-specs/ directory to index all *.md files inside\n"
     );
     import_node_process.default.exit(64);
   }
@@ -10695,13 +11000,16 @@ try {
   } else if (base === "sprint-tasks.md") {
     result = extractSprintTasks({ mdPath: absPath, mdContent });
     targetFile = "slice-4-tasks.json";
+  } else if (base === "backend-tasks.md") {
+    result = extractBackendTasks({ mdPath: absPath, mdContent });
+    targetFile = "slice-4-backend-tasks.json";
   } else if (base === "decisions.jsonl") {
     result = extractDecisionsJsonl({ mdPath: absPath, mdContent });
     targetFile = "slice-4-decisions.json";
   } else {
     import_node_process.default.stderr.write(
       `Usage: graph-index <path>
-  Recognized basenames: product-spec.md, DESIGN.md, component-manifest.md, architecture.md, sprint-tasks.md, decisions.jsonl
+  Recognized basenames: product-spec.md, DESIGN.md, component-manifest.md, architecture.md, sprint-tasks.md (legacy), backend-tasks.md, decisions.jsonl
   Directory mode: pass a page-specs/ directory to index all *.md files inside
   Got: ${base}
 `

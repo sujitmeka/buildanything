@@ -32,7 +32,7 @@ Call the Agent tool once:
 
 1. Description: "Visual DNA directional preview" — agent_type: `design-brand-guardian` — subagent_type: `design-brand-guardian` — prompt: "[CONTEXT header above — phase: 2. NOTE: `dna` is omitted — this step produces the preview, not the lock.] Read `docs/plans/design-doc.md` (#persona, #scope, #voice), `docs/plans/phase1-scratch/findings-digest.md` (reference signals), and `docs/plans/architecture.md` (stack constraints). Emit a 3-5 bullet DIRECTIONAL preview of the intended Visual DNA — brand read in one line, then proposed leanings on Scope, Character, Material/Motion, and Type. NO rationale paragraphs, NO reference citations, NO incompatibility-matrix work. This is a sanity-check for the user at Gate 2, not the locked card. Save to `docs/plans/visual-dna-preview.md` as a flat bullet list. Target 150 tokens of output, max 250."
 
-Output: `docs/plans/visual-dna-preview.md` — surfaced by the orchestrator in the Gate 2 prompt alongside Architecture + Sprint Task List. Phase 3.0 Brand Guardian re-invokes to produce the full locked 6-axis card; the preview is discarded after Gate 2 approval.
+Output: `docs/plans/visual-dna-preview.md` — surfaced by the orchestrator in the Gate 2 prompt alongside Architecture + Backend Tasks. Phase 3.0 Brand Guardian re-invokes to produce the full locked 6-axis card; the preview is discarded after Gate 2 approval.
 
 ## Phase 3 — Design (web branch)
 
@@ -159,13 +159,22 @@ Output: `docs/plans/ux-architecture.md` + `docs/plans/page-specs/*.md`.
 
 #### Step 3.3.idx — Page-specs graph index
 
-After `design-ux-architect` returns and `docs/plans/page-specs/` is populated with one .md file per screen, index the directory into the build graph. Slice 3 graph index — best-effort, BO falls back to file reads on failure.
+After `design-ux-architect` returns and `docs/plans/page-specs/` is populated with one .md file per screen, index the directory into the build graph. Slice 3 graph index — REQUIRED. Phase 4 will not start without `slice-3-pages.json`.
 
 Run via the Bash tool:
 
 - Command: `node ${CLAUDE_PLUGIN_ROOT}/bin/graph-index.js docs/plans/page-specs/`
 - On exit 0: log success to `docs/plans/build-log.md` and continue.
-- On non-zero exit: STOP. Log the error to `docs/plans/build-log.md` and report the failure. Downstream agents require the graph — do not proceed without a successful index.
+- On non-zero exit: STOP. Log the error to `docs/plans/build-log.md` (include the file:line and the rename hint from the parser stderr) and re-dispatch `design-ux-architect` with the parser error attached. The producer freelanced an h1 or h2 name the parser does not match — the fix is rename the headings to match the schema, NOT route around the index.
+
+<HARD-GATE>
+SKIP is NOT an allowed outcome for Step 3.3.idx. The Briefing Officer at Step
+4.2.a calls `graph_query_screen(screen_id, full: true)` and expects a non-null
+payload. A null payload (because Slice 3 is missing) halts Phase 4 with no
+fallback to source markdown. Recovery is fix-the-source: the
+`design-ux-architect` re-runs with the parser's specific rename hint, the
+indexer is re-run, slice-3-pages.json is regenerated. Then Phase 4 starts.
+</HARD-GATE>
 
 ### Step 3.3b — UX Flow Validation
 
@@ -271,7 +280,7 @@ Call the Agent tool — description: "Design system setup" — agent_type: `engi
 
 #### 4.0.c — Acceptance test scaffolding
 
-Call the Agent tool — description: "Scaffold acceptance tests" — agent_type: `engineering-frontend-developer` — subagent_type: `engineering-frontend-developer` — mode: "bypassPermissions" — prompt: "[CONTEXT header above — phase: 4] Read docs/plans/sprint-tasks.md. For every task with a Behavioral Test field, create a Playwright test stub in tests/e2e/acceptance/. Use Page Object Model. Each test should: navigate to the page, perform the interaction, assert the expected outcome. Tests should FAIL right now (features aren't built yet) — that's correct. Also ensure agent-browser is available (run `which agent-browser`). Commit: 'test: scaffold acceptance tests from sprint tasks'."
+Call the Agent tool — description: "Scaffold acceptance tests" — agent_type: `engineering-frontend-developer` — subagent_type: `engineering-frontend-developer` — mode: "bypassPermissions" — prompt: "[CONTEXT header above — phase: 4] Read docs/plans/page-specs/*.md. For every page-spec with behavioral descriptions (interactions, state transitions, error flows), create a Playwright test stub in tests/e2e/acceptance/. Use Page Object Model. Each test should: navigate to the page, perform the interaction, assert the expected outcome. Tests should FAIL right now (features aren't built yet) — that's correct. Also ensure agent-browser is available (run `which agent-browser`). Commit: 'test: scaffold acceptance tests from page-specs'."
 
 ## Phase 4 — Build per-task flow (web branch)
 
@@ -279,7 +288,7 @@ These are the web-specific prompt templates for the per-task flow inside Phase 4
 
 ### Wave dispatch (feature-grained, from feature-delegation-plan.json)
 
-The Product Owner (Step 4.1) groups features into waves and writes `docs/plans/feature-delegation-plan.json`. The orchestrator reads that plan — not sprint-tasks.md Dependencies — to determine wave membership. Each wave dispatches one Briefing Officer per feature in parallel. Within a feature, tasks run in DAG-parallel batches (topological order from the `Dependencies:` field in sprint-tasks.md — independent sibling tasks run in parallel, yielding ~30-50% wall-clock saving).
+The Product Owner (Step 4.1) groups features into waves and writes `docs/plans/feature-delegation-plan.json`. The orchestrator reads that plan — not backend-tasks.md Dependencies — to determine wave membership. Each wave dispatches one Briefing Officer per feature in parallel. Within a feature, tasks run in DAG-parallel batches (topological order from the `Dependencies:` field in backend-tasks.md for backend tasks — independent sibling tasks run in parallel, yielding ~30-50% wall-clock saving). UI tasks are driven directly by `docs/plans/page-specs/*.md` — the page-spec IS the implementation spec. The implementer receives the full wireframe + component inventory + interaction model from graph_query_screen(full: true).
 
 No magic parallelism cap — the dependency graph is the limit within a feature. A task that declares no dependencies runs in the first intra-feature batch alongside every other root. A task that declares `Dependencies: T1, T2` runs in whichever batch first satisfies both.
 
@@ -327,7 +336,7 @@ Implement fully with real code and tests. Commit: 'feat: [task]'. Report what yo
 
 #### Metric Loop (web behavioral verification)
 
-Per `protocols/metric-loop.md` Step 0.5, extract acceptance criteria from `sprint-tasks.md` Behavioral Test field into the Scoring Criteria Checklist before the loop starts. **Phase 4 per-task extraction is mechanical — no dispatch.** The Behavioral Test field is a single structured value per task; the orchestrator copies it directly into `active_metric_loop.scoring_criteria_checklist` in `.build-state.json`.
+Per `protocols/metric-loop.md` Step 0.5, extract acceptance criteria from `docs/plans/page-specs/*.md` behavioral descriptions into the Scoring Criteria Checklist before the loop starts. **Phase 4 per-task extraction is mechanical — no dispatch.** For backend tasks, criteria come from `backend-tasks.md` acceptance fields. For UI tasks, criteria come from the page-spec's interaction model and state transitions; the orchestrator copies them directly into `active_metric_loop.scoring_criteria_checklist` in `.build-state.json`.
 
 For UI-facing tasks, include behavioral verification: the measurement agent receives the checklist + uses agent-browser to verify the feature renders and responds to interaction, not just read the code. Max 5 iterations. Generator re-invocation on iteration 2+ follows the lean context rule (top issue + file paths + relevant checklist values only — no full `[CONTEXT header above]`). Other Metric Loop mechanics (critic dispatch, exit conditions) follow `protocols/metric-loop.md`.
 
@@ -335,13 +344,15 @@ For UI-facing tasks, include behavioral verification: the measurement agent rece
 
 Uses agent-browser against localhost to open the app, execute the task's behavioral acceptance criteria, and verify the feature actually works. Evidence saved to `docs/plans/evidence/[task-name]/`: annotated screenshot, snapshot diff, error log, network log, HAR file.
 
+For UI tasks, the verify gate MUST include visual comparison against the page-spec wireframe via agent-browser. Code that compiles but doesn't match the wireframe is a FAIL.
+
 ## Phase 5 — Audit (web branch)
 
 Phase 5 in the web branch is split into three layers — Track A (engineering envelope: 5 parallel auditors), Track B (product reality: parallel per-feature audit driven by graph queries), and Cross-cutting (3-iteration Playwright E2E, autonomous agent-browser dogfood, fake-data detector). All findings route through the Feedback Synthesizer (Step 5.4) and Fix loop (Step 5.5). The orchestrator-side machinery (Track-A team dispatch, Track-B fan-out, synthesizer, evidence writes, fix loop) follows `commands/build.md` Phase 5 — this file carries web-branch-specific elaboration only. Reality Check and LRR Aggregation are Phase 6, not here.
 
 ### Step 5.1 — Track A: Engineering Reality (5 agents in parallel, ONE message)
 
-Read the NFRs from `docs/plans/quality-targets.json` (and `docs/plans/sprint-tasks.md` NFR section if present). Pass the relevant NFR thresholds to each audit agent so they have concrete targets, not generic checks. The fifth auditor is the Brand Guardian drift check — it runs alongside the technical auditors to catch DNA drift before the Phase 6 LRR Brand Guardian chapter renders its verdict. Per-feature UX quality (loading states, empty states, error states, mobile responsiveness, visual consistency) is now covered feature-by-feature in Step 5.2 Track B — DO NOT add a generic UX-quality dispatch back here.
+Read the NFRs from `docs/plans/quality-targets.json` (and `docs/plans/backend-tasks.md` NFR section if present). Pass the relevant NFR thresholds to each audit agent so they have concrete targets, not generic checks. The fifth auditor is the Brand Guardian drift check — it runs alongside the technical auditors to catch DNA drift before the Phase 6 LRR Brand Guardian chapter renders its verdict. Per-feature UX quality (loading states, empty states, error states, mobile responsiveness, visual consistency) is now covered feature-by-feature in Step 5.2 Track B — DO NOT add a generic UX-quality dispatch back here.
 
 Call the Agent tool 5 times in one message:
 
@@ -408,7 +419,7 @@ Three checks run in parallel as a cross-cutting layer: 3-iteration Playwright E2
 
 HARD-GATE: ALL 3 ITERATIONS ARE MANDATORY. Do NOT stop after iteration 1 even if all tests pass. The purpose of 3 runs is to catch flaky tests, timing-dependent failures, and race conditions that only surface on repeated execution. Skip this step ONLY if the project has no user-facing frontend.
 
-**Scope (POST Track B):** E2E covers **multi-feature User Journeys ONLY** — login → browse → buy, signup → onboarding → first-action, etc. Single-feature happy paths are covered by Track B per-feature auditors at Step 5.2 — DO NOT duplicate. The User Journey list lives in `docs/plans/sprint-tasks.md` (Step 0 of the Planning Protocol). Each cross-feature journey = one E2E test file.
+**Scope (POST Track B):** E2E covers **multi-feature User Journeys ONLY** — login → browse → buy, signup → onboarding → first-action, etc. Single-feature happy paths are covered by Track B per-feature auditors at Step 5.2 — DO NOT duplicate. The User Journey list lives in `docs/plans/backend-tasks.md` (Step 0 of the Planning Protocol). Each cross-feature journey = one E2E test file.
 
 **Iteration 1 — Generate & Run:**
 
@@ -418,13 +429,13 @@ Call the Agent tool — description: "E2E test generation" — agent_type: `engi
 
 INPUTS:
 Read these files via your Read tool before starting — do NOT expect pasted content:
-- User Journeys: `docs/plans/sprint-tasks.md` (User Journeys section — each journey becomes one E2E test)
+- User Journeys: `docs/plans/backend-tasks.md` (User Journeys section — each journey becomes one E2E test)
 - Architecture (API contracts): `docs/plans/architecture.md`
-- NFRs: `docs/plans/sprint-tasks.md` (NFR section — use performance thresholds as test assertions)
+- NFRs: `docs/plans/backend-tasks.md` (NFR section — use performance thresholds as test assertions)
 - Visual Design Spec (component selectors): `DESIGN.md`
 
 REQUIREMENTS:
-1. One E2E test per User Journey from sprint-tasks.md (each journey = one test file covering the full flow)
+1. One E2E test per User Journey from backend-tasks.md (each journey = one test file covering the full flow)
 2. Use Page Object Model pattern — one page object per major view
 3. Use data-testid selectors (add them to components if missing)
 4. Wait for API responses, NEVER use arbitrary timeouts (no waitForTimeout)

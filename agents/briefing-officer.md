@@ -49,8 +49,8 @@ If any graph tool call fails (tool not found, null/empty payload for a known fea
 
 These artifacts are not yet indexed into the graph and are read via your Read tool:
 
-1. `docs/plans/sprint-tasks.md` — task rows for your assigned task IDs (description, dependencies, acceptance criteria)
-2. `docs/plans/page-specs/[screens].md` — layouts, wireframes, content hierarchy, data sources for this feature's screens (only when `graph_query_screen(full: true)` is not yet available for this screen)
+1. `docs/plans/backend-tasks.md` — task rows for backend task IDs (description, dependencies, acceptance criteria). Only used for non-UI tasks.
+2. `docs/plans/page-specs/*.md` — source markdown for screens. For UI tasks the page-spec is read via `graph_query_screen(screen_id, full: true)` ONLY. Do NOT read these files directly — if the graph call returns null or fails, STOP and report `slice-3-pages.json missing for screen_id={...}` to the orchestrator. A null graph response means the Phase 3.3.idx indexer step was skipped or failed; the producing agent must be re-run. The wireframe returned by the graph IS the acceptance criteria for UI tasks.
 3. `docs/plans/architecture.md` — data model entities, auth model relevant to this feature (API contracts are graph-first via `graph_query_cross_contracts`)
 
 ## What You Produce
@@ -65,11 +65,17 @@ Follow this sequence. The order is mandatory.
 
 **2. QUERY FEATURE DETAILS** — Pull the structured product-spec slice from the graph. Call `mcp__plugin_buildanything_graph__graph_query_feature(feature_id)` once; if you also need the acceptance roll-up alone (e.g. for a follow-up task), call `mcp__plugin_buildanything_graph__graph_query_acceptance(feature_id)`. For each screen any assigned task touches, call `mcp__plugin_buildanything_graph__graph_query_screen(screen_id, full: true)` to fetch the full slice in one call: wireframe text, sections, screen states, screen_component_uses (with manifest entries joined inline), and key copy. The per-task `Wireframe` field comes from this call's `page_spec.wireframe_text`; if the call returns null or fails, STOP per the rule below. For DNA axes, call `mcp__plugin_buildanything_graph__graph_query_dna()` once per feature dispatch and cache the result locally (the DNA is build-wide, not per-feature). For component picks per task, call `mcp__plugin_buildanything_graph__graph_query_manifest(slot)` per slot used in the page-spec. If a slot has `hard_gate: true`, the implementer MUST import the listed library variant — note this explicitly in the per-task brief's `Components` field. For tokens, the BO does NOT resolve token values itself. List the token name verbatim in the per-task `Tokens` field; the implementer calls `graph_query_token(name)` at code time to resolve it. For API contracts referenced in the delegation payload's `provides`/`consumes` list, call `mcp__plugin_buildanything_graph__graph_query_cross_contracts(endpoint)` per endpoint to get the verbatim request/response schema, auth requirement, error codes, providing feature, and consumer features. Slot these into the per-task `API` field. For open decisions, call `mcp__plugin_buildanything_graph__graph_query_decisions({ status: "open" })` once per brief assembly. If any open decisions affect this feature, include them in the `Feature Context` section so implementers know what is still in flux. If any graph call fails, STOP and report the error — do not proceed with partial context.
 
-**3. READ TASK ROWS** — Read sprint-tasks.md for your assigned task IDs. Note each task's description, dependencies, and acceptance criteria.
+**3. READ TASK ROWS** — Classify each assigned task as **UI** or **backend**:
+- **Backend tasks:** Read `backend-tasks.md` for your assigned backend task IDs. Note each task's description, dependencies, and acceptance criteria.
+- **UI tasks:** The page-spec IS the task definition. Call `graph_query_screen(screen_id, full: true)` for each screen the task touches. Extract the wireframe, components, interactions, screen states, and key copy. The wireframe is the acceptance criteria — the implementer must produce output that MATCHES the wireframe visually, not just satisfies a functional test. If the graph call returns null or fails, STOP and report the missing `slice-3-pages.json` to the orchestrator — do NOT fall back to reading source markdown.
 
 **4. DECOMPOSE INTO EXECUTION SPECS** — For each task, determine: what agent type should execute it, what skills that agent needs, and what structured context payload to include. Every task gets a self-contained spec — the execution agent should NOT need to read raw artifacts.
 
 When assembling the per-task `Context` block, slot graph-pulled fields verbatim per `protocols/agent-prompt-authoring.md` Standard 1. Allowed transforms: ID-to-label resolution (`state_id` → its `label`) and list-filtering (drop fields not relevant to the current task). Carry each fact's `source_location` as a trailing line ref (`from product-spec.md L142`).
+
+For **UI tasks**: the `Wireframe` field is MANDATORY and is the primary acceptance criteria. Include the full verbatim wireframe text from `graph_query_screen(full: true).page_spec.wireframe_text`. Also include all component slots, interactions, screen states, and visual hierarchy from the page-spec. The implementer's job is to produce a UI that visually matches the wireframe — not just pass a functional check.
+
+For **backend tasks**: acceptance criteria come from `backend-tasks.md` task rows + product-spec business rules. No wireframe field needed.
 
 **5. PICK AGENTS + SKILLS** — Match each task to the right agent type based on the work:
 - Frontend UI work → `engineering-frontend-developer`
@@ -127,7 +133,7 @@ Assign skills from the skill catalog that match the task's framework and pattern
   - Loading states: {loading treatment — skeleton, spinner, progressive from product-spec}
   - Business rules: {concrete values — thresholds, limits, validation rules}
   - Persona: {ALL persona constraints for this feature, grouped by persona. One bullet per `(persona_label, constraint_text)` pair from `graph_query_feature.persona_constraints`. Multi-persona features list every persona's constraints — do not pick only the primary. Example: "[Buyer] keep checkout to 3 steps max (from product-spec.md L142); [Seller] show fulfillment SLA + payout timing on confirmation (from product-spec.md L156)"}
-- **Acceptance:** {testable criteria from sprint-tasks + product-spec}
+- **Acceptance:** {For UI tasks: "Implementer output must visually match the wireframe above — layout, component hierarchy, spacing, and content placement. Functional criteria:" followed by testable criteria from product-spec. For backend tasks: testable criteria from backend-tasks.md + product-spec.}
 
 ### Task {ID}: {description}
 ...
@@ -148,6 +154,7 @@ Authoring discipline (verbatim slotting, positive prescriptions, source refs) is
 - **All personas in every brief.** Multi-persona features (Buyer + Seller, Patient + Clinician) carry constraint sets for each persona. Include every persona's constraints in each task's `Persona` field — not just the primary's. The implementer must satisfy DNA AND every persona's constraints simultaneously.
 - **Scope guards.** Brief only the task IDs you were assigned. Flag missing tasks as `[GAP: {description}]` and ambiguous spec as `[ESCALATE: {question}]` — the Product Owner decides on gaps; the orchestrator routes escalations.
 - **Self-contained > DRY.** Business rules and persona constraints duplicate across tasks by design. Each per-task brief must stand alone — the implementer should never need to read a sibling task's brief to understand its own.
+- **Disk write contract.** You MUST write `docs/plans/feature-briefs/{feature}.md` before returning. Returning a brief in the response body without writing the file is a contract violation — the orchestrator gates implementer dispatch on the file's existence at Step 4.2.a.gate. If you halted early (e.g. graph query failure), STILL write the file with a `## STATUS: BLOCKED` block explaining why, so the orchestrator can re-dispatch with full context.
 
 ## Implementer Tool Affordance (Slice 3)
 

@@ -15,9 +15,9 @@ The pipeline's output quality must measurably exceed one-shotting with Claude. T
 | -1 | iOS Bootstrap (iOS-only, greenfield) | `.xcodeproj`, `maestro/` scaffold |
 | 0 | Discover | Project type (web/iOS), resume state, prior-build learnings replay |
 | 1 | Plan | PRD + `product-spec.md` + per-project `CLAUDE.md` (<200 lines, product brain) |
-| 2 | Architect | `architecture.md` + `sprint-tasks.md` + first `decisions.jsonl` rows |
-| 3 | Design | `DESIGN.md` (Brand DNA + tokens + components) + `page-specs/*.md` + Design Critic loop |
-| 4 | Build | Three-tier hierarchy: Product Owner → Briefing Officers (per feature) → Implementers. Implementers query the graph for spec slices instead of receiving paraphrase. |
+| 2 | Architect | `architecture.md` + `backend-tasks.md` (DB, auth, APIs, infra only — NO UI tasks) + first `decisions.jsonl` rows |
+| 3 | Design | `DESIGN.md` (Brand DNA + tokens + components) + `page-specs/*.md` (THE implementation spec for all UI work) + Design Critic loop |
+| 4 | Build | Two-track: (1) Backend tasks from `backend-tasks.md` (Wave 1). (2) UI pages from `page-specs/*.md` — each page-spec is one implementation unit, Briefing Officer reads it directly via `graph_query_screen(full: true)`. No sprint-tasks for UI. |
 | 5 | Audit | Track A (engineering envelope) + Track B (per-feature product reality) + Cross-cutting (E2E + dogfood + fake-data) + Synth + Fix loop |
 | 6 | Launch Review | 5 chapter judges + aggregator with backward routing on BLOCK |
 | 7 | Ship | Docs + deploy |
@@ -28,7 +28,8 @@ The pipeline's output quality must measurably exceed one-shotting with Claude. T
 - `CLAUDE.md` (user's project root) — Phase 1.4 generated <200-line product brain. Auto-loaded into every spawned subagent context. NOT this file.
 - `DESIGN.md` (user's project root, web only) — consolidated design system. Two-pass authoring: Pass 1 at Step 3.0 (`design-brand-guardian` writes Overview + Brand DNA + Do's and Don'ts), Pass 2 at Step 3.4 (`design-ui-designer` writes YAML tokens + Colors/Typography/Layout/Elevation/Shapes/Components prose). Format spec vendored at `protocols/design-md-spec.md` (Apache 2.0; attribution in `NOTICE`). Authoring contract at `protocols/design-md-authoring.md`. Lint gate at Step 3.8 (`hooks/design-md-lint.ts`).
 - `docs/plans/page-specs/*.md` — per-screen ASCII wireframes + content hierarchy + states. Produced at Step 3.3.
-- `docs/plans/architecture.md` + `docs/plans/sprint-tasks.md` — Phase 2 outputs; task DAG with `owns_files`. Schemas at `protocols/architecture-schema.md` and `protocols/sprint-tasks-schema.md`.
+- `docs/plans/architecture.md` + `docs/plans/backend-tasks.md` — Phase 2 outputs; backend-only task DAG (migrations, RLS, RPCs, auth infra, rate limits, cron) with `owns_files`. UI work is driven by `page-specs/*.md` directly, NOT by a task list. Schema at `protocols/architecture-schema.md` and `protocols/backend-tasks-schema.md`.
+- `docs/plans/page-specs/*.md` — Phase 3 outputs; THE implementation spec for all UI work. Each page-spec is one unit of work for Phase 4 UI implementers. Contains wireframe, component inventory, interaction model, data sources, accessibility notes. Replaces sprint-tasks for UI.
 - `docs/plans/decisions.jsonl` — append-only decision log; orchestrator-scribe only via the `scribe_decision` MCP tool. Subagents return `deviation_row` objects; the orchestrator forwards.
 - `docs/plans/learnings.jsonl` — append-only PITFALL/PATTERN rows from Phase 5 reality sweep; Phase 0 replays them at the start of the next build.
 - `docs/plans/evidence/product-reality/{feature_id}/` — Track B per-feature audit evidence: `tests-generated.md`, `results.json`, `findings.json`, `coverage.json`, `screenshots/`.
@@ -46,7 +47,7 @@ Slices:
 | 1 | Step 1.6 (post product-spec) | Feature, Screen, State, Transition, BusinessRule, Persona, AcceptanceCriterion |
 | 2 | Step 3.0 + Step 3.2 (post DESIGN.md Pass 1 + component manifest) | DNAAxis, Token, ManifestEntry |
 | 3 | Step 3.3 (post page-specs) | Screen.full (wireframe_text + sections + screen_component_uses joined inline + key copy) |
-| 4 | Step 2.3.1 + 2.3.2 (post architecture + sprint-tasks + decisions) | APIContract, Task (with `owns_files` and `assigned_phase`), Decision |
+| 4 | Step 2.3.1 + 2.3.2 (post architecture + backend-tasks + decisions) | APIContract, BackendTask (with `owns_files` and `assigned_phase`), Decision |
 | 5 | Step 3.1 + 5.1 + 5.3b (post screenshots) | Screenshot, ImageComponentDetection, DogfoodFinding, BrandDriftObservation (multimodal extraction is stub-level — vision integration is open work) |
 
 MCP tools (prefix `mcp__plugin_buildanything_graph__`): `graph_list_features`, `graph_query_feature`, `graph_query_screen` (`full: true` for Slice 3 payload), `graph_query_acceptance`, `graph_query_dna`, `graph_query_manifest`, `graph_query_token`, `graph_query_cross_contracts`, `graph_query_decisions`, `graph_query_dependencies`.
@@ -101,8 +102,8 @@ Parser contracts for graph-indexed artifacts:
 
 - `protocols/product-spec-schema.md` — `## Feature: {Name}` sections with states, transitions, business rules, etc.
 - `protocols/architecture-schema.md` — top-level section anchors + feature attribution annotations on API endpoints (drives the graph indexer's cross-feature dependency edges).
-- `protocols/sprint-tasks-schema.md` — pipe-delimited table with 9 required columns.
-- `protocols/page-spec-schema.md` — per-screen wireframe + sections + states + manifest joins.
+- `protocols/backend-tasks-schema.md` — pipe-delimited table for backend-only tasks (migrations, RLS, RPCs, auth, rate limits, cron). UI tasks are NOT listed here — they come from page-specs.
+- `protocols/page-spec-schema.md` — per-screen wireframe + sections + states + manifest joins. THE implementation spec for UI work in Phase 4.
 - `protocols/design-md-spec.md` (vendored, Apache 2.0) — DESIGN.md format spec; authoring contract at `protocols/design-md-authoring.md`.
 
 ## Open Work

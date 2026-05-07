@@ -28,6 +28,20 @@ ExpenseFlow is a B2B expense reporting tool for small-to-mid teams. End-users su
 | Approver | View team's reports, approve/reject with comment, request changes | View reports outside their direct reports, edit policies |
 | Admin | Configure policies, view all reports, view audit log, override approvals | Submit expense reports for other users (admin must use End-User role to submit) |
 
+## First 60 Seconds
+
+### Persona: End-User
+
+**First-encounter promise**: End-users learn at submit-time which line items will fail policy, rather than receiving rejection emails days later the way Concur and Expensify deliver them.
+
+### Persona: Approver
+
+**First-encounter promise**: Approvers see policy-flag badges per row instead of having to manually cross-check spend against a separate policy doc, unlike the email-attachment workflow most teams default to.
+
+### Persona: Admin
+
+**First-encounter promise**: Admins get a single chronological audit surface for both submissions and approvals, rather than reconciling two separate logs the way SAP Concur splits them.
+
 ## Cross-Feature Interactions
 
 - Expense Submission (End-User) → Approval Workflow (Approver): submitted report routes to direct manager based on org chart, approver notified within 2 minutes

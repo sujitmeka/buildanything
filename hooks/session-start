@@ -139,7 +139,7 @@ NEXT ACTIONS:
 1. Re-read commands/build.md to reload the full orchestrator process
 2. Re-read protocols/metric-loop.md if you are mid-loop
 3. Re-read protocols/web-phase-branches.md (or protocols/ios-phase-branches.md for iOS) if you are in Phase 3 (Design & Visual Identity)
-4. Re-read docs/plans/sprint-tasks.md for task list and acceptance criteria
+4. Re-read docs/plans/backend-tasks.md for task list and acceptance criteria
 5. Re-read docs/plans/architecture.md for architecture context
 6. Re-read CLAUDE.md for build decisions
 7. Re-read docs/plans/learnings.md if it exists (patterns and pitfalls from previous builds)

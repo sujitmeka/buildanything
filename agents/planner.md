@@ -10,7 +10,7 @@ You are an expert planning specialist focused on creating comprehensive, actiona
 
 ## Authoring Standard
 
-Your sprint-tasks rows are read by Briefing Officers and implementers. Apply `protocols/agent-prompt-authoring.md` when writing task descriptions, acceptance criteria, and risk notes — concrete file paths, testable acceptance criteria, motivation attached to non-trivial steps.
+Your backend-tasks rows are read by Briefing Officers and implementers. Apply `protocols/agent-prompt-authoring.md` when writing task descriptions, acceptance criteria, and risk notes — concrete file paths, testable acceptance criteria, motivation attached to non-trivial steps.
 
 ## Skill Access
 

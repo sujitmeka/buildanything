@@ -133,6 +133,22 @@ describe('parser fail-loud', () => {
     assert.ok(matchesAppOverview, 'expected at least one error referencing App Overview');
     assert.equal(result.fragment, undefined);
   });
+
+  it('audit fix #16: malformed fixture (missing First 60 Seconds) returns ok:false', () => {
+    const result = parseFixture('malformed-missing-first-60-seconds.md');
+    assert.equal(result.ok, false);
+    const matchesFirst60 = result.errors.some((e) => /First 60 Seconds/i.test(e.message));
+    assert.ok(matchesFirst60, 'expected at least one error referencing First 60 Seconds');
+  });
+
+  it('audit fix #16: First-encounter promise without comparison marker returns ok:false', () => {
+    const result = parseFixture('malformed-stub-first-60-seconds.md');
+    assert.equal(result.ok, false);
+    const noComparison = result.errors.some((e) => /no comparison marker/i.test(e.message));
+    assert.ok(noComparison, 'expected error about missing comparison marker');
+    const mentionsAlternative = result.errors.some((e) => /closest alternative/i.test(e.message));
+    assert.ok(mentionsAlternative, 'expected hint to reference competitive-differentiation alternative');
+  });
 });
 
 describe('parser determinism', () => {

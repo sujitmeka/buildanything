@@ -866,6 +866,111 @@ function sortEdges(edges: GraphEdge[]): GraphEdge[] {
 // Public entrypoint
 // =============================================================================
 
+// ---------------------------------------------------------------------------
+// First 60 Seconds (audit fix #16) — single-field design
+//
+// One required `**First-encounter promise**:` field per persona. The field
+// must reference an external alternative via a comparison marker (`vs`, `than`,
+// `compared to`, `instead of`, `rather than`, `unlike`). The comparison
+// requirement is the structural force that makes this section load-bearing on
+// `competitive-differentiation.md` instead of free-floating boilerplate. A
+// determined writer can still produce bland content, but they cannot avoid
+// articulating *what alternative they're better than* — which is the original
+// failure (Issue 2 of known-issues-2026-05-06.md) the section exists to close.
+// ---------------------------------------------------------------------------
+
+const FIRST_60_PROMISE_PATTERN = /^\*\*First-encounter promise\*\*\s*:/i;
+const FIRST_60_MIN_FIELD_CHARS = 50;
+const FIRST_60_COMPARISON_MARKERS = [
+  /\bvs\b/i,
+  /\bthan\b/i,
+  /\bcompared to\b/i,
+  /\binstead of\b/i,
+  /\brather than\b/i,
+  /\bunlike\b/i,
+];
+
+function parseFirst60Seconds(
+  ctx: Ctx,
+  section: Section,
+  // screenInfos kept in signature for compatibility but unused now —
+  // single-field design no longer enforces Entry surface ↔ Screen Inventory.
+  _screenInfos: ScreenInfo[],
+): void {
+  const personaSubsections = partitionSections(section.bodyLines, 3, 0, section.bodyLines.length);
+  const personaKeys = new Set(ctx.personasByKey.keys());
+  const seenPersonas = new Set<string>();
+
+  for (const sub of personaSubsections) {
+    const m = sub.heading.match(/^Persona\s*:\s*(.+)$/i);
+    if (!m) continue;
+    const rawLabel = m[1].replace(/\(primary\)/gi, "").trim();
+    const key = rawLabel.toLowerCase();
+    if (!personaKeys.has(key)) {
+      pushError(
+        ctx,
+        sub.startLine,
+        `First 60 Seconds: persona "${rawLabel}" does not appear in the App Overview persona table. Persona names must match exactly.`,
+      );
+      continue;
+    }
+    seenPersonas.add(key);
+
+    // Rule 3: required field exists.
+    const matchLine = sub.bodyLines.find((l) => FIRST_60_PROMISE_PATTERN.test(l.text));
+    if (!matchLine) {
+      pushError(
+        ctx,
+        sub.startLine,
+        `First 60 Seconds [${rawLabel}]: missing required field **First-encounter promise**:`,
+      );
+      continue;
+    }
+    const colonIdx = matchLine.text.indexOf(":");
+    const content = matchLine.text.slice(colonIdx + 1).trim();
+
+    // Rule 4: minimum content length (stub floor).
+    if (content.length < FIRST_60_MIN_FIELD_CHARS) {
+      pushError(
+        ctx,
+        matchLine.n,
+        `First 60 Seconds [${rawLabel}]: **First-encounter promise** has < ${FIRST_60_MIN_FIELD_CHARS} chars of content (got ${content.length}). Stub bullets are not accepted — describe concretely.`,
+      );
+      continue;
+    }
+
+    // Rule 5: comparison marker — forces external-alternative reference.
+    const hasComparison = FIRST_60_COMPARISON_MARKERS.some((re) => re.test(content));
+    if (!hasComparison) {
+      pushError(
+        ctx,
+        matchLine.n,
+        `First 60 Seconds [${rawLabel}]: **First-encounter promise** has no comparison marker. The sentence must reference an external alternative via one of: "vs", "than", "compared to", "instead of", "rather than", "unlike". A first-encounter promise without a comparison is a stub — what is the persona getting that they couldn't from the closest alternative in competitive-differentiation.md?`,
+      );
+    }
+  }
+
+  // Rule 2: every persona row in the table needs a subsection.
+  const missingPersonas: string[] = [];
+  for (const key of personaKeys) {
+    if (!seenPersonas.has(key)) {
+      const node = ctx.personasByKey.get(key)!;
+      missingPersonas.push(node.label);
+    }
+  }
+  if (missingPersonas.length > 0) {
+    pushError(
+      ctx,
+      section.startLine,
+      `First 60 Seconds: missing required \`### Persona: <name>\` subsection(s) for: ${missingPersonas.join(", ")}. One subsection required per persona table row.`,
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Public entrypoint
+// ---------------------------------------------------------------------------
+
 export function extractProductSpec(input: { mdPath: string; mdContent: string }): ExtractResult {
   const { mdPath, mdContent } = input;
   const lines = splitLines(mdContent);
@@ -881,7 +986,7 @@ export function extractProductSpec(input: { mdPath: string; mdContent: string })
   const byHeading = (name: string): Section | undefined =>
     topSections.find((s) => s.heading.trim().toLowerCase() === name.toLowerCase());
 
-  const required = ["App Overview", "Screen Inventory", "Cross-Feature Interactions"];
+  const required = ["App Overview", "Screen Inventory", "First 60 Seconds", "Cross-Feature Interactions"];
   for (const r of required) {
     if (!byHeading(r)) {
       pushError(ctx, 1, `Missing required top-level section: "## ${r}"`);
@@ -908,10 +1013,15 @@ export function extractProductSpec(input: { mdPath: string; mdContent: string })
 
   // 3. Screen inventory (after personas; doesn't depend on features but
   //    emits feature-targeted edges).
-  parseScreenInventory(ctx, byHeading("Screen Inventory")!);
+  const screenInfos = parseScreenInventory(ctx, byHeading("Screen Inventory")!);
 
   // 4. Cross-feature interactions (depends on nothing, but emits feature edges).
   parseCrossFeature(ctx, byHeading("Cross-Feature Interactions")!);
+
+  // 5. First 60 Seconds (audit fix #16) — validate per-persona subsections
+  //    against the persona table parsed in step 1, and the Screen Inventory
+  //    parsed in step 3. Stub-prevention: enforce min content length per field.
+  parseFirst60Seconds(ctx, byHeading("First 60 Seconds")!, screenInfos);
 
   if (ctx.errors.length > 0) {
     return { ok: false, errors: ctx.errors };

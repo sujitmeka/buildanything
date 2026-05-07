@@ -31,6 +31,16 @@ CraftMarket is a peer-to-peer marketplace where independent makers sell handmade
 | Seller | Manage own listings, view incoming orders, mark shipped, request payouts | Access other sellers' inboxes, view buyer payment details |
 | Admin | Mediate disputes, suspend accounts, view platform analytics | Edit listing prices, place orders on behalf of buyers |
 
+## First 60 Seconds
+
+### Persona: Buyer
+
+**First-encounter promise**: Buyers see whether a maker's craft is real and shippable in one scan, instead of digging through Etsy reviews to verify the seller exists.
+
+### Persona: Seller
+
+**First-encounter promise**: Sellers see today's payout-blocking obligations sorted by urgency rather than chasing notifications across email and SMS the way they do on consumer marketplaces.
+
 ## Cross-Feature Interactions
 
 - Product Discovery → Order Placement: clicking "Buy Now" on Product Detail seeds the cart with that item

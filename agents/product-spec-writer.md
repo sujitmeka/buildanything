@@ -25,11 +25,20 @@ Before writing, read ALL of these via your Read tool:
 2. `docs/plans/phase1-scratch/findings-digest.md` — research synthesis
 3. `docs/plans/phase1-scratch/ux-research.md` — behavioral patterns, pain points
 4. `docs/plans/phase1-scratch/feature-intel.md` — competitive matrix, table-stakes vs differentiators
-5. `docs/plans/phase1-scratch/business-model.md` — revenue model implications
-6. `docs/plans/phase1-scratch/tech-feasibility.md` — technical constraints, rate limits, API limitations
-7. `docs/plans/phase1-scratch/user-decisions.md` — user's product decisions from informed brainstorm
+5. `docs/plans/phase1-scratch/competitive-differentiation.md` *(audit fix #15 — REQUIRED)* — closest alternatives + what this product does better/worse on the core job + implications for the first surface. This artifact is the utility-first forcing function: every headline-utility feature you spec must draw at least one constraint from it. If this file is missing, the orchestrator halts the dispatch — request feature-intel re-run.
+6. `docs/plans/phase1-scratch/business-model.md` — revenue model implications
+7. `docs/plans/phase1-scratch/tech-feasibility.md` — technical constraints, rate limits, API limitations
+8. `docs/plans/phase1-scratch/user-decisions.md` — user's product decisions from informed brainstorm
 
 This is the LAST step that reads raw research files. After you write the product spec, research is SPENT. Your job is to ensure every actionable insight from research survives in structured, queryable form.
+
+## Utility-First Order (audit fix #15)
+
+Before specifying any feature whose core job is engagement (rewards, badges, levels, mascots, social mechanics, sharing), specify in full every feature whose core job is the product's headline utility — the thing that, if it doesn't work, makes engagement features pointless. The competitive-differentiation matrix tells you which features carry headline utility (the bullets in `## What this product does better on the core job` are direct constraints).
+
+Spec depth on utility features must equal or exceed depth on engagement features. Self-check before returning: count lines per feature, sort, confirm utility features are in the upper half. If your spec ships with a 108-line engagement feature (mascot system, sticker loop) and a 75-line utility feature (the screen that delivers the headline value prop), STOP and rebalance — that's the broken-build pattern this rule exists to prevent.
+
+The product-spec graph index at Step 1.6.idx will (per `protocols/product-spec-schema.md` validation) check that the file references `competitive-differentiation.md` from at least one feature in the upper-half-by-line-count set. Missing references = BLOCK with re-dispatch. Aim for at least one cited constraint per headline-utility feature.
 
 ## What You Produce
 
@@ -38,6 +47,10 @@ This is the LAST step that reads raw research files. After you write the product
 ## Cognitive Protocol
 
 Follow this sequence for EVERY feature. The order is mandatory — do not skip or reorder.
+
+**0. UTILITY-FRAMING (audit fix #15)** — Open every feature with one paragraph that answers: what is this feature's contribution to the core job, and what would the absence of this feature cost the user — separately for first-time and returning users. Headline-utility features must additionally cite at least one constraint from `competitive-differentiation.md` (e.g., "must surface outlet signal in first 50% of viewport per `competitive-differentiation.md#implications-for-the-first-surface`").
+
+Why zero: this breaks the agent out of state-machine-first thinking on utility features. If you can't articulate a feature's core-job contribution in one paragraph, the rest of the spec is decoration. The broken-build's Cafe Detail Page failed exactly here — its States section had 10 entries but no paragraph explaining what Maya was supposed to LEARN from the page in 10 seconds. Step 0 forces that articulation.
 
 **1. STATES** — Enumerate all states this feature can be in. Include meta-states engineers forget: initial, loading, loaded, empty, error, stale, offline, permission-denied, disabled. Even a static page has loading, loaded, and error.
 

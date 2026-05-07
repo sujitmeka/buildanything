@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { extractSprintTasks } from '../../src/graph/parser/sprint-tasks.js';
+import { extractBackendTasks } from '../../src/graph/parser/backend-tasks.js';
 import type { GraphFragment, TaskNode } from '../../src/graph/types.js';
 
 const FIXTURES = join(dirname(fileURLToPath(import.meta.url)), 'fixtures');
@@ -11,7 +11,7 @@ const FIXTURES = join(dirname(fileURLToPath(import.meta.url)), 'fixtures');
 function parseFixture(name: string) {
   const p = join(FIXTURES, name);
   const md = readFileSync(p, 'utf-8');
-  return extractSprintTasks({ mdPath: p, mdContent: md });
+  return extractBackendTasks({ mdPath: p, mdContent: md });
 }
 
 function stableStringify(v: unknown): string {
@@ -29,9 +29,9 @@ function nodesOfType<T extends { entity_type: string }>(
   return fragment.nodes.filter((n): n is T & typeof n => n.entity_type === type) as T[];
 }
 
-describe('sprint-tasks parser -- marketplace fixture', () => {
+describe('backend-tasks parser -- marketplace fixture', () => {
   it('parses ok:true with exactly 14 task nodes', () => {
-    const result = parseFixture('sprint-tasks-marketplace.md');
+    const result = parseFixture('backend-tasks-marketplace.md');
     assert.equal(result.ok, true);
     assert.ok(result.fragment);
     const tasks = nodesOfType<TaskNode>(result.fragment, 'task');
@@ -39,7 +39,7 @@ describe('sprint-tasks parser -- marketplace fixture', () => {
   });
 
   it('T-2 has exactly one task_depends_on edge to task__t-1', () => {
-    const result = parseFixture('sprint-tasks-marketplace.md');
+    const result = parseFixture('backend-tasks-marketplace.md');
     assert.ok(result.fragment);
     const deps = result.fragment.edges.filter(
       (e) => e.relation === 'task_depends_on' && e.source === 'task__t-2',
@@ -49,7 +49,7 @@ describe('sprint-tasks parser -- marketplace fixture', () => {
   });
 
   it('T-7 has exactly two task_depends_on edges to task__t-3 and task__t-5', () => {
-    const result = parseFixture('sprint-tasks-marketplace.md');
+    const result = parseFixture('backend-tasks-marketplace.md');
     assert.ok(result.fragment);
     const deps = result.fragment.edges.filter(
       (e) => e.relation === 'task_depends_on' && e.source === 'task__t-7',
@@ -60,7 +60,7 @@ describe('sprint-tasks parser -- marketplace fixture', () => {
   });
 
   it('T-1 has zero task_depends_on edges', () => {
-    const result = parseFixture('sprint-tasks-marketplace.md');
+    const result = parseFixture('backend-tasks-marketplace.md');
     assert.ok(result.fragment);
     const deps = result.fragment.edges.filter(
       (e) => e.relation === 'task_depends_on' && e.source === 'task__t-1',
@@ -69,7 +69,7 @@ describe('sprint-tasks parser -- marketplace fixture', () => {
   });
 
   it('T-10 owns_files has two entries', () => {
-    const result = parseFixture('sprint-tasks-marketplace.md');
+    const result = parseFixture('backend-tasks-marketplace.md');
     assert.ok(result.fragment);
     const t10 = nodesOfType<TaskNode>(result.fragment, 'task').find((t) => t.task_id === 'T-10');
     assert.ok(t10);
@@ -80,7 +80,7 @@ describe('sprint-tasks parser -- marketplace fixture', () => {
   });
 
   it('T-7 has task_implements_feature edge to feature__order-placement', () => {
-    const result = parseFixture('sprint-tasks-marketplace.md');
+    const result = parseFixture('backend-tasks-marketplace.md');
     assert.ok(result.fragment);
     const edge = result.fragment.edges.find(
       (e) =>
@@ -92,7 +92,7 @@ describe('sprint-tasks parser -- marketplace fixture', () => {
   });
 
   it('T-3 has task_touches_screen edge to screen__catalog', () => {
-    const result = parseFixture('sprint-tasks-marketplace.md');
+    const result = parseFixture('backend-tasks-marketplace.md');
     assert.ok(result.fragment);
     const edge = result.fragment.edges.find(
       (e) =>
@@ -104,8 +104,8 @@ describe('sprint-tasks parser -- marketplace fixture', () => {
   });
 
   it('determinism: parsing twice produces byte-identical output (modulo produced_at)', () => {
-    const a = parseFixture('sprint-tasks-marketplace.md');
-    const b = parseFixture('sprint-tasks-marketplace.md');
+    const a = parseFixture('backend-tasks-marketplace.md');
+    const b = parseFixture('backend-tasks-marketplace.md');
     assert.ok(a.fragment && b.fragment);
     const { produced_at: _ax, ...aRest } = a.fragment;
     const { produced_at: _bx, ...bRest } = b.fragment;
@@ -113,9 +113,9 @@ describe('sprint-tasks parser -- marketplace fixture', () => {
   });
 });
 
-describe('sprint-tasks parser -- saas fixture', () => {
+describe('backend-tasks parser -- saas fixture', () => {
   it('parses ok:true with exactly 9 task nodes', () => {
-    const result = parseFixture('sprint-tasks-saas.md');
+    const result = parseFixture('backend-tasks-saas.md');
     assert.equal(result.ok, true);
     assert.ok(result.fragment);
     const tasks = nodesOfType<TaskNode>(result.fragment, 'task');
@@ -123,14 +123,14 @@ describe('sprint-tasks parser -- saas fixture', () => {
   });
 });
 
-describe('sprint-tasks parser -- inline fixtures', () => {
+describe('backend-tasks parser -- inline fixtures', () => {
   it('empty Task ID returns ok:false with Anonymous task error', () => {
     const md = [
       '| Task ID | Title | Size | Dependencies | Behavioral Test | Owns Files | Implementing Phase | Feature | Screens |',
       '|---|---|---|---|---|---|---|---|---|',
       '|  | Some title | M | — | test | — | phase-4 | Auth | — |',
     ].join('\n');
-    const result = extractSprintTasks({ mdPath: '<inline>', mdContent: md });
+    const result = extractBackendTasks({ mdPath: '<inline>', mdContent: md });
     assert.equal(result.ok, false);
     assert.ok(result.errors.some((e) => e.message.includes('Anonymous task')));
   });
@@ -141,7 +141,7 @@ describe('sprint-tasks parser -- inline fixtures', () => {
       '|---|---|---|---|---|---|---|---|---|',
       '| T-1 | Valid task | XL | — | test | — | phase-4 | Auth | — |',
     ].join('\n');
-    const result = extractSprintTasks({ mdPath: '<inline>', mdContent: md });
+    const result = extractBackendTasks({ mdPath: '<inline>', mdContent: md });
     assert.equal(result.ok, false);
     assert.ok(result.errors.some((e) => e.message.includes('Invalid Size')));
   });

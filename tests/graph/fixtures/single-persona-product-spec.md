@@ -20,6 +20,12 @@ LogTail is a developer CLI for tailing and filtering structured logs from local 
 
 Single role: developer running the CLI on their own machine. No admin, no remote access, no multi-user concept. The CLI inherits the OS user's filesystem permissions and reads only files the user can already read.
 
+## First 60 Seconds
+
+### Persona: Developer
+
+**First-encounter promise**: The developer can apply a substring filter to a live stream with sub-100ms keystroke latency, rather than piping through `tail -f | grep` and re-running every time the pattern changes.
+
 ## Cross-Feature Interactions
 
 - Filter Builder → Live Tail: applying a filter from the builder updates the active filter expression on Live Tail without restarting the stream

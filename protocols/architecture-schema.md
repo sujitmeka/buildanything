@@ -102,13 +102,14 @@ The synthesizer MUST fail loudly (emit a BLOCKED verdict) if it cannot produce a
 
 - `design-doc.md` (THE PRD)
 - `architecture.md`
-- `sprint-tasks.md`
+- `backend-tasks.md`
+- `page-specs/*.md`
 - `visual-design-spec.md` (if exists)
 - `quality-targets.json` (via flat key anchors)
 
 Writer: Phase 2.2 Refs Indexer step (dispatched as INTERNAL inline role-string). Consumers: Phase 3+ agents via the Briefing Officer per-task context map (no full pastes). Phase 1 raw research files are NOT in `refs.json` — they are spent after Phase 2 hybrid routing distributes them to architects.
 
-The Phase 2.2 Refs Indexer (INTERNAL inline role-string dispatched by the orchestrator) is the sole writer of `refs.json`. It runs after the architecture synthesizer and Sprint Breakdown steps, reads the live docs (`design-doc.md`, `architecture.md`, `sprint-tasks.md`, `visual-design-spec.md` if exists, `quality-targets.json`), and emits the multi-doc anchor index.
+The Phase 2.2 Refs Indexer (INTERNAL inline role-string dispatched by the orchestrator) is the sole writer of `refs.json`. It runs after the architecture synthesizer and Backend Task Breakdown steps, reads the live docs (`design-doc.md`, `architecture.md`, `backend-tasks.md`, `page-specs/*.md`, `visual-design-spec.md` if exists, `quality-targets.json`), and emits the multi-doc anchor index.
 
 See `commands/build.md` Phase 2.2 Step 2.3 Refs Indexer dispatch for the exact generation prompt.
 
@@ -142,9 +143,9 @@ See `commands/build.md` Phase 2.2 Step 2.3 Refs Indexer dispatch for the exact g
       "line_end": 358
     },
     {
-      "file_path": "docs/plans/sprint-tasks.md",
-      "anchor": "#sprint-1-task-3",
-      "topic": "wire checkout form to /api/checkout",
+      "file_path": "docs/plans/backend-tasks.md",
+      "anchor": "#task-3",
+      "topic": "implement /api/checkout endpoint",
       "line_start": 88,
       "line_end": 104
     }

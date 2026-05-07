@@ -23,7 +23,7 @@ Read these files directly (no agent needed — this is fast):
 
 1. `CLAUDE.md` — product context, tech stack, rules
 2. `docs/plans/architecture.md` — current architecture
-3. `docs/plans/sprint-tasks.md` — existing user journeys and scope
+3. `docs/plans/backend-tasks.md` — existing user journeys and scope
 
 If any file is missing, proceed with what exists. If the codebase is unfamiliar or the feature touches unknown areas, spawn an Explore agent:
 

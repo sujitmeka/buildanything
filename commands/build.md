@@ -21,7 +21,7 @@ Exception: Brainstorming in Phase 1 Step 1.0 and Step 1.3 uses an INTERNAL Brain
 <HARD-GATE>
 SUBAGENT_TYPE REQUIRED.
 
-Every Agent tool call MUST include a `subagent_type` field unless the dispatch is explicitly marked INTERNAL (inline role-string). INTERNAL dispatches are orchestrator helpers: Brainstorm Facilitator, Research Synthesizer, Design Doc Writer, Prereq Collector, Task DAG Validator, Refs Indexer, Briefing Officer, PM chapter, LRR Aggregator, Completion Report, Verify scaffolding dispatcher.
+Every Agent tool call MUST include a `subagent_type` field unless the dispatch is explicitly marked INTERNAL (inline role-string). INTERNAL dispatches are orchestrator helpers: Brainstorm Facilitator, Research Synthesizer, Design Doc Writer, Prereq Collector, Task DAG Validator, Refs Indexer, Briefing Officer, Completion Report, Verify scaffolding dispatcher.
 
 Missing `subagent_type` on a non-INTERNAL dispatch is a HARD-GATE violation. The orchestrator rejects dispatches that don't name a specific agent. If you catch yourself typing `description: "..."` without a `subagent_type:` line alongside it, STOP and look up the right agent from the per-phase dispatch tables further down in this file.
 </HARD-GATE>
@@ -42,7 +42,7 @@ Live downstream docs (read across Phase 3+):
   - `docs/plans/design-doc.md` (PRD)    — P1 writer
   - `docs/plans/product-spec.md`        — P1 writer (Step 1.6), product-spec-writer writer
   - `docs/plans/architecture.md`        — P2 writer
-  - `docs/plans/sprint-tasks.md`        — P2 writer
+  - `docs/plans/backend-tasks.md`        — P2 writer (backend/infra only; UI tasks come from page-specs in Phase 3)
   - `docs/plans/quality-targets.json`   — P2 writer
   - `docs/plans/phase-2-contracts/*.md`  — P2 writer (per-architect post-debate contract files)
   - `docs/plans/visual-dna-preview.md`  — P2 writer, design-brand-guardian writer, ios-swift-ui-design writer (directional DNA preview at Gate 2)
@@ -174,7 +174,7 @@ At every phase boundary (after gate approval, before starting the next phase):
    - Gate presentation text (user already approved)
 
 4. **Re-read for next phase.** Read `.build-state.json` fresh (contains `phase_summaries` — your structured memory of all prior phases). Then read only the input artifacts needed for the next phase:
-   - Entering Phase 3: `architecture.md`, `sprint-tasks.md`, `quality-targets.json`
+   - Entering Phase 3: `architecture.md`, `backend-tasks.md`, `quality-targets.json`
    - Entering Phase 4: `feature-delegation-plan.json`, current wave's feature briefs
    - Entering Phase 5: `quality-targets.json`, feature list from state
    - Entering Phase 6: Phase 5 findings paths from state, `decisions.jsonl`
@@ -223,9 +223,13 @@ METRIC LOOP NON-NEGOTIABLES:
 
 The 7-check verification gate is called by Phase 2 (architecture check), Phase 4 (per task), Phase 5 (audit), and Phase 7 (pre-ship). Full protocol at `protocols/verify.md`. Phase-internal — dispatched as INTERNAL inline role-string "Verify scaffolding" with agent running 7 checks sequentially: Build → Type-Check → Lint → Test → Security → Diff Review → Artifacts.
 
+<HARD-GATE>
+HALT-CONDITION ASSERTIONS (audit fix #12): After the 7-check verify gate passes, the orchestrator MUST call `checkHaltConditions(projectDir)` from `src/orchestrator/halt-conditions.ts`. If `pass === false`, a project-specific "never do X" rule was violated. HALT the task — the implementer must fix the violation before proceeding. Halt-conditions are defined in `docs/plans/halt-conditions.json` (written by Phase 2 architect or Phase 3 designer). Format: `[{id, description, pattern, glob?, severity}]`.
+</HARD-GATE>
+
 ### Decision Log (callable service)
 
-`docs/plans/decisions.jsonl` — append-only, ORCHESTRATOR-SCRIBE ONLY via the `scribe_decision` MCP tool. Subagents return `deviation_row` objects in their structured result; the orchestrator forwards each row through `scribe_decision`, which allocates `D-{phase}-<seq>` IDs and atomically appends. The orchestrator MUST NOT Write or Edit this file directly. Row-producing phases: Phase 1 synthesis (3 rows), Phase 2 architecture synthesis (4 rows), Phase 4 implementers (only on deviation). Readers: Phase 0 resume handler, Phase 5 Reality Checker, Phase 6 LRR Aggregator (the ⭐⭐ backward-routing read). Schema at `protocols/decision-log.md`. Dispatch flow: see Phase 4 "Orchestrator-scribe dispatch" section.
+`docs/plans/decisions.jsonl` — append-only, ORCHESTRATOR-SCRIBE ONLY via the `scribe_decision` MCP tool. Subagents return `deviation_row` objects in their structured result; the orchestrator forwards each row through `scribe_decision`, which allocates `D-{phase}-<seq>` IDs and atomically appends. The orchestrator MUST NOT Write or Edit this file directly. Row-producing phases (audit fix #10 — scribe across all phases that make consequential, revisitable choices, not just 0–2): Phase 1 synthesis (3 rows fixed), Phase 2 architecture synthesis (4 rows fixed), Phase 3 (0–4 rows: DNA lock, primitive/manifest deviations, design-critic threshold gap), Phase 4 implementers (0–N rows on deviation; PO 4.1 wave sequencing; PO 4.3 acceptance gap), Phase 5 (0–N: synthesizer routing override + fix-loop max-cycle exhaustion), Phase 6 (1 row always for Customer Reality Judge verdict + 0–1 for proceed-despite-BLOCKED when build proceeds after cycle 2), Phase 7 (0–1 ship-vs-hold + 0–1 deploy outcome). Per-phase row caps in `protocols/decision-log.md`; total per build remains ~10–18. Readers: Phase 0 resume handler, Phase 5 dissent-log-revisit pass, Phase 6 Customer Reality routing (the ⭐⭐ backward-routing read uses `decisions.jsonl` to find `decided_by` for each finding's `target_phase`). Schema at `protocols/decision-log.md`. Dispatch flow: see Phase 4 "Orchestrator-scribe dispatch" section (canonical pattern). Phases 3, 5, 6, 7 each have a per-phase scribe dispatch block at their end mirroring this pattern.
 
 ### Learnings (callable service)
 
@@ -233,7 +237,7 @@ The 7-check verification gate is called by Phase 2 (architecture check), Phase 4
 
 ### Refs-Not-Pastes Rule
 
-For Phase 3+ agents, the orchestrator passes REFS to live downstream docs (`design-doc.md`, `architecture.md`, `DESIGN.md`, `sprint-tasks.md`, `quality-targets.json`, `decisions.jsonl`) — NOT pasted content. The orchestrator reads `docs/plans/refs.json` (produced by the Phase 2 Refs Indexer), resolves the task topic against the flat anchor index, and passes a short ref list to the agent. The agent uses the Read tool to pull refs it needs. This keeps orchestrator context lean and lets the agent widen its view on demand. Phase 1-2 agents still receive full documents because the architecture anchors don't exist yet.
+For Phase 3+ agents, the orchestrator passes REFS to live downstream docs (`design-doc.md`, `architecture.md`, `DESIGN.md`, `backend-tasks.md`, `quality-targets.json`, `decisions.jsonl`) — NOT pasted content. The orchestrator reads `docs/plans/refs.json` (produced by the Phase 2 Refs Indexer), resolves the task topic against the flat anchor index, and passes a short ref list to the agent. The agent uses the Read tool to pull refs it needs. This keeps orchestrator context lean and lets the agent widen its view on demand. Phase 1-2 agents still receive full documents because the architecture anchors don't exist yet.
 
 **refs.json mutation invalidates sprint-context hash (Stage 6 / task 6.3.2).** Any orchestrator update to `docs/plans/refs.json` (Phase 2 Refs Indexer initial write, Phase 3 extension after `DESIGN.md` lands, or any subsequent correction) MUST be IMMEDIATELY followed by a `state_save` call that sets `.build-state.json.current_sprint_context_hash = null`. This invalidates the cached Phase 4 sprint-scoped shared-context block so the next subagent dispatch re-renders with fresh references. See `src/orchestrator/phase4-shared-context.ts#shouldInvalidate` for how the hash is consulted at render time. Skipping this invalidation causes Phase 4 implementers to read stale anchor indices — a silent correctness failure.
 
@@ -266,7 +270,7 @@ LRR-NEEDS_WORK-code-level                                 →   phase-4.target-t
 phase-6-LRR-NEEDS_WORK-structural                        →   phase-2-or-phase-3
 ```
 
-The ⭐⭐ star rule: when the LRR Aggregator receives a BLOCK verdict, it reads the `related_decision_id` on the blocker, looks up that row in `decisions.jsonl`, finds which phase authored the decision (the `decided_by` field), and re-opens that phase with the finding as input. Infrastructure already exists (decision IDs, author tracking) — wired here.
+The ⭐⭐ star rule: when Phase 6's Customer Reality routing classifies a finding to a target phase, it can additionally consult `decisions.jsonl` to find a `related_decision_id` (when set) — looking up the `decided_by` field tells the orchestrator which authoring agent should be re-dispatched within the target phase. Infrastructure already exists (decision IDs, author tracking) — preserved from the v1 LRR design.
 
 **Re-entry halt rule (Stage 4 A7).** Before dispatching any backward routing (LRR BLOCK to Phase N re-open, Reality Checker BLOCK to Phase M re-entry, Gate "no" to Phase 1/2 re-entry, etc.), check `.build-state.json.backward_routing_count` AND the per-target-phase variant `.build-state.json.backward_routing_count_by_target_phase[<N>]`. If the new (post-increment) value of EITHER counter for the target phase would exceed `max_cycles` (currently 2, from `phase-graph.yaml:routing.max_cycles`) — i.e., on the attempted third backward iteration — the orchestrator MUST halt and escalate to the user instead of dispatching. The Stage 4 `cycle_counter_check` MCP is the authoritative enforcer at runtime — it increments atomically and returns `escalate_to_user` once the new value exceeds `max_cycles`. This prose documents the behavior for the markdown-mode rollback path and for human readers.
 
@@ -320,8 +324,8 @@ Do NOT stop for missing iOS MCPs. Log the warning and continue.
 1. Read `docs/plans/.build-state.json` (source of truth) — verify it exists and has a `resume_point` field. Fall back to reading `docs/plans/.build-state.md` (rendered view) if the JSON file is missing but the markdown exists (graceful migration path from pre-W1-2 builds).
    If neither exists, OR neither has a Resume Point, warn the user: 'No previous build state found. Starting fresh.' Then proceed to Step 0.1 as a new build.
 2. Re-read this file and all protocol files in `protocols/`.
-3. Re-read live downstream docs: `docs/plans/sprint-tasks.md`, `docs/plans/architecture.md`, `docs/plans/design-doc.md`, `DESIGN.md` (if exists), `CLAUDE.md`.
-4. Read `docs/plans/decisions.jsonl` if it exists (top 5 most recent rows, filtered to the current phase and upstream phases). Pass short row fields + `ref` anchors into Phase 0 rehydration context — not the full row prose. See `protocols/decision-log.md`.
+3. Re-read live downstream docs: `docs/plans/backend-tasks.md`, `docs/plans/architecture.md`, `docs/plans/design-doc.md`, `DESIGN.md` (if exists), `CLAUDE.md`.
+4. Read `docs/plans/decisions.jsonl` if it exists. Surface two slices into Phase 0 rehydration context: (a) top 5 most recent rows filtered to the current phase and upstream phases, and (b) ALL rows where `status: "triggered"` regardless of phase (these are revisit-criteria the Phase 5 Reality Checker fired — the new build should re-evaluate them per `protocols/decision-log.md` Dissent Log Revisit Pass). Pass short row fields + `ref` anchors only — not full row prose.
 5. Rebuild TodoWrite from the state file (TodoWrite does NOT survive compaction or session breaks).
 6. Reset `dispatches_since_save` to 0 (fresh context window).
 7. Resume from the saved phase and step. Skip Phase 0.
@@ -442,7 +446,7 @@ Call the Agent tool 4 times in a single message. Each gets the build request + `
 
 **CONTEXT header:** Render `rendered_context_header` for phase 1 per the canonical template (see CONTEXT HEADER HARD-GATE above). Prepend to every Phase 1 research prompt below.
 
-1. Description: "Feature intel" — agent_type: `feature-intel` — subagent_type: `feature-intel` — Prompt: "[CONTEXT header above] Extract competitor feature matrix for: [build request]. Idea draft: read docs/plans/phase1-scratch/idea-draft.md with your Read tool. Walk 5-10 rivals. Return must-haves (features present in >=80% of rivals — table stakes) + stand-outs (features unique to individual rivals — differentiation opportunities), sorted by competitor. Save to `docs/plans/phase1-scratch/feature-intel.md`."
+1. Description: "Feature intel" — agent_type: `feature-intel` — subagent_type: `feature-intel` — Prompt: "[CONTEXT header above] Extract competitor feature matrix for: [build request]. Idea draft: read docs/plans/phase1-scratch/idea-draft.md with your Read tool. Walk 5-10 rivals. Return must-haves (features present in >=80% of rivals — table stakes) + stand-outs (features unique to individual rivals — differentiation opportunities), sorted by competitor. Save to `docs/plans/phase1-scratch/feature-intel.md`. **Audit fix #15:** ALSO produce `docs/plans/phase1-scratch/competitive-differentiation.md` per the schema in your agent file — closest 1-3 alternatives, what this product does better/worse on the core job, implications for the first surface. This artifact is REQUIRED — Step 1.6 will halt without it."
 
 2. Description: "Tech feasibility" — agent_type: `tech-feasibility` — subagent_type: `tech-feasibility` — Prompt: "[CONTEXT header above] Evaluate hard technical problems (Solved/Hard/Unsolved), build-vs-buy decisions, stack validation for: [build request]. Idea draft: read docs/plans/phase1-scratch/idea-draft.md with your Read tool. Verify APIs and libraries from the draft exist and are maintained. Save to `docs/plans/phase1-scratch/tech-feasibility.md`. Report with a Technical Verdict."
 
@@ -577,15 +581,20 @@ Output: `docs/plans/phase1-scratch/prereqs.json` with shape `{supabase_url, supa
 
 ### Step 1.6 — PRODUCT SPEC
 
-Call the Agent tool — description: "Product spec" — agent_type: `product-spec-writer` — subagent_type: `product-spec-writer` — prompt: "[CONTEXT header above] Write `docs/plans/product-spec.md` following the structure in `protocols/product-spec-schema.md`. Read ALL of these via your Read tool before writing (do NOT expect pasted content):
+<HARD-GATE>
+**Audit fix #15 precondition:** Before dispatching the product-spec-writer, verify `docs/plans/phase1-scratch/competitive-differentiation.md` exists and is non-empty (`test -s`). If missing, HALT — re-dispatch `feature-intel` with the directive "your previous run did not produce competitive-differentiation.md; produce it now per your agent file's `## Competitive differentiation on the core job` section." This file is the utility-first forcing function the spec-writer reads. Phase 1 must answer "what does this product do better than the closest 1-3 alternatives on the core job" in writing before mechanics get specified.
+</HARD-GATE>
+
+Call the Agent tool — description: "Product spec" — agent_type: `product-spec-writer` — subagent_type: `product-spec-writer` — prompt: "[CONTEXT header above] Write `docs/plans/product-spec.md` following the structure in `protocols/product-spec-schema.md` (note the required `## First 60 Seconds` top-level section per audit fix #16). Read ALL of these via your Read tool before writing (do NOT expect pasted content):
   - `docs/plans/design-doc.md` — PRD: features, persona, JTBD, value prop, scope, tech stack
   - `docs/plans/phase1-scratch/findings-digest.md` — research synthesis
   - `docs/plans/phase1-scratch/ux-research.md` — behavioral patterns, pain points
   - `docs/plans/phase1-scratch/feature-intel.md` — competitive matrix, table-stakes vs differentiators
+  - `docs/plans/phase1-scratch/competitive-differentiation.md` — *(audit fix #15 — REQUIRED)* closest alternatives + what this product does better/worse on the core job + implications for the first surface. Headline-utility features in your spec MUST cite at least one constraint from this file.
   - `docs/plans/phase1-scratch/business-model.md` — revenue model implications
   - `docs/plans/phase1-scratch/tech-feasibility.md` — technical constraints, rate limits, API limitations
   - `docs/plans/phase1-scratch/user-decisions.md` — user's product decisions from informed brainstorm
-This is the LAST step that reads raw research files. Every actionable insight must survive in product-spec.md in structured, queryable form. Commit: 'feat: product spec'."
+**Cognitive Protocol Step 0 (UTILITY-FRAMING — audit fix #15)** runs before Step 1 (STATES) for every feature. Open every feature with one paragraph naming its core-job contribution; headline-utility features cite a constraint from `competitive-differentiation.md`. Self-check before returning: count lines per feature and confirm utility features land in the upper half. **`## First 60 Seconds`** is required (one `### Persona: {Name}` subsection per persona table row, each with a single `**First-encounter promise**:` field ≥ 50 chars that contains a comparison marker — `vs`, `than`, `compared to`, `instead of`, `rather than`, or `unlike` — referencing an external alternative typically named in `competitive-differentiation.md`). Step 1.6.idx will BLOCK on missing comparisons. This is the LAST step that reads raw research files. Every actionable insight must survive in product-spec.md in structured, queryable form. Commit: 'feat: product spec'."
 
 #### Step 1.6.idx — Slice 1 graph index
 
@@ -621,9 +630,9 @@ The 4 architects design as a TEAM — not 4 isolated subagents. Cross-domain con
 
 Security is NOT in the team — it runs as a separate review pass after synthesis (Step 2.4) to avoid the coordination overhead of its dense cross-check pairings.
 
-**On re-entry from LRR backward routing:** If Phase 2 is being re-opened via the re-entry dispatch template (Step 6.3), skip team creation if the original `phase-2-architects` team is still live from this build; otherwise recreate it. Pass the re-entry payload (`{blocking_finding, prior_output: "docs/plans/architecture.md", decision_row}`) into the dispatch prompt of the architect(s) whose domain matches `decision_row.author` — only those architects re-run, not all 4. The re-dispatched architect revises its `docs/plans/phase-2-contracts/<name>.md` in place, SendMessages peers on any contract boundary it now changes, and the synthesizer re-runs once to re-stitch `architecture.md`. Do NOT redo unaffected domains.
+**On re-entry from Phase 6 (Customer Reality) backward routing:** If Phase 2 is being re-opened via the re-entry dispatch template (Phase 6 Step 6.2), skip team creation if the original `phase-2-architects` team is still live from this build; otherwise recreate it. Pass the re-entry payload (`{blocking_finding, prior_output: "docs/plans/architecture.md", decision_row}`) into the dispatch prompt of the architect(s) whose domain matches `decision_row.author` — only those architects re-run, not all 4. The re-dispatched architect revises its `docs/plans/phase-2-contracts/<name>.md` in place, SendMessages peers on any contract boundary it now changes, and the synthesizer re-runs once to re-stitch `architecture.md`. Do NOT redo unaffected domains.
 
-After the synthesizer re-stitches `architecture.md`, re-run the Refs Indexer (Step 2.3 dispatch #4) to update `docs/plans/refs.json` with fresh anchors, and re-run the DAG Validator (Step 2.3 dispatch #3) to verify sprint-tasks.md still references valid architecture sections. Invalidate the sprint-context hash per the refs.json mutation rule.
+After the synthesizer re-stitches `architecture.md`, re-run the Refs Indexer (Step 2.3 dispatch #4) to update `docs/plans/refs.json` with fresh anchors, and re-run the DAG Validator (Step 2.3 dispatch #3) to verify backend-tasks.md still references valid architecture sections. Invalidate the sprint-context hash per the refs.json mutation rule.
 
 **Step 2.2a — Create the team.**
 
@@ -686,20 +695,20 @@ Four sequential dispatches.
 
 1. Description: "Implementation blueprint" — agent_type: `code-architect` — subagent_type: `code-architect` — Prompt: "[CONTEXT header above] Implementation blueprint. Read the PRD via your Read tool: `docs/plans/design-doc.md`. Read the product spec: `docs/plans/product-spec.md` (Screen Inventory + per-feature behavioral sections — your blueprint's file-and-build-order list must cover every feature in the spec). Read all 4 post-debate architect positions via your own Read tool from `docs/plans/phase-2-contracts/`:\n  - `backend-architect.md`\n  - `frontend-architect.md`\n  - `data-engineer.md`\n  - `performance-benchmarker.md`\n\nThese files are the authoritative team positions AFTER any SendMessage-driven revisions — the architects already cross-checked each other's contract boundaries, so you can stitch without re-debating. Your job is to assemble the 4 positions into a coherent architecture. Where positions conflict OUTSIDE the 3 mandatory cross-check pairings, flag the contradiction explicitly in `architecture.md` under a `### Unresolved Tensions` section and pick the safer default. Do not silently absorb contradictions. Include specific files to create/modify, build sequence, dependency order. Write `docs/plans/architecture.md` with stable section anchors per `protocols/architecture-schema.md`. Required top-level sections: Overview, Frontend, Backend, Data Model, Security, Infrastructure, Scope, Out of Scope. Scope to the boundary from the PRD. Every API endpoint heading in the Backend section MUST include feature attribution annotations — e.g. `**POST /api/orders** (provides: order-placement)` — using the feature kebab names from `product-spec.md`. These annotations are required for the graph indexer to emit cross-feature dependency edges."
 
-2. Description: "Sprint breakdown" — agent_type: `planner` — subagent_type: `planner` — Prompt: "[CONTEXT header above] Break this architecture into ordered, atomic tasks. Each task needs: description, acceptance criteria, **dependencies** (list of task IDs this depends on), size (S/M/L), **Behavioral Test** field for every UI task (concrete interaction: 'Navigate to [page], click [element], verify [outcome]') or curl-based acceptance test for API tasks, **Feature** — the exact feature name from product-spec.md (e.g. 'Order Placement', 'Auth') that must match a `## Feature: X` heading in product-spec.md (use '—' for infrastructure tasks that don't belong to a specific feature), **Screens** — comma-separated screen names from the product-spec Screen Inventory (e.g. 'Catalog, Product Detail') that must match screen names in product-spec.md (use '—' for backend-only tasks). Read these files via your Read tool before starting:\n  - ARCHITECTURE: `docs/plans/architecture.md`\n  - PRODUCT SPEC: `docs/plans/product-spec.md` (per-feature behavioral sections — every feature in the spec must have at least one task, and per-feature acceptance criteria become Behavioral Test field values)\n  - PRD: `docs/plans/design-doc.md`\nSave to `docs/plans/sprint-tasks.md`. The table must have these columns in order: Task ID, Title, Size, Dependencies, Behavioral Test, Owns Files, Implementing Phase, Feature, Screens. Dependencies field is load-bearing — Phase 4 uses it to batch independent tasks in parallel. Each task's Behavioral Test field SHOULD reference a specific feature acceptance criterion from the product spec (e.g., \"User can submit form with valid email; submitted form appears in admin dashboard within 5s\" — derived from product-spec.md's Happy Path or per-state criteria).\n\n**CRITICAL FORMAT CONSTRAINT — graph-index parser schema:**\nThe downstream graph-index parser (`sprint-tasks.ts`) will reject the file if ANY of these are violated:\n- Output MUST be a single markdown pipe table. Do NOT include any other pipe tables in the file (wave tables, summary tables, etc.) — the parser scans ALL tables and rejects any with fewer than 9 columns.\n- Exactly 9 columns, lowercase in header: `| task id | title | size | dependencies | behavioral test | owns files | implementing phase | feature | screens |`\n- Size column MUST be exactly `S`, `M`, or `L` (uppercase, single letter).\n- Use `—` (em-dash) for empty cells, not blank.\n- Task IDs must be unique.\n- Example row: `| T-001 | Setup project scaffold | S | — | Run `npm start`, verify dev server on localhost:3000 | package.json, src/index.ts | Phase 4 | — | — |`\nDo NOT wrap the table in prose paragraphs that contain pipe characters. Keep non-table content as headings and bullet lists only."
+2. Description: "Backend task breakdown" — agent_type: `planner` — subagent_type: `planner` — Prompt: "[CONTEXT header above] Break the architecture into ordered, atomic BACKEND/INFRA tasks ONLY. This file covers: database migrations, RLS policies, RPCs/API endpoints, auth setup, rate limits, cron jobs, and infrastructure scaffolding. UI tasks are NOT produced here — they come from page-specs/*.md in Phase 3. Each task needs: description, acceptance criteria, **dependencies** (list of task IDs this depends on), size (S/M/L), **Behavioral Test** field (curl-based acceptance test for API tasks, or migration/RLS verification command), **Feature** — the exact feature name from product-spec.md (e.g. 'Order Placement', 'Auth') that must match a `## Feature: X` heading in product-spec.md (use '—' for infrastructure tasks that don't belong to a specific feature). Read these files via your Read tool before starting:\n  - ARCHITECTURE: `docs/plans/architecture.md`\n  - PRODUCT SPEC: `docs/plans/product-spec.md` (per-feature behavioral sections — every feature in the spec must have at least one backend task)\n  - PRD: `docs/plans/design-doc.md`\nSave to `docs/plans/backend-tasks.md`. The table must have these columns in order: Task ID, Title, Size, Dependencies, Behavioral Test, Owns Files, Implementing Phase, Feature. Dependencies field is load-bearing — Phase 4 uses it to batch independent tasks in parallel.\n\n**CRITICAL FORMAT CONSTRAINT — graph-index parser schema:**\nThe downstream graph-index parser (`backend-tasks.ts` / legacy `sprint-tasks.ts`) will reject the file if ANY of these are violated:\n- Output MUST be a single markdown pipe table. Do NOT include any other pipe tables in the file (wave tables, summary tables, etc.) — the parser scans ALL tables and rejects any with fewer than 8 columns.\n- Exactly 8 columns, lowercase in header: `| task id | title | size | dependencies | behavioral test | owns files | implementing phase | feature |`\n- Size column MUST be exactly `S`, `M`, or `L` (uppercase, single letter).\n- Use `—` (em-dash) for empty cells, not blank.\n- Task IDs must be unique.\n- Example row: `| T-001 | Setup project scaffold | S | — | Run `npm start`, verify dev server on localhost:3000 | package.json, src/index.ts | Phase 4 | — |`\nDo NOT wrap the table in prose paragraphs that contain pipe characters. Keep non-table content as headings and bullet lists only."
 
-3. Description: "Task DAG validator" — INTERNAL inline role-string — Prompt: "You are the Task DAG Validator. Read `docs/plans/sprint-tasks.md`. Validate for DAG correctness:
+3. Description: "Task DAG validator" — INTERNAL inline role-string — Prompt: "You are the Task DAG Validator. Read `docs/plans/backend-tasks.md`. Validate for DAG correctness:
   - No circular dependencies
   - All referenced task IDs in the Dependencies field exist
   - Sizing is consistent (S/M/L)
   - Dependencies match the architecture document (don't depend on a task that builds a component you don't need)
-  - Every UI task has a Behavioral Test field; every API task has a curl-based test
-Report any violations. If clean, return PASS. If violations, return a list of fix requests — Sprint Breakdown re-dispatches once with the fix list."
+  - Every API/infra task has a curl-based or verification test
+Report any violations. If clean, return PASS. If violations, return a list of fix requests — Backend Task Breakdown re-dispatches once with the fix list."
 
 4. Description: "Refs indexer" — INTERNAL inline role-string — Prompt: "You are the Refs Indexer. Generate `docs/plans/refs.json` covering ALL live downstream docs:
   - `docs/plans/design-doc.md` (PRD)
   - `docs/plans/architecture.md`
-  - `docs/plans/sprint-tasks.md`
+  - `docs/plans/backend-tasks.md`
   - `docs/plans/quality-targets.json`
   - `DESIGN.md` (if it exists yet — Phase 3 extends refs.json after it writes this file)
 
@@ -717,15 +726,32 @@ Run via the Bash tool:
 - On exit 0: log success to `docs/plans/build-log.md` and continue.
 - On non-zero exit: STOP. Log the error to `docs/plans/build-log.md` and report the failure. Downstream agents require the graph — do not proceed without a successful index.
 
-#### Step 2.3.2.idx — Sprint tasks graph index
+<HARD-GATE>
+SKIP is NOT an allowed outcome for Step 2.3.1.idx. The orchestrator MUST NOT
+write a `decisions.jsonl` row with `action=graph-index-architecture outcome=SKIP`.
+On parser failure, return to Step 2.3 dispatch #1 with the parser error message
+attached and re-run code-architect. Recovery is fix-the-source, not skip-the-index.
+Downstream consumers (Phase 4 Briefing Officer, Track B auditor, Phase 6 routing)
+read this slice as the single source of truth — a SKIP row corrupts every later
+phase's substrate.
+</HARD-GATE>
 
-After `planner` returns from the Sprint Breakdown dispatch (#2 above) AND the Task DAG Validator (#3 above) returns PASS, index `sprint-tasks.md` into the build graph. Slice 4 graph index — best-effort.
+#### Step 2.3.2.idx — Backend tasks graph index
+
+After `planner` returns from the Backend Task Breakdown dispatch (#2 above) AND the Task DAG Validator (#3 above) returns PASS, index `backend-tasks.md` into the build graph. Slice 4 graph index — best-effort.
 
 Run via the Bash tool:
 
-- Command: `node ${CLAUDE_PLUGIN_ROOT}/bin/graph-index.js docs/plans/sprint-tasks.md`
+- Command: `node ${CLAUDE_PLUGIN_ROOT}/bin/graph-index.js docs/plans/backend-tasks.md`
 - On exit 0: log success to `docs/plans/build-log.md` and continue.
 - On non-zero exit: STOP. Log the error to `docs/plans/build-log.md` and report the failure. Downstream agents require the graph — do not proceed without a successful index.
+
+<HARD-GATE>
+SKIP is NOT an allowed outcome for Step 2.3.2.idx. The orchestrator MUST NOT
+write a `decisions.jsonl` row with `action=graph-index-backend-tasks outcome=SKIP`.
+On parser failure, return to Step 2.3 dispatch #2 with the parser error message
+attached and re-run the Backend Task Breakdown. Recovery is fix-the-source.
+</HARD-GATE>
 
 #### Step 2.3.4.idx — Decisions re-index (end of Phase 2)
 
@@ -737,6 +763,12 @@ Run via the Bash tool:
 - On exit 0: log success to `docs/plans/build-log.md` and continue.
 - On non-zero exit: STOP. Log the error to `docs/plans/build-log.md` and report the failure. The decisions graph fragment must be current before downstream consumers query it.
 
+<HARD-GATE>
+SKIP is NOT an allowed outcome for Step 2.3.4.idx. On parser failure, fix the
+malformed `decisions.jsonl` line(s) the parser flagged and re-run the index.
+Recovery is fix-the-source, not skip-the-index.
+</HARD-GATE>
+
 **Architecture decisions:** The Implementation Blueprint synthesizer returns 4 `deviation_row` objects (or a `phase_2_decisions` array of row objects) in its structured result — one per cross-cutting Phase 2 decision (API contract, persistence layer, auth model, framework choice). The orchestrator forwards each row through the `scribe_decision` MCP tool (see Phase 4 "Orchestrator-scribe dispatch"); the MCP allocates `D-2-<seq>` IDs and atomically appends to `docs/plans/decisions.jsonl`. Author = `architect`. Each row carries a `ref` anchor pointing into `architecture.md` per `protocols/decision-log.md`. Total: 4 rows.
 
 ### Step 2.4 — Security Review (post-synthesis, NOT in team)
@@ -747,7 +779,7 @@ Description: "Security architecture review" — agent_type: `engineering-securit
 
 **Post-security revision (conditional):** If the security review's `### Required Revisions` section is non-empty, re-dispatch the Implementation Blueprint synthesizer (Step 2.3 dispatch #1) with an additional instruction: "Read `docs/plans/phase-2-contracts/security-engineer.md` § Required Revisions and incorporate into `architecture.md`. Do not re-read other contracts — only apply the security revisions." Then re-run the Refs Indexer. Max 1 revision cycle.
 
-**Writes:** `docs/plans/architecture.md`, `docs/plans/sprint-tasks.md`, `docs/plans/quality-targets.json`, `docs/plans/refs.json`. Decision rows (4) flow through the orchestrator's `scribe_decision` MCP calls.
+**Writes:** `docs/plans/architecture.md`, `docs/plans/backend-tasks.md`, `docs/plans/quality-targets.json`, `docs/plans/refs.json`. Decision rows (4) flow through the orchestrator's `scribe_decision` MCP calls.
 
 ### Quality Gate 2
 
@@ -798,13 +830,24 @@ Phase 4 WILL NOT START without `DESIGN.md` (Pass 1 + Pass 2 complete). If the ar
 - Step 3.5 Inclusive Visuals Check: agent_type: `design-inclusive-visuals-specialist` — subagent_type: `design-inclusive-visuals-specialist` (web)
 - Step 3.2-ios iOS Design Board: agent_type: `ios-swift-ui-design` — subagent_type: `ios-swift-ui-design` (iOS)
 
-**Phase 3 write discipline:** Phase 3 is the writer for `DESIGN.md` (web) and extends `docs/plans/refs.json` to cover the visual spec anchors once it lands. Phase 3 does NOT write to `architecture.md` or `sprint-tasks.md` — those are Phase 2's.
+**Phase 3 write discipline:** Phase 3 is the writer for `DESIGN.md` (web) and extends `docs/plans/refs.json` to cover the visual spec anchors once it lands. Phase 3 does NOT write to `architecture.md` or `backend-tasks.md` — those are Phase 2's.
 
 <HARD-GATE>
 LRR BLOCK backward edge: `LRR BLOCK authoring=Phase 3 → back to Phase 3`. The ⭐⭐ star rule routes BLOCK findings via Aggregator decisions.jsonl `decided_by` lookup; if `decided_by == design-brand-guardian` or any Phase 3 writer, the build re-opens Phase 3 with the finding as input.
 </HARD-GATE>
 
-**On re-entry from LRR backward routing:** When Phase 3 is re-opened via the re-entry dispatch template (Step 6.3), the orchestrator passes the re-entry payload (`{blocking_finding, prior_output: "DESIGN.md", decision_row}`) into the specific Phase 3 step named by `decision_row.author`. That step revises the prior output to address `blocking_finding` only — DESIGN.md Pass 1 (Step 3.0), component manifest (Step 3.2), or DESIGN.md Pass 2 (Step 3.4) — and emits a new decision_row. Unaffected steps are NOT re-run. Mode-specific branch files (`protocols/web-phase-branches.md` / `protocols/ios-phase-branches.md`) define which step owns which `decided_by` value.
+**On re-entry from Phase 6 (Customer Reality) backward routing:** When Phase 3 is re-opened via the re-entry dispatch template (Phase 6 Step 6.2), the orchestrator passes the re-entry payload (`{blocking_finding, prior_output: "DESIGN.md", decision_row}`) into the specific Phase 3 step named by `decision_row.author`. That step revises the prior output to address `blocking_finding` only — DESIGN.md Pass 1 (Step 3.0), component manifest (Step 3.2), or DESIGN.md Pass 2 (Step 3.4) — and emits a new decision_row. Unaffected steps are NOT re-run. Mode-specific branch files (`protocols/web-phase-branches.md` / `protocols/ios-phase-branches.md`) define which step owns which `decided_by` value.
+
+#### Orchestrator-scribe dispatch (Phase 3 — audit fix #10)
+
+After all Phase 3 steps complete and before the compaction checkpoint, collect deviation_rows from the Phase 3 agent returns and forward each through `scribe_decision` MCP. Same mechanics as Phase 4's Orchestrator-scribe dispatch (`commands/build.md` §"Orchestrator-scribe dispatch"). Row triggers (cap totals shown — only emit when condition fires; uneventful runs emit zero):
+
+- **Step 3.0 — Brand Guardian DNA lock** (cap 1): emit when the locked 7-axis DNA card materially differs from the directional defaults inferred from the persona digest. `decided_by: design-brand-guardian`. `summary` = locked axes + directional kill rationale (the loudest rejected axis pair). `ref` = `DESIGN.md#overview-brand-dna`.
+- **Step 3.2 — UI Designer component primitive choice** (cap 1, often 0): emit only when the chosen primitive library / tree-shaking strategy departs from a sensible default for the project's stack. `decided_by: design-ui-designer`. `summary` = library + variant strategy. `ref` = `DESIGN.md#components` or `docs/plans/component-manifest.md`.
+- **Step 3.4 — Component manifest closure** (cap 0–1): emit when the closed manifest deviates from the auto-derived manifest from page-specs. `decided_by: design-ui-designer`. `summary` = which slots got non-default fills + why.
+- **Step 3.6 — Design Critic verdict gap** (cap 0–1): emit only when the orchestrator accepts a critic verdict below threshold (terminal score gap). `decided_by: design-critic`. `summary` = which axis fell short + the rationale for accepting.
+
+Total Phase 3 cap: ~4 rows. Re-entry runs (revising a prior output) emit one new row keyed to the re-entered step.
 
 **Compaction checkpoint.** Update `.build-state.json` per the format above.
 
@@ -813,10 +856,17 @@ LRR BLOCK backward edge: `LRR BLOCK authoring=Phase 3 → back to Phase 3`. The 
 ## Phase 4: Build — THREE-TIER FEATURE-BASED EXECUTION
 
 <HARD-GATE>
-Before starting Phase 4: Phase 2 must be approved, Phase 3 must have produced the design artifact (`DESIGN.md` — Pass 1 + Pass 2 complete; broken-refs lint == 0), and `docs/plans/page-specs/` must contain at least one file (web). You MUST call the Agent tool for EVERY task. No exceptions.
+Before starting Phase 4:
+- Phase 2 must be approved.
+- Phase 3 must have produced the design artifact (`DESIGN.md` — Pass 1 + Pass 2 complete; broken-refs lint == 0).
+- `docs/plans/page-specs/` must contain at least one file (web).
+- The Slice 3 graph index `*.buildanything/graph/slice-3-pages.json` must exist (Step 3.3.idx ran with exit 0). A missing slice-3-pages.json means the Briefing Officer's `graph_query_screen()` will return null and Phase 4 will halt at Step 4.2.a.gate. Recovery is fix-the-source: re-dispatch `design-ux-architect` and re-run the indexer. Do NOT proceed.
+- After each Briefing Officer dispatch within a wave, `docs/plans/feature-briefs/{feature}.md` must exist before the corresponding implementer batch dispatches (enforced at Step 4.2.a.gate).
+
+You MUST call the Agent tool for EVERY task. No exceptions.
 </HARD-GATE>
 
-**Goal**: Scaffold project, then execute sprint tasks organized by FEATURE with product adherence checked per-feature during build. Three tiers: Product Owner (product quality) → Briefing Officers (task planning per feature) → Execution Agents (code). The orchestrator drives all dispatches — PO and BO are planning agents that write artifacts to disk.
+**Goal**: Scaffold project, then execute backend tasks organized by FEATURE with product adherence checked per-feature during build. Three tiers: Product Owner (product quality) → Briefing Officers (task planning per feature) → Execution Agents (code). The orchestrator drives all dispatches — PO and BO are planning agents that write artifacts to disk.
 
 **Mode-specific branch:**
 - `project_type=ios`: follow `protocols/ios-phase-branches.md` §Phase 4 for scaffold details and execution agent prompts.
@@ -849,7 +899,7 @@ Scaffolding is project skeleton + design system + acceptance test stubs. Three s
 
 2. Description: "Design system setup" — agent_type: `engineering-frontend-developer` — subagent_type: `engineering-frontend-developer` — mode: "bypassPermissions" — prompt per branch file. Implements design tokens from `DESIGN.md`.
 
-3. Description: "Scaffold acceptance tests" — INTERNAL inline role-string — mode: "bypassPermissions" — prompt: "[CONTEXT header above] Scaffold acceptance tests from sprint-tasks.md. Use Page Object Model. For every task with a Behavioral Test field, create a Playwright test stub (web) or Maestro flow stub (iOS). Stubs must FAIL right now. Commit: 'test: scaffold acceptance tests from sprint tasks'."
+3. Description: "Scaffold acceptance tests" — INTERNAL inline role-string — mode: "bypassPermissions" — prompt: "[CONTEXT header above] Scaffold acceptance tests from backend-tasks.md and page-specs/*.md. Use Page Object Model. For every backend task with a Behavioral Test field, create a test stub. For every page-spec, create a Playwright test stub (web) or Maestro flow stub (iOS). Stubs must FAIL right now. Commit: 'test: scaffold acceptance tests from backend tasks + page specs'."
 
 **Scaffold verification:** Run the Verify Protocol with `scope: static` (checks 1-3 and 6 only: Build, Type-Check, Lint, Diff Review). Test stubs are designed to fail at this point — do not run checks 4, 5, or 7 until after task implementation.
 
@@ -861,12 +911,12 @@ Call the Agent tool — description: "Product Owner: feature planning" — agent
 
 Read these artifacts via graph queries:
 - `docs/plans/product-spec.md` — feature list, cross-feature interactions, screen inventory
-- `docs/plans/sprint-tasks.md` — task breakdown with dependencies
+- `docs/plans/backend-tasks.md` — backend/infra task breakdown with dependencies
 - `docs/plans/architecture.md` — cross-feature API contracts, shared data entities
-- `docs/plans/page-specs/*.md` — screen assignments per feature
+- `docs/plans/page-specs/*.md` — one page-spec per UI screen (each is one unit of UI work)
 - `docs/plans/quality-targets.json` — NFRs
 
-Produce `docs/plans/feature-delegation-plan.json` per the schema in `agents/product-owner.md`. For each feature: list assigned tasks (from sprint-tasks.md), write a product_context summary (~100-200 tokens: persona constraints, key business rules, critical error scenarios, competitive differentiators), extract cross-feature contracts, list page-spec refs (web: `page-specs/*.md` paths; iOS: `DESIGN.md` section anchors). Sequence features into waves by dependency order."
+Produce `docs/plans/feature-delegation-plan.json` per the schema in `agents/product-owner.md`. For each feature: list assigned backend tasks (from backend-tasks.md) and UI page-specs (from page-specs/*.md), write a product_context summary (~100-200 tokens: persona constraints, key business rules, critical error scenarios, competitive differentiators), extract cross-feature contracts, list page-spec refs (web: `page-specs/*.md` paths; iOS: `DESIGN.md` section anchors). Sequence features into waves by dependency order. Wave 1 = backend tasks from backend-tasks.md. Wave 2+ = UI pages from page-specs/*.md (each page-spec is one unit of UI work)."
 
 Output: `docs/plans/feature-delegation-plan.json`. Update `.build-state.json`: set `feature_delegation_plan_path`, initialize `current_wave: 1`, `completed_features: []`, `feature_acceptance: {}`.
 
@@ -886,15 +936,38 @@ Cross-feature contracts: [paste contracts from delegation plan]
 Assigned tasks: [paste task IDs]
 Page spec refs: [paste page_spec_refs from delegation plan]
 
-Read the full feature spec via graph query. Read task rows from `docs/plans/sprint-tasks.md`. Read page specs, architecture, component manifest, visual design spec for this feature's screens.
+Read the full feature spec via graph query. For backend tasks: read task rows from `docs/plans/backend-tasks.md`. For UI work: read page-specs via graph_query_screen(full: true). Read architecture, component manifest, visual design spec for this feature's screens.
 
 Write `docs/plans/feature-briefs/[feature].md` per the schema in `agents/briefing-officer.md`. For each task: specify agent type, skills, structured context payload (layout, components, API contract, error states, business rules, persona constraints), and acceptance criteria."
 
 Output: `docs/plans/feature-briefs/[feature].md`. Update `.build-state.json.feature_briefs[feature]` with the path.
 
+#### 4.2.a.gate — Brief existence gate (orchestrator)
+
+After each Briefing Officer dispatch returns, verify `docs/plans/feature-briefs/[feature].md` exists and is non-empty. Use the Bash tool: `test -s docs/plans/feature-briefs/[feature].md && echo PASS || echo BLOCKED`.
+
+<HARD-GATE>
+On gate failure (file missing or empty):
+  1. Log to `docs/plans/build-log.md`: `phase=4 step=4.2.a.gate feature=[name] outcome=BLOCKED reason=brief-not-written`.
+  2. Re-dispatch the Briefing Officer ONCE with the additional directive in the prompt:
+     "Your previous run did not produce `docs/plans/feature-briefs/[feature].md`.
+      Write the file before returning. The orchestrator will halt Phase 4 if it
+      is still missing. If you halted because of a graph-query failure, write
+      the file with a `## STATUS: BLOCKED` block naming the missing slice so
+      the orchestrator can re-dispatch the producing agent."
+  3. On a second gate failure, STOP the build and surface the BO's last response
+     to the user.
+  4. Do NOT dispatch implementers without a brief on disk. The empty
+     `feature-briefs/` failure mode (Phase 4 implementers ran with no per-feature
+     load-bearing context, see `docs/known-issues-2026-05-06.md` Issue 1) is the
+     specific regression this gate exists to close.
+</HARD-GATE>
+
+After PASS, update `.build-state.json.feature_briefs[feature]` with the verified path before proceeding to 4.2.b.
+
 #### 4.2.b — Task execution (orchestrator reads BO brief, dispatches per task)
 
-After the Briefing Officer writes the feature brief, the orchestrator reads it and executes each task. Tasks within a feature are executed in DAG-parallel batches (topological ordering from the Dependencies field — independent siblings run in parallel, yielding ~30-50% wall-clock saving). The per-task pipeline is unchanged in structure — only the input to the execution agent changes.
+After the Briefing Officer writes the feature brief AND Step 4.2.a.gate has confirmed the file exists, the orchestrator reads it and executes each task. Tasks within a feature are executed in DAG-parallel batches (topological ordering from the Dependencies field — independent siblings run in parallel, yielding ~30-50% wall-clock saving). The per-task pipeline is unchanged in structure — only the input to the execution agent changes.
 
 **For each task in the feature brief:**
 
@@ -952,16 +1025,67 @@ Write verdict: ACCEPTED or NEEDS_REVISION with specific findings citing product-
 
 **Verdict routing:**
 - `ACCEPTED` → mark feature complete in `.build-state.json.feature_acceptance`. Proceed.
-- `NEEDS_REVISION` → orchestrator re-dispatches the Briefing Officer for this feature with the findings. BO writes an updated brief targeting only the failing tasks. Orchestrator re-executes those tasks. Max 2 revision cycles per feature. After 2nd NEEDS_REVISION: interactive → present findings to user. Autonomous → accept with gap note in build-log.md AND append a structured gap entry to `.build-state.json.feature_acceptance[feature].gaps[]` with shape `{finding, severity, accepted_at_cycle}`. The Phase 6 LRR Eng-Quality chapter reads these gaps as input evidence.
+- `NEEDS_REVISION` → orchestrator re-dispatches the Briefing Officer for this feature with the findings. BO writes an updated brief targeting only the failing tasks. Orchestrator re-executes those tasks. Max 2 revision cycles per feature. After 2nd NEEDS_REVISION: interactive → present findings to user. Autonomous → accept with gap note in build-log.md AND append a structured gap entry to `.build-state.json.feature_acceptance[feature].gaps[]` with shape `{finding, severity, accepted_at_cycle}`. **Audit fix #10 — also emit a Phase 4 deviation row** via `scribe_decision`: `{phase: 4, step_id: \"4.3\", decided_by: \"product-owner\", summary: \"Accepted [feature] with N gaps after 2 revision cycles\", rationale: <brief reason — usually one or more gap descriptions>, ref: \"docs/plans/.build-state.json#feature_acceptance.[feature].gaps\"}`. One row per accepted-with-gaps feature; the per-Phase-4 cap is implicit (one per feature that hits the gap path). This row is the backward-routing anchor if Phase 6 Customer Reality later surfaces the gap as a `doesnt_deliver` or `confusing_or_illogical` finding.
+
+### Step 4.3.5 — Wave-End Gate (audit fixes #4, #5, #11, #13, #14, #17)
+
+After every feature in the current wave returns `ACCEPTED` from Step 4.3, BUT before the wave transitions to the next wave at Step 4.4, the orchestrator runs a wave-end gate. The gate's purpose is to catch integration-level and spec-adherence issues that per-task verify cannot see — bugs that only manifest with the wave's full output assembled. Wave-end findings route to a wave-scoped fix loop (max 2 cycles per gate-check, mirroring PO acceptance retry semantics) and resolve INSIDE this wave, NOT forward to Phase 5. Phase 5 is the broad-net audit; the wave-end gate is the narrow-net forcing function.
+
+**Why a separate step.** The broken-build at `tables2.1.1` shipped because Phase 5 caught 192 findings at end-of-build, the fix loop ran out of cycles, and ~80 HIGH findings were deferred. Per-wave gates catch ~70% of those bugs while they are still cheap to fix.
+
+**Composition: cheap tier (parallel) → expensive tier (sequential).** Cheap-tier checks are deterministic shell + grep + SQL — no LLM judgment. Expensive-tier checks need the running app + agent-browser, so they share the dev-server lifecycle. Run cheap tier first; if anything blocks, fix and re-run cheap tier. Only proceed to expensive tier when cheap tier is green.
+
+#### Cheap tier — parallel, ONE message
+
+Three deterministic checks. Wall-clock target: 1–3 min combined.
+
+1. **Production-mode build (audit fix #4)** — INTERNAL inline role-string — Bash dispatch: web → `NODE_ENV=production npm run build` (or `pnpm build` per `protocols/verify.md` package-manager detection); iOS → `xcodebuild -scheme <Scheme> build` per `protocols/ios-phase-branches.md:226`. The wave-level build runs after the cleanup pass + cross-feature shared-file reconciliation, so it sees the wave's *final* state. Production mode catches lint-only-in-prod errors and integration-level type drift across feature boundaries. On non-zero exit: BLOCK the wave, capture stderr, route to the feature whose changeset most likely introduced the error (use the per-task `owns_files` union to attribute), max 2 wave-fix cycles.
+
+2. **Halt-condition assertions (audit fix #12 — already wired at Step per-task verify; re-runs at wave-end as integration check)** — call `checkHaltConditions(projectDir)` from `src/orchestrator/halt-conditions.ts`. Per-task verify catches single-file violations; wave-end re-runs to catch combined patterns (e.g., a rule file that became a violation only after another task's edit). On `pass: false`: BLOCK the wave, route to BO of the feature owning the violating file. Halt-conditions are the user's explicit "never do X" rules — treat as critical-severity always.
+
+3. **A11y assertion (audit fix #11b — promoted from old LRR A11y chapter)** — INTERNAL inline role-string — Bash dispatch: web → run `npx @axe-core/cli http://localhost:3000` (or equivalent against the wave's pages); iOS → XcodeBuildMCP accessibility audit. Block on findings with severity `critical` or `serious`. Log `moderate` and `minor` to `docs/plans/evidence/wave-a11y/{wave_n}/log.md` for forwarding to the Phase 6 Customer Reality Judge as supporting context. Mechanical a11y fires here at wave-end (deterministic) so the judge at Phase 6 only flags a11y when it manifests as customer confusion ("I can't tab to this button" / "I can't read this on mobile"). Replaces the v1 LRR A11y chapter that ran end-of-build.
+
+4. **Schema/code execution (audit fix #13)** — INTERNAL inline role-string — Bash dispatch: walk `supabase/migrations/*.sql` (or equivalent for non-Supabase) and build a column manifest `{table_name → [column_name, ...]}`. Then grep all source files for SQL queries (`.from('...')`, `.select('...')`, `query: SELECT ... FROM`) and assert each referenced column exists in the manifest. For dynamic queries, execute `SELECT column_name FROM information_schema.columns WHERE table_schema = 'public'` against the running local Supabase (orchestrator already starts one for Phase 5 dogfood — extend startup to wave-end gate). On column mismatch (code references `companion_outfits.unlock_level` but no migration has it): BLOCK the wave, route to BO of the feature owning the migration OR the consumer code — gate emits both candidates; BO picks. The `tables2.1.1` companion_outfits schema mismatch (`name`, `unlock_level`, `sprite_sheet_url` queried but absent from migrations) is the regression target.
+
+If cheap tier passes (all three return PASS), proceed to expensive tier. If any cheap-tier check fails, halt expensive tier, route the failures to wave-fix per gate-check (max 2 cycles), then re-run cheap tier.
+
+#### Expensive tier — sequential, after cheap tier PASS
+
+Four LLM + agent-browser checks sharing the running dev-server. Wall-clock target: 10–20 min combined.
+
+4. **Brand-drift gate (audit fix #11)** — Description: "Brand drift wave gate" — agent_type: `design-brand-guardian` — subagent_type: `design-brand-guardian` — mode: "bypassPermissions" — Prompt: "[CONTEXT header above — phase: 4] **Phase 4 wave-drift gate.** You score this wave's UI pages against the locked DNA card with **blocking authority** (different from your Phase 5 observer-only role). Capture screenshots of each page-spec affected by this wave's features via agent-browser. Score each page on the 7 DNA axes per `agents/design-critic.md` rubric. Total possible 140; wave-pass requires ≥ 100 (≥ 71% — slightly looser than design-critic's 195/240 ≈ 81% to account for Phase 4 not being a /design-system route). Drift findings BLOCK the wave the same way PO `NEEDS_REVISION` does — route to the BO of the offending feature with the gap list. Output: `docs/plans/evidence/wave-drift/{wave_n}/findings.json` with shape `[{page_spec, axis, score_/20, finding}, ...]` and `docs/plans/evidence/wave-drift/{wave_n}/wave-drift.md` summary."
+
+5. **PO Mode 2 visual acceptance (audit fix #5)** — Description: "PO wave acceptance" — agent_type: `product-owner` — subagent_type: `product-owner` — Prompt: "[CONTEXT header above] MODE: wave-acceptance. WAVE: [wave_n]. FEATURES: [feature list]. For each feature, capture screenshots of all page-specs via agent-browser. For each page-spec, write `docs/plans/evidence/feature-acceptance/{feature_id}/screenshots/{page_spec_basename}.png` (capture from running app). Compare each screenshot to the page-spec's `## ASCII Wireframe` section: layout, component hierarchy, dominant element, spacing, content placement. Write `docs/plans/evidence/feature-acceptance/{feature_id}/wireframe-diff.md` (ASCII side-by-side: spec wireframe left, observed structure right, section-by-section). Write `docs/plans/evidence/feature-acceptance/{feature_id}/verdict.json` with shape `{feature_id, verdict: \"ACCEPTED\" | \"NEEDS_REVISION\", page_spec_comparisons: [...], business_rule_checks: [...], audited_at}`. The orchestrator confirms ALL THREE artifacts exist on disk with non-zero size before marking the feature `ACCEPTED` for wave-pass — missing artifacts → automatic `NEEDS_REVISION` regardless of verdict text. This closes the `feature_acceptance: {}` loophole from `tables2.1.1`."
+
+   **Post-dispatch verification:** for each feature in the wave, `test -s` against `verdict.json`, `wireframe-diff.md`, and at least one `screenshots/*.png`. Any feature with a missing artifact: treat as `NEEDS_REVISION`, route to BO. Any `verdict.json` with `verdict: NEEDS_REVISION`: route to BO. Update `.build-state.json.feature_acceptance[feature]` from the on-disk `verdict.json` (preserves the existing `gaps[]` field that audit fix #10's Phase 4 row reads).
+
+6. **Security wave-execute (audit fix #14)** — Description: "Security wave execute" — agent_type: `engineering-security-engineer` — subagent_type: `engineering-security-engineer` — mode: "bypassPermissions" — Prompt: "[CONTEXT header above] **Phase 4 wave-execute mode.** Generate **executable proof of exploitability** for the canonical vulnerability classes against the running app. Scope: ONLY the endpoints / RPCs / forms that this wave introduced or modified (use the wave's `owns_files` union to filter). Vulnerability classes to attempt: IDOR on auth-protected RPCs/endpoints (e.g., `curl /rest/v1/rpc/<rpc_name> -d '{p_user_id: <other_uuid>}' -H 'Authorization: Bearer <other_user_jwt>'` returning the other user's data), SQL injection on form fields, missing rate limit on mutating endpoints, open-redirect on auth flows, CSRF on state-changing actions, missing/weak CSP. For each class, produce a curl or agent-browser script. Run each. Severity-CRITICAL findings WITHOUT executable proof are downgraded to severity-HIGH-unverified. Findings WITH executable proof BLOCK the wave. Output: `docs/plans/evidence/wave-security/{wave_n}/findings.json` with shape `[{vuln_class, endpoint_or_form, severity, proof_of_exploit: <script + observed result> | null, file_ref}, ...]`. Only findings with `proof_of_exploit: <non-null>` block. The `tables2.1.1` SEC-001 IDOR (`api.visited_map(p_user_id uuid)` SECURITY DEFINER, no `auth.uid()` check) would have been caught here at Wave 1 (backend RPCs)."
+
+7. **Holistic dogfood per-wave (audit fix #17)** — Description: "Wave dogfood" — agent_type: `testing-evidence-collector` — subagent_type: `testing-evidence-collector` — mode: "bypassPermissions" — Prompt: "[CONTEXT header above] **Wave-mode dogfood** (NOT the Phase 5 full-app dogfood — narrower scope, faster feedback). Wave-mode budget: 5–10 min wall-clock; CRITICAL findings BLOCK the wave, HIGH findings route to fix the same way; MEDIUM/LOW are logged and forwarded to Phase 5 dogfood for ratification. Inputs: this wave's feature list and pages introduced this wave + the full feature-delegation-plan for prior waves' completed features (so dogfood knows what's *supposed* to work end-to-end up to this point). Behavior: navigate the new pages, exercise critical user flows that traverse the new pages plus any prior-wave pages they depend on, report findings as severity-tagged blocks. Output: `docs/plans/evidence/wave-dogfood/{wave_n}/findings.json`. The `tables2.1.1` Edge Runtime crypto crash CF-001 (blocked every route) would have surfaced in Wave 1 on the first navigation."
+
+#### Wave-end gate failure routing (max 2 cycles per gate-check)
+
+If any check (cheap or expensive tier) returns BLOCKING findings:
+
+1. Log to `docs/plans/build-log.md`: `phase=4 step=4.3.5 wave=[n] gate=[name] outcome=BLOCKED finding_count=N`.
+2. Route to the BO of the affected feature(s) with the wave-fix payload: `{wave: n, gate: name, blocking_findings: [...], cycle: 1}`. The BO writes an updated brief targeting only the failing tasks; orchestrator re-executes those tasks.
+3. After fix dispatch, re-run only the failed gate-check (not the entire gate).
+4. Max 2 wave-fix cycles per gate-check. After 2nd failure: autonomous → annotate `.build-state.json.wave_gate[wave_n][gate_name].gaps[]` and proceed (these gaps surface to Phase 5 audit and may be re-flagged at Phase 6 Customer Reality); interactive → present remaining gate-fail list to user.
+
+**Wave-gate decision rows (audit fix #10):** For every gate-fail that gets accepted-with-gap (autonomous after cycle 2), emit a `deviation_row` via `scribe_decision`: `{phase: 4, step_id: \"4.3.5\", decided_by: \"orchestrator\", summary: \"Accepted wave [n] with gaps in gate [name] after 2 fix cycles\", rationale: <one-line gap list>, ref: \"docs/plans/.build-state.json#wave_gate.[wave_n].[gate_name].gaps\"}`. This is the backward-routing anchor if Phase 6 LRR later flags the wave-gap as BLOCK.
+
+#### Wave-gate cost notes
+
+Per-wave overhead estimate (one wave = 3–5 features): cheap tier ~5K tokens, expensive tier ~145K tokens (~$1.50–3 per build at Sonnet medium pricing). Net negative vs the cost of a single Phase 5 fix-loop cycle that exhausts (the failure mode in `tables2.1.1`). Cheap-tier-first ordering is the primary cost control: broken waves never run the expensive checks.
 
 ### Step 4.4 — Wave Transition
 
-After all features in the current wave are ACCEPTED:
+After all features in the current wave are ACCEPTED **AND Step 4.3.5 wave-end gate passes**:
 
 1. Update `.build-state.json`: add features to `completed_features`, increment `current_wave`.
 2. Handle shared file mutations: if any BO flagged shared file changes needed by the next wave, apply them now. The orchestrator identifies shared files from BO cross-feature contract fields. For each shared file flagged by multiple features in the next wave, dispatch a single `code-architect` agent to reconcile the mutations before wave execution begins. Do NOT let multiple BOs independently modify the same shared file.
 3. Run a quick Verify Protocol (static checks) to confirm the wave didn't break anything.
-4. Proceed to next wave. Repeat Steps 4.2-4.4.
+4. Proceed to next wave. Repeat Steps 4.2–4.4.
 
 After all waves complete, Phase 4 is done.
 
@@ -1051,6 +1175,18 @@ Track B audits the built app against `product-spec.md` on a per-feature basis. E
 
 **Post-dispatch verification:** After all Track B auditors return, verify each feature has the four evidence files (`tests-generated.md`, `results.json`, `findings.json`, `coverage.json`) AND that each JSON file parses as valid JSON. If any feature is missing a file or has a malformed JSON file, log `TRACK B EVIDENCE MISSING/MALFORMED: {feature_id}: {path}` to `docs/plans/build-log.md` and re-dispatch that feature's auditor once (this distinguishes the retry from the first attempt). If the second attempt still fails, emit a synthetic finding with `target_phase: 1, target_task_or_step: "1.6"` (the auditor failing twice on the same feature is a strong signal the spec for that feature is malformed) and let it route through the existing spec-gap path at Step 5.4.
 
+**1:1 coverage diff (audit fix #8):** After post-dispatch verification, the orchestrator MUST diff the dispatched feature_ids against the on-disk evidence folders. The bug class this closes is the `tables2.1.1` shape where Auth was a feature in product-spec.md but no `evidence/product-reality/auth-dev-stub/` folder existed — Track B silently skipped the feature. Procedure:
+
+1. Build `dispatched_ids` = the set of feature_ids you dispatched in this Step 5.2 (from the dispatch loop).
+2. Build `disk_ids` = `ls docs/plans/evidence/product-reality/` filtered to directories.
+3. Build `spec_ids` = the feature_id list returned by `graph_list_features` at the top of Step 5.2.
+4. Compare:
+   - **`spec_ids \ disk_ids`** (spec feature with no evidence folder): emit one synthetic finding per missing feature with shape `{finding_id: "track-b-coverage-missing-{feature_id}", source: "track-a", severity: "block", target_phase: 5, target_task_or_step: "5.2", description: "Track B did not produce evidence for spec feature {feature_label} ({feature_id}). Re-dispatch product-reality-auditor for this feature_id."}`. The Phase 5.5 fix loop will route these `target_phase: 5` findings back into Step 5.2 for re-dispatch.
+   - **`disk_ids \ spec_ids`** (folder with no spec feature, e.g. `infra/`): log `TRACK B EXTRA EVIDENCE: {disk_id}` to `docs/plans/build-log.md` as WARN. Extra evidence is not a contract violation — could be infra-only audit or stale folder. Do NOT block.
+   - **`spec_ids \ dispatched_ids`** (spec feature you forgot to dispatch): this is an orchestrator bug. Log `TRACK B DISPATCH GAP: {missing_id}` to `docs/plans/build-log.md` and emit the same synthetic finding above with `severity: "block"`. The diff catches both forgot-to-dispatch and dispatched-but-failed-to-write cases.
+
+If any synthetic findings are emitted, write them to `docs/plans/evidence/track-b-coverage-gaps.json` (one array of finding objects) BEFORE Step 5.4 dispatches — the synthesizer reads this file as part of its Track A finding stream.
+
 **Note on the metric loop:** The Metric Loop callable service is no longer wired as a primary Phase 5 step. It can still be invoked ad-hoc by Track A audit fixes via Step 5.5 if a single check class needs iterative tightening, but the structured per-feature audit replaces the orchestrator-improvised eval cases that the previous Step 5.2 (Eval Harness → Metric Loop) drove.
 
 ### Step 5.3 — Cross-cutting (3 parallel, ONE message)
@@ -1088,6 +1224,7 @@ Call the Agent tool — description: "Synthesize all findings" — agent_type: `
 - E2E test failures: `docs/plans/evidence/e2e/iter-3-results.json` — failures that persisted through 3 Playwright iterations. For each, set `source: "e2e"`, classify severity, route to `target_phase: 4`.
 - Fake-data findings: `docs/plans/evidence/fake-data-audit.md` — hardcoded/mock data in production paths. For each, set `source: "fake-data"`, classify severity, route to `target_phase: 4`.
 - Track A audit findings: `docs/plans/evidence/brand-drift.md`, `docs/plans/evidence/track-a/*.json` (API contract, performance, a11y, security). Web uses Playwright/Lighthouse; iOS uses XcodeBuildMCP/Instruments. These are engineering-focused findings. For each Track A finding, set `source: "track-a"`, classify severity, and route: API/perf/security findings → `target_phase: 4` (implementation fix); a11y findings → `target_phase: 4` (implementation fix); brand-drift findings → `target_phase: 3` (design fix, re-run Brand Guardian at Step 3.0).
+- Track B coverage gaps: `docs/plans/evidence/track-b-coverage-gaps.json` (audit fix #8 — synthetic findings emitted by Step 5.2 when a spec feature has no evidence folder). For each, set `source: "track-a"` (these are coverage failures not feature behavior), preserve `severity: "block"` and `target_phase: 5, target_task_or_step: "5.2"`. The Phase 5.5 fix loop re-dispatches Track B for the missing feature.
 
 For each finding, ensure it ends up classified with:
   - Code-level bug (broken feature, failing logic, fake data) → `target_phase: 4`, assign to the specific task that owns the affected file
@@ -1095,27 +1232,72 @@ For each finding, ensure it ends up classified with:
   - Structural/architecture issue (missing feature, wrong data flow, API mismatch) → `target_phase: 2`, assign to the architecture section
   - Spec-gap (acceptance criteria too vague, persona constraint not measurable) → `target_phase: 1, target_task_or_step: "1.6"`
 
-Output: `docs/plans/evidence/dogfood/classified-findings.json` with shape `[{finding_id, source: \"dogfood\" | \"product-reality\" | \"track-a\" | \"e2e\" | \"fake-data\", severity, target_phase, target_task_or_step, description, evidence_ref, related_decision_id?: string}, ...]`. The `source` field distinguishes the five input streams. The file also carries a footer object with: `graph_used: boolean` (false if any graph call failed and grep fallback ran), `re_routed_findings: [{finding_id, original_target, new_target, reason}, ...]` (Track B findings whose routing the synthesizer overrode after graph validation failed — empty array if none), `source_counts: {dogfood: N, product_reality: M, track_a: P, e2e: N, fake_data: N}` (count by input stream). This file is read by the Phase 5 fix loop and by the Phase 6 LRR Aggregator for backward routing."
+Output: `docs/plans/evidence/dogfood/classified-findings.json` with shape `[{finding_id, source: \"dogfood\" | \"product-reality\" | \"track-a\" | \"e2e\" | \"fake-data\", severity, target_phase, target_task_or_step, description, evidence_ref, related_decision_id?: string}, ...]`. The `source` field distinguishes the five input streams. The file also carries a footer object with: `graph_used: boolean` (false if any graph call failed and grep fallback ran), `re_routed_findings: [{finding_id, original_target, new_target, reason}, ...]` (Track B findings whose routing the synthesizer overrode after graph validation failed — empty array if none), `source_counts: {dogfood: N, product_reality: M, track_a: P, e2e: N, fake_data: N}` (count by input stream). This file is read by the Phase 5 fix loop and by Phase 6 Customer Reality routing for backward-routing context.
+
+LEARNINGS EMISSION (audit fix #9 — broader writer): In addition to writing `classified-findings.json`, you ALSO append rows to `docs/plans/learnings.jsonl` so the next build's Phase 0 Learnings Loader (Step 0.1d) can replay them. Append (do NOT overwrite — Phase 7 also writes late-learning rows). Schema per row:
+
+```json
+{\"row_id\": \"L-5-<seq>\", \"schema_version\": \"1\", \"run_id\": \"<from .build-state.json.session_id>\", \"timestamp\": \"<ISO8601>\", \"project_type\": \"web|ios\", \"phase_where_learning_surfaced\": \"5.4\", \"pattern_type\": \"PITFALL|PATTERN|HEURISTIC\", \"top_issue\": \"<one sentence>\", \"fix_applied\": \"<one sentence>\", \"score_delta\": <number, optional>, \"metric\": \"<optional metric name>\", \"provenance\": {\"decision_id\": \"<optional D-N-M back-ref>\", \"finding_id\": \"<optional from classified-findings.json>\", \"evidence_ref\": \"<optional file path>\"}}
+```
+
+Derivation rules — emit one row per match:
+
+1. **Track B coverage gaps** (`source: \"track-a\"` rows that came from `track-b-coverage-gaps.json`): emit a PITFALL row with `top_issue: \"Track B skipped feature {feature_label} ({feature_id})\", fix_applied: \"Re-dispatched product-reality-auditor at Step 5.2 (re-entry from Phase 5.5 fix loop)\"`, provenance `{finding_id: <coverage gap finding_id>}`. Lessons-learned signal for next build: feature enumeration discipline.
+
+2. **Fake-data findings promoted to CRITICAL severity**: emit a PITFALL row with `top_issue: \"Fake/mock data shipped in production path: {file:line}\", fix_applied: \"<the fix-loop dispatch description if available, else 'flagged for Phase 4 re-implementation'>\"`, provenance `{finding_id: <fake-data finding_id>, evidence_ref: \"docs/plans/evidence/fake-data-audit.md\"}`. Top signal — fake-data shipping is the highest-leverage drift class.
+
+3. **E2E test instability** (failure that took all 3 Playwright iterations to surface or that flaked): emit a HEURISTIC row with `top_issue: \"E2E flake / late-iteration failure on test: <test name>\", fix_applied: \"Captured in iter-3-results.json — flaky-test quarantine recommended\"`, provenance `{evidence_ref: \"docs/plans/evidence/e2e/iter-3-results.json\"}`. Helps next build's E2E generator pre-quarantine known flake patterns.
+
+4. **Fix-loop pass-on-cycle-1** (build-state shows `metric_loop_scores[]` entry where `target_phase: 4` ran a single cycle and the verify gate passed without re-dispatch): emit a PATTERN row with `top_issue: \"Fix-loop converged in cycle 1 for {feature_id} {fix_target}\", fix_applied: \"Pattern: <briefly describe what worked — e.g., focused diff scope, single-file change>\"`, provenance `{evidence_ref: \".build-state.json\"}`. Captures what's working — too easy to only log failures.
+
+After deriving all rows: append each line to `docs/plans/learnings.jsonl` (atomic append, one JSON object per line, newline-terminated). Allocate `row_id` as `L-5-<seq>` where `<seq>` is the next integer past any existing `L-5-*` rows already in the file (the orchestrator-scribe pattern doesn't apply here because synthesizer is single-instance per build). If no rows match the derivation rules (clean build, no learnings), STILL emit a single sentinel row `{pattern_type: \"PATTERN\", top_issue: \"no learnings surfaced — build was clean\", fix_applied: \"none\", provenance: {evidence_ref: \".build-state.json\"}}` so the Phase 5 → Phase 6 learnings gate (`learningsGate()`) accepts the file. The Phase 5 → Phase 6 gate is the enforcement point: it BLOCKs the build if `learnings.jsonl` is missing or empty. Phase 7 may append additional `L-7-*` rows for late learnings discovered during ship."
 
 ### Step 5.5 — Fix loop
 
 For each CRITICAL/HIGH classified finding, dispatch the appropriate fix agent based on `target_phase`. Max 2 fix cycles. Routing template at the bottom of this file ("Re-entry dispatch template"). Findings with `target_phase: 1, target_task_or_step: "1.6"` route back to `product-spec-writer` to tighten the spec, which re-triggers Track B for the affected feature on the next loop.
 
+<HARD-GATE>
+FIX-LOOP EXIT GATE (audit fix #6): After each fix cycle, the orchestrator MUST call `fixLoopGate(findings, currentCycle)` from `src/orchestrator/fix-loop-gate.ts`. If `may_exit === false`, cycle 2 is MANDATORY — the loop cannot exit with HIGH or CRITICAL findings still open after only 1 cycle. After cycle 2 (max): interactive → present remaining findings to user. Autonomous → proceed with gap note.
+</HARD-GATE>
+
 **Writes:** `docs/plans/evidence/*.json`, `docs/plans/evidence/fake-data-audit.md`, `docs/plans/evidence/dogfood/classified-findings.json`, `docs/plans/evidence/product-reality/*/{tests-generated.md, results.json, findings.json, coverage.json, screenshots/}`, `docs/plans/learnings.jsonl` (reality sweep writes PITFALL/PATTERN rows — see `protocols/decision-log.md` for the Dissent Log Revisit Pass path).
+
+#### Step 5.5.5 — Dissent Log Revisit Pass (relocated from old Phase 6.0)
+
+After the fix loop closes and before the compaction checkpoint, the orchestrator runs the Dissent Log Revisit Pass directly (no agent dispatch — mechanical):
+
+1. Read `docs/plans/decisions.jsonl`.
+2. For every row where `status == "open"` and `revisit_criterion` is non-empty, evaluate the criterion against current evidence (the row's `revisit_criterion` may reference specific evidence files like `evidence/track-a/*.json` or `evidence/dogfood/classified-findings.json` — read those and check whether the criterion fired).
+3. If a criterion is triggered:
+   - Mark the decision row's `status` as `triggered` (via `scribe_decision` update flow if available, otherwise by appending a successor row with `supersedes: <decision_id>`).
+   - Append a PITFALL row to `docs/plans/learnings.jsonl` via the synthesizer's existing learnings-write path: `{pattern_type: "PITFALL", top_issue: "[decision] — [criterion]", fix_applied: "[what build did instead]", provenance: {decision_id: "D-N-M"}}`.
+
+This is the housekeeping step that ensures the learnings file captures revisit-criteria signals, which Phase 0 of the next build replays. The revisit pass used to live at Phase 6.0; it moves here under v2.4-fix because the v1 LRR Reality Checker that hosted it has been replaced.
+
+#### Orchestrator-scribe dispatch (Phase 5 — audit fix #10)
+
+After the Dissent Log Revisit Pass and before the compaction checkpoint, collect deviation_rows and forward through `scribe_decision`. Row triggers:
+
+- **Step 5.4 — Synthesizer routing override** (cap 0–N): for each entry in the synthesizer's `re_routed_findings[]` footer (Track B routing the synthesizer overrode after graph validation failed), emit one row. `decided_by: product-feedback-synthesizer`. `summary` = `original_target → new_target`. `provenance.finding_id` = the re-routed finding_id. Cap implicit: synthesizer can return at most a handful of overrides per build — Reality Checker reads these as part of revisit-criteria scan.
+- **Step 5.5 — Fix-loop max-cycle exhaustion** (cap 0–1 per route target): emit one row per `target_phase` if cycle 2 ended with HIGH still open after the fix-loop-gate (`fixLoopGate`) reports `may_exit: true` because of the cycle ceiling rather than zero-findings. `decided_by: orchestrator`. `summary` = `Fix loop exhausted at cycle 2 with N HIGH findings open for target_phase X`. `provenance.finding_id` = the synthetic blocker finding_id (per audit fix #6 — these surface to Phase 6 Customer Reality routing if they manifest as customer-perceptible issues).
 
 **Compaction checkpoint.** Update `.build-state.json` per the format above.
 
 ---
 
-## Phase 6: Launch Readiness Review
+## Phase 6: Customer Reality Check
 
-**Goal**: 5 independent chapter judges + mechanical aggregator with file-completeness checkpoint + author-aware backward routing on BLOCK.
+<HARD-GATE>
+LEARNINGS GATE (audit fix #9): Before starting Phase 6, the orchestrator MUST call `learningsGate(projectDir)` from `src/orchestrator/learnings-gate.ts`. If `pass === false`, Phase 5 failed to emit learnings. HALT — return to Phase 5 and dispatch the Reality Checker's Dissent Log Revisit Pass to emit at least one PITFALL/PATTERN row. This build cannot teach the next build if learnings.jsonl is empty.
+</HARD-GATE>
 
-Split from old Phase 6. Old 6.4 (Reality Check) and 6.5 (LRR) merged and restructured. Reality Checker keeps its evidence sweep role only — the combined verdict authority moved to the LRR Aggregator.
+**Goal**: A single Customer Reality Judge walks the running app as a brand-new customer and reports what doesn't deliver what the user asked for + what's confusing or illogical. **Replaces** the old 5-chapter LRR (v2.4-fix). The technical envelope (build, security, brand drift, PO acceptance, dogfood) is now owned by the per-wave gate at Step 4.3.5; what's left for Phase 6 is the gestalt question the chapters could not answer: would a real customer be served by this product?
+
+Why a single judge: the 5 chapters checked sub-properties (tests, security, a11y, brand, SRE) but none was positioned to ask "would a real customer pay for this." Worse, every chapter read evidence files that summarized the build's prior framing — they confirmed the build matched its plan rather than questioning whether the plan was good. The Customer Reality Judge has deliberately narrow inputs (user's brief + Q&A + competitive-differentiation + the running app) and is explicitly forbidden from reading product-spec.md / architecture.md / page-specs / evidence files. The simplicity of the brief is the forcing function: a judge with one clear question (compare app to brief, not app to plan) catches coherence failures the chapter system structurally couldn't see.
 
 #### Step 6.0.idx — Decisions re-index (pre-LRR backfill)
 
-Before dispatching the Reality Checker (Step 6.0) and the LRR chapter judges (Step 6.1), re-index `decisions.jsonl` so the Slice 4 fragment reflects any decisions appended since the last Phase 4 wave transition. The aggregator's backward-routing walk at Step 6.2 (the ⭐⭐ star rule) reads the indexed fragment via `graph_query_decisions` — running this once here catches any drift from hand-edits or out-of-band scribe writes. Skip silently if `docs/plans/decisions.jsonl` does not exist.
+Before dispatching the Customer Reality Judge (Step 6.0), re-index `decisions.jsonl` so the Slice 4 fragment reflects any decisions appended since the last Phase 4 wave transition. The orchestrator's classification + backward-routing walk at Step 6.1 / 6.2 consults the indexed fragment via `graph_query_decisions` to enrich findings with `related_decision_id` — running this once here catches any drift from hand-edits or out-of-band scribe writes. Skip silently if `docs/plans/decisions.jsonl` does not exist.
 
 Run via the Bash tool:
 
@@ -1123,188 +1305,105 @@ Run via the Bash tool:
 - On exit 0: log success to `docs/plans/build-log.md` and continue.
 - On non-zero exit: STOP. Log the error to `docs/plans/build-log.md` and report the failure. The LRR aggregator's backward-routing walk requires current decision data.
 
-### Step 6.0 — Reality Check (evidence sweep + dissent log revisit pass)
+### Step 6.0 — Customer Reality Judge dispatch
 
-Reality Checker runs its existing evidence sweep per `commands/build.md` precondition list. Writes the manifest to `docs/plans/evidence/reality-check-manifest.json`. Does NOT issue a combined verdict.
+A single agent walks the running app fresh, with deliberately narrow inputs, and reports findings in two lists. Default outcome: empty lists = PASS. Any non-empty list = BLOCKED.
 
-<HARD-GATE>
-PRECONDITION (orchestrator-side, BEFORE dispatching Reality Checker):
+**CONTEXT header:** Render `rendered_context_header` for phase 6 per the canonical template (see CONTEXT HEADER HARD-GATE above). Prepend.
 
-REQUIRED EVIDENCE FOR ALL PROJECTS:
-  - `docs/plans/.build-state.json` exists, contains current build session id, contains a recent `VERIFY: PASS` line from this session.
+**Pre-dispatch:** Verify the running app is reachable. Web: dev-server URL responds 200 (`curl -o /dev/null -w '%{http_code}' http://localhost:3000`). iOS: simulator running with the app installed (`xcrun simctl list devices booted` returns a device, app launchable via XcodeBuildMCP). If the app is not reachable, the judge cannot do its job — STOP and report.
 
-REQUIRED EVIDENCE FOR `project_type=web`:
-  - `docs/plans/evidence/e2e/iter-3-results.json` (non-empty)
-  - `docs/plans/evidence/dogfood/findings.md` (non-empty)
-  - `docs/plans/evidence/dogfood/classified-findings.json` (non-empty)
-  - `docs/plans/evidence/fake-data-audit.md` (non-empty)
-  - `docs/plans/evidence/product-reality/*/coverage.json` — at least one per feature in product-spec.md (non-empty); a missing file for any feature listed in product-spec.md is itself a BLOCK
-  - `docs/plans/evidence/product-reality/*/findings.json` (one per feature; may be an empty array `[]` if no failures)
-  - `docs/plans/evidence/manifest.json`
+Call the Agent tool — description: "Customer Reality Judge" — agent_type: `customer-reality-judge` — subagent_type: `customer-reality-judge` — mode: "bypassPermissions" — Prompt: "[CONTEXT header above] Walk the running app as a first-time customer who has read the marketing brief.
 
-REQUIRED EVIDENCE FOR `project_type=ios`:
-  - `docs/plans/ios-verify-report.md` (non-empty)
-  - `docs/plans/ios-ux-review-report.md` (non-empty)
-  - At least one `*.yaml` file in `maestro/`
-  - At least one `*.png` screenshot in `docs/plans/evidence/maestro-runs/` from this build session
-  - `docs/plans/evidence/manifest.json`
+Read ONLY: `docs/plans/phase1-scratch/idea-draft.md`, `docs/plans/phase1-scratch/user-decisions.md`, `docs/plans/phase1-scratch/competitive-differentiation.md`. DO NOT read product-spec.md, architecture.md, page-specs/, design-doc.md, DESIGN.md, evidence/, feature-briefs/. These would prime confirmation bias toward 'build matches plan' when your job is 'is the plan good.'
 
-If any required file does not exist or is empty, do NOT dispatch Reality Checker. Log "REALITY CHECK BLOCKED" with missing-file list. Interactive: present blocker to user. Autonomous: return to the failing step and re-dispatch once; if still missing, abort.
-</HARD-GATE>
+Open the running app (web: agent-browser at the dev URL; iOS: simulator via XcodeBuildMCP, walk Maestro flows or interact directly). Try to do the thing the user said they wanted to do. Take a screenshot of every major surface you reach.
 
-**CONTEXT header:** Render `rendered_context_header` for phase 6 per the canonical template (see CONTEXT HEADER HARD-GATE above). Prepend to every Phase 6 prompt below (Reality Checker + the 5 LRR chapters).
+Output two lists per the schema in `agents/customer-reality-judge.md`:
+- `doesnt_deliver`: surfaces where the brief said one thing and the app does another (or nothing). Each finding cites a verbatim quote from the brief that the build failed to honor.
+- `confusing_or_illogical`: surfaces where a customer would close the tab and go back to the closest alternative. Each finding cites what the alternative does differently.
 
-Call the Agent tool — description: "Evidence sweep" — agent_type: `testing-reality-checker` — subagent_type: `testing-reality-checker` — Prompt: "[CONTEXT header above] You are the Reality Checker — evidence-sweep role only. Default verdict: NONE. You receive evidence by FILE PATH only — never by paste. Use Read and Glob tools to verify each file exists, is non-empty, was modified within this build session, contains no placeholder strings ('TODO', 'PLACEHOLDER', 'TBD', 'FIXME', 'XXX').
+Empty lists = PASS. Any non-empty list = the build is not customer-ready. No verdict score, no rubric, no severity gradation — just the two lists.
 
-Evidence paths to verify: [orchestrator pastes the precondition list per project_type].
+Write findings to `docs/plans/evidence/customer-reality-findings.json`. Save screenshots under `docs/plans/evidence/customer-reality-screenshots/`."
 
-For every Behavioral Test field in `docs/plans/sprint-tasks.md`, verify a corresponding evidence file exists in `docs/plans/evidence/[task-slug]/` AND that the test-stub-detector (per `protocols/verify.md` Step 2) does not flag the corresponding test file as a stub.
+**Output:** `docs/plans/evidence/customer-reality-findings.json` per the customer-reality-judge schema. Screenshot files under `docs/plans/evidence/customer-reality-screenshots/`.
 
-For every architecture MUST in `docs/plans/architecture.md`, verify the implementation file exists via Glob AND contains the named symbol via Grep.
+### Step 6.1 — Findings classification (orchestrator-internal)
 
-**Dissent Log Revisit Pass:** Read `docs/plans/decisions.jsonl`. For every row where `status == \"open\"` and `revisit_criterion` is non-empty, semantically evaluate the criterion against current evidence. If triggered:
-  1. Emit a structural finding in the manifest: `revisit-criterion-triggered: D-N-M — [criterion]`
-  2. Append a PITFALL row to `docs/plans/learnings.jsonl` with `{pattern_type: \"PITFALL\", top_issue: \"[decision] — [criterion]\", fix_applied: \"[what build did instead]\", provenance: {decision_id: \"D-N-M\"}}`
-  3. Flag the triggered decision — this feeds LRR as a potential cross-chapter concern
+After the judge returns, the orchestrator reads `customer-reality-findings.json` and classifies each finding to a target phase via a small mechanical rule. NO LLM dispatch — the judge produces findings, the orchestrator routes.
 
-Write the evidence manifest to `docs/plans/evidence/reality-check-manifest.json` with fields `{file_path, sha256, byte_count, modified_time, verdict_contribution}` per file. Emit any structural findings surfaced during the sweep. DO NOT issue a combined verdict — that authority moved to the LRR Aggregator at Step 6.1 below."
+Classification rules (applied per finding):
 
-### Step 6.1 — LRR: 5 chapter judges in parallel (ONE message)
+1. Every entry in `doesnt_deliver[]` → `target_phase: 1, target_step: "1.6"` (product-spec re-scope; the build didn't deliver what the brief promised).
+2. Every entry in `confusing_or_illogical[]` → `target_phase: 3, target_step: "3.3"` (page-spec re-design; the layout / IA doesn't communicate or doesn't make sense).
+3. **Architectural escape hatch:** if a finding's `description` matches the regex `/\b(performance|latency|throughput|schema|data model|API contract)\b/i`, override the default to `target_phase: 2, target_step: "2.3"`. Narrow exception for the rare case where a customer-perceptible issue traces back to architecture (e.g., "feed loads in 12 seconds, customer abandons before content arrives" — that's perf and routes to Phase 2).
+4. **Implementation drift escape hatch:** if a finding clearly cites that the rendered code doesn't match its stated intent (rare here — wave-gate should have caught it), classify as `target_phase: 4, target_step: "4.3.5"`.
 
-Follow the Launch Readiness Review Protocol (`protocols/launch-readiness.md`). The net-5 panel: Eng-Quality (merged Eng+QA with PM chapter folded in), Security, SRE (includes Performance), A11y (NEW SEAT), Brand Guardian (REPLACES old Design mechanical check).
+Write `docs/plans/evidence/customer-reality-routing.json` with shape:
 
-Dispatch 5 chapter judges in parallel. Each receives fresh context, its own evidence slice, and the chapter verdict schema from `protocols/launch-readiness.md`.
+```json
+[
+  {
+    "finding_id": "CR-DD-001 | CR-CI-001",
+    "source_list": "doesnt_deliver | confusing_or_illogical",
+    "target_phase": 1 | 2 | 3 | 4,
+    "target_step": "1.6 | 2.3 | 3.3 | 4.3.5",
+    "description": "<copied from finding>",
+    "screenshot_path": "<copied from finding>"
+  }
+]
+```
 
-Call the Agent tool 5 times in ONE message. Note: the Eng-Quality chapter dispatches `code-reviewer` as primary, with a parallel `pr-test-analyzer` sub-dispatch for test-coverage adequacy evidence that feeds into the Eng-Quality verdict file.
+### Step 6.2 — Verdict resolution
 
-1. Description: "LRR Eng-Quality chapter" — agent_type: `code-reviewer` — subagent_type: `code-reviewer` — Prompt: "[CONTEXT header above] You are the Eng-Quality chapter of the Launch Readiness Review. Your natural tendency is to be encouraging. Fight it. Default verdict: NEEDS WORK.
+Verdict logic is binary, no middle rung (closes Group 2 #7 softening risk by eliminating the rung that could be drifted into):
 
-Read: `docs/plans/architecture.md`, `docs/plans/design-doc.md` (PRD), `docs/plans/sprint-tasks.md`, `docs/plans/.task-outputs/`, `protocols/verify.md` check outputs from `.build-state.json`, test results from Phase 4 and 5, `docs/plans/evidence/product-reality/*/coverage.json` (Track B per-feature coverage). Also read `docs/plans/decisions.jsonl` for cross-chapter context.
+- `doesnt_deliver[]` empty AND `confusing_or_illogical[]` empty → **PRODUCTION READY**. Log aggregate path to `.build-state.json` and `build-log.md`. Proceed to Phase 7.
+- Either list non-empty → **BLOCKED**. Apply backward routing per `customer-reality-routing.json`. NEVER proceed to Phase 7 with BLOCKED.
 
-Requirements coverage is sourced from Phase 5 Track B evidence — do NOT recompute. Read every `docs/plans/evidence/product-reality/*/coverage.json` (one per feature). Aggregate the per-feature `coverage_pct` and `status` fields into a single `requirements_coverage[]` array on your verdict, one entry per feature with `{feature_id, feature_label, status, coverage_pct, blocker_summary}` where `blocker_summary` is a short string distilling `missing_states + broken_transitions + unenforced_rules + persona_constraint_violations` from coverage.json. Any `MISSING` status is a BLOCK finding. Any `PARTIAL` is CONCERNS at minimum. If a `coverage.json` file is missing for a feature listed in product-spec.md, that itself is a BLOCK finding (Track B did not run for that feature — pipeline integrity issue).
+There is no `NEEDS WORK` rung at Phase 6 anymore. The judge's two lists are binary on each list (empty/non-empty); the verdict is binary on the union.
 
-Before writing the final verdict, spawn a parallel subagent dispatch: description: 'LRR test coverage adequacy' — agent_type: `pr-test-analyzer` — subagent_type: `pr-test-analyzer` — prompt: 'You are a test-coverage auditor for the Eng-Quality LRR chapter. Read the test files under tests/, task-outputs/, and behavioral-test stub detector output. Evaluate: (1) do declared behavioral tests have non-stub bodies, (2) does coverage match the PR diff scope, (3) are edge cases covered, (4) are any tests flaky markers set. Return a JSON summary with test_coverage_score (0-100), stub_flagged_count, edge_case_gap_count, recommendations[]. Save to docs/plans/evidence/lrr/eng-quality-coverage.json.' Read the resulting eng-quality-coverage.json and fold its findings into your verdict.
+**Cycle limit:** Max 2 customer-reality cycles per build. After cycle 2 still BLOCKED:
+- Interactive: present remaining findings to the user. Ask for direction.
+- Autonomous: log remaining findings to `build-log.md`. Proceed to Phase 7 with a Verification Gap section in the Completion Report.
 
-Evaluate code quality + test coverage adequacy + architecture conformance + requirements coverage TOGETHER (single coherent view — merged from old Eng + QA chapters). Check: do declared behavioral tests actually exercise the features? Are there stub-flagged tests? Do tests match task acceptance criteria? Does the built code match architecture MUSTs? Are features all COVERED?
+**Re-entry dispatch template (Phase 6 → Phase 1 / Phase 2 / Phase 3 / Phase 4):** the orchestrator assembles the re-entry payload from `customer-reality-routing.json` + `decisions.jsonl` + the prior artifact path, then invokes the target phase's "on re-entry" branch. Phase 1 re-entry → product-spec-writer with `doesnt_deliver` findings as input. Phase 3 re-entry → design-ux-architect with `confusing_or_illogical` findings as input. Phase 2 re-entry (rare) → architecture re-think with the perf/schema finding. Phase 4 re-entry (rare) → wave-gate re-run for the affected feature. Each target phase revises its prior output to address findings without redoing unaffected work, and emits a new `decision_row` documenting the revision rationale.
 
-Write verdict to `docs/plans/evidence/lrr/eng-quality.json` per `protocols/launch-readiness.md` schema. Fields: `chapter=eng-quality`, `verdict` (PASS|CONCERNS|BLOCK), `override_blocks_launch` (false unless BLOCK), `evidence_files_read` (non-empty, MUST include eng-quality-coverage.json), `findings[]` (each with `severity`, `description`, `evidence_ref`, `related_decision_id` if blocker ties to a decisions.jsonl row), `requirements_coverage[]` (shape per the Track B aggregation paragraph above — `{feature_id, feature_label, status, coverage_pct, blocker_summary}`), `follow_up_spawned=false`, `follow_up_findings=null`. Eng-Quality CANNOT spawn follow-ups."
-
-2. Description: "LRR Security chapter" — agent_type: `security-reviewer` — subagent_type: `security-reviewer` — Prompt: "[CONTEXT header above] You are the Security chapter of the LRR. Read: `docs/plans/evidence/fake-data-audit.md`, Phase 5 security audit output (from Step 5.1). Also read `docs/plans/decisions.jsonl` for context.
-
-Evaluate auth model, input validation, secrets management, dependency vulnerabilities. Write verdict to `docs/plans/evidence/lrr/security.json` per schema. Fields: `chapter=security`, `verdict`, `override_blocks_launch`, `evidence_files_read` (non-empty), `findings[]` (with `related_decision_id` when applicable), `follow_up_spawned` (boolean), `follow_up_findings` (null or typed object).
-
-Security MAY spawn ONE read-only follow-up investigation, but ONLY if verdict would be BLOCK — NOT on suspicion. This is tightened from current behavior. Follow-up: read-only, Read/Grep/Glob only, max 15 tool calls, self-report tool_calls_used. See `protocols/launch-readiness.md` for follow-up flow."
-
-3. Description: "LRR SRE chapter" — agent_type: `engineering-sre` — subagent_type: `engineering-sre` — Prompt: "[CONTEXT header above] You are the SRE chapter of the LRR. Read: performance-audit outputs from Phase 5 (Step 5.1 performance auditor), Performance Benchmarker evidence, NFRs from `docs/plans/quality-targets.json` and `docs/plans/sprint-tasks.md`, reliability checks. Also read `docs/plans/decisions.jsonl` for context.
-
-Evaluate whether the build meets NFR targets (response time, load handling, error rates) and is production-ready under load. Bundle-size budget violations (>25% over Scope budget) auto-block. Write verdict to `docs/plans/evidence/lrr/sre.json` per schema.
-
-SRE MAY spawn ONE read-only follow-up investigation, but ONLY if verdict would be BLOCK. Same caps as Security."
-
-4. Description: "LRR A11y chapter" — agent_type: `a11y-architect` — subagent_type: `a11y-architect` — Prompt: "[CONTEXT header above] Advisory only — BLOCK verdict requires Critical-severity violations only. Serious issues are CONCERNS, not BLOCK. You are the A11y chapter of the LRR (NEW SEAT in this panel — closes the biggest coverage gap). Read: Phase 5 a11y audit output (from Step 5.1), WCAG 2.2 AA runtime check, per-page accessibility findings, `docs/plans/quality-targets.json` a11y section.
-
-Scoring rules:
-  - PASS if zero Serious + zero Critical findings
-  - CONCERNS if 1-3 Serious + 0 Critical
-  - BLOCK if any Critical OR >3 Serious
-
-Write verdict to `docs/plans/evidence/lrr/a11y.json` per schema. A11y CANNOT spawn follow-ups."
-
-5. Description: "LRR Brand Guardian chapter" — agent_type: `design-brand-guardian` — subagent_type: `design-brand-guardian` — Prompt: "[CONTEXT header above] You are the Brand Guardian chapter of the LRR (REPLACES the old Design mechanical check — real taste judgment, not a 15-line mechanical gate). Your natural tendency is to be encouraging. Fight it. Default verdict: NEEDS WORK.
-
-Read: `DESIGN.md` (full file — `## Overview > ### Brand DNA` is the locked 7-axis card from Phase 3.0; YAML tokens are what Phase 4 was supposed to honor; `## Do's and Don'ts` are the explicit guardrails), `docs/plans/design-references.md`, Playwright screenshots under `docs/plans/evidence/` matching production pages, Phase 3.6 Design Critic final score from `.build-state.json`.
-
-Evaluate DRIFT: did the built product stay true to DESIGN.md (DNA + tokens + guardrails)? Score the gap on 7 DNA axes (Scope, Density, Character, Material, Motion, Type, Copy) + 5 craft dimensions (whitespace rhythm, visual hierarchy, motion coherence, color harmony, typographic refinement). Cite specific elements ('the hero padding at landing.tsx:42 is 32px but DNA calls for Airy density — should be 48px+') — never vague ('needs polish').
-
-Write verdict to `docs/plans/evidence/lrr/brand-guardian.json` per schema. Fields per protocol. Brand Guardian CANNOT spawn follow-ups."
-
-**Security/SRE BLOCK-only follow-up dispatch — SDK-gated (Stage 5 / task 5.3.1).** The read-only follow-up investigations spawned by the Security and SRE chapters (BLOCK-only trigger per `protocols/launch-readiness.md`) are dispatched via a TS switch: when the SDK flag is active (default), the orchestrator dispatches the follow-up through `claude-agent-sdk` with `maxTurns: 15` — a hard safety rail that prevents runaway remediation loops. When the SDK is disabled (`BUILDANYTHING_SDK=off`), fall back to the standard Agent tool dispatch with the same 15 tool-call cap self-reported via `tool_calls_used` (the markdown-mode cap documented in `protocols/launch-readiness.md`). If a follow-up exceeds 15 turns under SDK mode, the orchestrator flags to the user (interactive) or logs a warning and treats the parent chapter as BLOCK confirmed (autonomous) — do NOT let the subagent churn indefinitely.
-
-### Step 6.1a — PM coverage fold-in
-
-PM coverage is a sub-input of the Eng-Quality chapter — evaluated inline within the Eng-Quality dispatch at Step 6.1 above against `design-doc.md` scope and emitted as a `requirements_coverage[]` field on `eng-quality.json`. The LRR Aggregator runs exactly once. Chapter count stays 5.
-
-### Step 6.2 — LRR Aggregator (sequential, after all 5 chapter files exist)
-
-Call the Agent tool — description: "LRR Aggregator" — INTERNAL inline role-string — Prompt: "You are the LRR Aggregator. You mechanically apply the 6 aggregation rules from `protocols/launch-readiness.md`. You may NOT self-approve — you cite the triggering rule number on every verdict.
-
-**STEP 1 — FILE-COMPLETENESS CHECKPOINT:** Before applying any aggregation rule, use Glob to list `docs/plans/evidence/lrr/*.json` and verify ALL 5 expected chapter files exist and parse as valid JSON:
-  - `eng-quality.json`
-  - `security.json`
-  - `sre.json`
-  - `a11y.json`
-  - `brand-guardian.json`
-
-If any are missing or malformed, log 'LRR INCOMPLETE' with the missing file list, write a partial status to `docs/plans/evidence/lrr-incomplete.json`, and STOP — do not emit a combined verdict. This is the file-completeness checkpoint that closes the partial-glob race the current Aggregator is vulnerable to.
-
-**STEP 2 — APPLY 6 RULES per `protocols/launch-readiness.md`:**
-  1. ANY `override_blocks_launch: true` → combined_verdict = BLOCKED
-  2. ALL verdicts PASS AND zero follow-ups spawned → combined_verdict = PRODUCTION READY
-  3. ANY verdict BLOCK (with override_blocks_launch: false) → combined_verdict = NEEDS WORK + findings routed to fix loop
-  4. ANY verdict CONCERNS → combined_verdict = NEEDS WORK, concerns logged
-  5. Follow-up spawned AND follow_up.confirmed: true → treat parent chapter verdict as if BLOCK
-  6. Contradictions between chapters on typed fields → combined_verdict = BLOCKED with cross-chapter contradiction finding
-
-**STEP 3 — ON BLOCK VERDICT (the ⭐⭐ star rule — backward routing):** For each BLOCK finding in any chapter, read the `related_decision_id` field. Look up that row in `docs/plans/decisions.jsonl`. Find the `decided_by` field (author of the decision — per the `decided_by` free-form role-string convention in `protocols/decision-log.md`. The Aggregator matches on the string value directly. Common values: `architect` (Phase 2 architecture decisions), `design-brand-guardian` (Phase 3 Visual DNA lock), `implementer` (Phase 4 deviation rows), `human` (Gate 1/2 user decisions)). Route BACKWARD to the authoring phase with the finding as input. This replaces the current 'stop and wait' BLOCK behavior with author-aware re-entry.
-
-**BLOCK sequentialization (Stage 4 A6 / task 4.4.3).** When multiple chapters return BLOCK in the same LRR round, the aggregator MUST process the BLOCK findings one-at-a-time in chapter declaration order (Eng-Quality → Security → SRE → A11y → Brand Guardian). DO NOT dispatch backward-routing re-entries or Security/SRE follow-up investigations in parallel — sequentialize to preserve deterministic commit ordering, avoid writer-owner lease contention on shared artifacts (`decisions.jsonl`, `lrr-routing.json`), and make the per-target-phase cycle-counter increments monotonic. Parallel BLOCK dispatch is a hard error.
-
-Write routing decisions to `docs/plans/evidence/lrr-routing.json` with shape `[{finding_id, chapter, related_decision_id, authoring_phase, action: \"re-open\"}, ...]`.
-
-**STEP 4 — ON NEEDS_WORK:** Classify findings & route to Phase 4 (code-level — single-task fix) or Phase 2 (structural — re-architect) or Phase 3 (visual — re-design). Same routing file.
-
-**STEP 5 — ON READY:** Write `docs/plans/evidence/lrr-aggregate.json` with shape:
+**Aggregate output:** Write `docs/plans/evidence/customer-reality-aggregate.json` with shape:
 
 ```json
 {
-  \"combined_verdict\": \"PRODUCTION READY | NEEDS WORK | BLOCKED\",
-  \"chapter_verdicts\": {\"eng-quality\": \"PASS|CONCERNS|BLOCK\", \"security\": \"...\", \"sre\": \"...\", \"a11y\": \"...\", \"brand-guardian\": \"...\"},
-  \"triggered_rule\": <1-6>,
-  \"findings\": [...aggregated from all chapters...],
-  \"follow_ups_spawned\": [list of chapters that spawned follow-ups],
-  \"backward_routing\": [...from lrr-routing.json if any...],
-  \"timestamp\": \"ISO-8601\"
+  "schema_version": "1",
+  "combined_verdict": "PRODUCTION READY | BLOCKED",
+  "doesnt_deliver_count": <int>,
+  "confusing_or_illogical_count": <int>,
+  "cycle": <int>,
+  "routing_targets": [<entries from customer-reality-routing.json>],
+  "judged_at": "<ISO-8601>"
 }
 ```
 
-Forward to Phase 7.
-
-Cite triggering rule number in output. No verdict is valid without citing the rule."
-
-### Step 6.3 — Verdict resolution
-
-The LRR Aggregator's `combined_verdict` is the authoritative verdict. Resolution rules:
-
-  - **PRODUCTION READY** → log aggregate path to `.build-state.json` and `build-log.md`. Proceed to Phase 7.
-  - **NEEDS WORK** → apply backward routing from `lrr-routing.json` per the re-entry template below. Max 2 NEEDS_WORK cycles before presenting to user (interactive) or proceeding with warning (autonomous).
-  - **BLOCKED** → apply backward routing (⭐⭐ star rule) per the re-entry template below. NEVER proceed to Phase 7 with BLOCKED.
-
-**Re-entry dispatch template (used by backward routing from LRR BLOCK / NEEDS_WORK, and by the Phase 5 → Phase 4 fix loop):**
-
-```
-On re-entry from LRR BLOCK:
-  INPUT passed to the re-opened phase:
-    blocking_finding: {chapter, finding_id, severity, description, related_decision_id, related_files}
-    prior_output: path to the phase's previous artifact
-    decision_row: the row from decisions.jsonl containing original reasoning + authorship
-    cycle_number: current backward-routing cycle count for this target phase (from .build-state.json.backward_routing_count_by_target_phase)
-    downstream_phases_affected: list of phases that consume this phase's output (e.g., Phase 2 re-entry affects Phases 3, 4, 5, 6)
-  TASK for the re-opened phase:
-    Revise prior_output to address blocking_finding. Do NOT redo unaffected work. Emit a new decision_row documenting the revision rationale.
-```
-
-The orchestrator assembles this payload from `lrr-routing.json` + `decisions.jsonl` + the prior artifact path, then invokes the target phase's "on re-entry" branch (see Phase 2 Step 2.2, Phase 3, and Phase 4 implementer dispatches).
-
 <HARD-GATE>
-The LRR Aggregator is the ONLY agent that may emit `combined_verdict`. No other agent — not the orchestrator, not Reality Checker, not individual chapters — may self-issue a combined verdict. This is the non-negotiable independence guarantee.
+The Customer Reality Judge is the ONLY agent that emits findings at Phase 6. No other agent self-issues a verdict at this stage.
 
-Max 2 NEEDS_WORK cycles. If LRR returns NEEDS_WORK a third time:
-  - Interactive: present all remaining issues. Ask for direction.
-  - Autonomous: log remaining issues. Proceed to Phase 7 with a warning in the Completion Report.
-Do not loop forever.
+VERDICT VALIDATION (audit fix #7 carry-forward): After the verdict is computed, the orchestrator MUST call `validateAggregateResult(result)` from `src/lrr/aggregator.ts`. The function continues to enforce the verdict enum (`PRODUCTION READY | NEEDS WORK | BLOCKED`) and reject any softening. Under v2.4-fix the only legal Phase 6 verdicts are PRODUCTION READY and BLOCKED — NEEDS WORK is unreachable from the binary mechanic above, but the validator continues to enforce the enum so future changes don't drift outside it.
+
+Max 2 cycles per the cycle-limit above. Do not loop forever.
 </HARD-GATE>
 
-**Writes:** `docs/plans/evidence/lrr/*.json`, `docs/plans/evidence/lrr-aggregate.json`, `docs/plans/evidence/lrr-routing.json`.
+**Why no NEEDS WORK rung.** The old LRR's NEEDS_WORK was a softening hatch in disguise — chapters returned BLOCK, aggregator wrote NEEDS_WORK, the build proceeded with "minor" gaps that turned out to be major. Replacing it with a binary verdict at Phase 6 (PRODUCTION READY / BLOCKED) makes the rule unambiguous: any customer-perceptible failure blocks the build until it's fixed or explicitly accepted with a gap row in `decisions.jsonl`.
+
+**Writes:** `docs/plans/evidence/customer-reality-findings.json`, `docs/plans/evidence/customer-reality-routing.json`, `docs/plans/evidence/customer-reality-aggregate.json`, `docs/plans/evidence/customer-reality-screenshots/*.png`.
+
+#### Orchestrator-scribe dispatch (Phase 6 — audit fix #10 carry-forward)
+
+After the Customer Reality Judge returns and verdict resolution completes (Step 6.2) — before the compaction checkpoint — forward decision rows through `scribe_decision`:
+
+- **Step 6.2 — Customer Reality verdict** (cap 1, always): emit one decision row capturing the binary verdict. `decided_by: customer-reality-judge`. `summary` = `combined_verdict: <PRODUCTION READY | BLOCKED>; doesnt_deliver: N; confusing_or_illogical: N`. `ref: "docs/plans/evidence/customer-reality-aggregate.json"`. The orchestrator constructs this row directly from the aggregate file (no `decisions_rows` return contract from the judge — the verdict is mechanical from the two-list shape).
+- **Step 6.2 — Proceed-despite-BLOCKED** (cap 0–1): emit only when the build proceeds to Phase 7 with `combined_verdict: BLOCKED` after cycle 2 (interactive: user accepted; autonomous: gap-accept). `decided_by: orchestrator` if autonomous, `human` if interactive. `summary` = which findings were accepted as ship-blockers and why proceed.
+
+The orchestrator forwards each row exactly once via `scribe_decision`. `customer-reality-aggregate.json` is for the rest-of-pipeline consumers; `decisions.jsonl` is for backward-routing.
 
 **Compaction checkpoint.** Update `.build-state.json` per the format above.
 
@@ -1330,7 +1429,7 @@ Do not loop forever.
 
 4. Description: "Deploy" — agent_type: `engineering-devops-automator` — subagent_type: `engineering-devops-automator` — mode: "bypassPermissions" — Prompt: "[CONTEXT header above] Deploy the app to the target from the PRD (`docs/plans/design-doc.md#tech-stack`). Run pre-deploy checks: build, env vars, secrets. Execute deploy. Verify the deployed URL returns 200 and serves the built app (not the placeholder). Report deploy URL and any smoke-test findings."
 
-5. Description: "Completion Report" — INTERNAL inline role-string — Prompt: "[CONTEXT header above] You are the Completion Report writer. Draw verification surface from THREE sources: the LRR Aggregator's structured output (`docs/plans/evidence/lrr-aggregate.json`), the Reality Checker evidence manifest (`docs/plans/evidence/reality-check-manifest.json`), and the build state (`docs/plans/.build-state.json` — for backward-routing counts and mode transitions per state-schema v2). Do NOT draw from orchestrator summary prose. Present:
+5. Description: "Completion Report" — INTERNAL inline role-string — Prompt: "[CONTEXT header above] You are the Completion Report writer. Draw verification surface from THREE sources: the Customer Reality verdict (`docs/plans/evidence/customer-reality-aggregate.json`), the Customer Reality findings (`docs/plans/evidence/customer-reality-findings.json` — the two-list output), and the build state (`docs/plans/.build-state.json` — for backward-routing counts and mode transitions per state-schema v2). Do NOT draw from orchestrator summary prose. Present:
 
 ```
 BUILD COMPLETE
@@ -1344,7 +1443,7 @@ Remaining: [any NEEDS WORK items from lrr-routing.json]
 
 | Metric | Count | Status |
 |--------|-------|--------|
-| Behavioral Tests declared in spec | from sprint-tasks.md | — |
+| Behavioral Tests declared in spec | from backend-tasks.md + page-specs/*.md | — |
 | Behavioral Tests with non-stub bodies | from Eng-Quality findings | PASS if equal |
 | Behavioral evidence files written | count from manifest | — |
 | Maestro flows present (iOS) | count of maestro/*.yaml | — |
@@ -1375,5 +1474,14 @@ If there's a Verification Gap (declared != passing, or stub-flagged > 0), surfac
 Create final commit. Mark all TodoWrite items complete. Update `.build-state.json`: 'Phase: 7 COMPLETE'."
 
 **Writes:** `docs/plans/learnings.jsonl` (late learnings only — doc friction, deploy blockers, late-surfacing gaps). If no late learnings surfaced, skip. Row schema: `{run_id, timestamp, project_type, phase_where_learning_surfaced: \"7.x\", metric, top_issue, fix_applied, score_delta, pattern_type}`.
+
+#### Orchestrator-scribe dispatch (Phase 7 — audit fix #10)
+
+Before the Completion Report's final commit, forward Phase 7 decision rows through `scribe_decision`. Row triggers:
+
+- **Step 7.1 — Ship-vs-hold on NEEDS WORK** (cap 0–1): emit only when the build ships despite an LRR `combined_verdict: NEEDS WORK` and the user (interactive) or orchestrator (autonomous gap-accept) chose to proceed. `decided_by: orchestrator` or `human`. `summary` = which gaps were accepted as ship-blockers and the rationale.
+- **Step 7.1 — Deploy outcome non-trivial** (cap 0–1): emit only when the deploy step made a non-routine choice — target swap, deploy retry after failure, env-config drift discovered at deploy time. `decided_by: engineering-devops-automator`. `summary` = the choice + outcome. Routine successful deploys emit no row.
+
+Add `engineering-devops-automator` to the Phase 6 backward-routing known-author registry per `protocols/decision-log.md` so future Phase 7 rows backward-route correctly.
 
 **Compaction checkpoint.** Update `.build-state.json` per the format above.

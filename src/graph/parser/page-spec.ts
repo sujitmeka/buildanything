@@ -416,7 +416,12 @@ export function extractPageSpec(input: { mdPath: string; mdContent: string }): E
   const h1 = lines.find((l) => isHeadingAtLevel(l.text, 1));
   const h1Match = h1?.text.match(/^#\s+Page:\s+(.+)$/);
   if (!h1 || !h1Match) {
-    pushError(ctx, h1?.n ?? 1, "Missing required h1: '# Page: <Screen Name>'");
+    const found = h1 ? `Found: '${h1.text}'.` : "No h1 found.";
+    pushError(
+      ctx,
+      h1?.n ?? 1,
+      `Missing required h1 '# Page: <Screen Name>'. ${found} The first line of a page-spec must match this format exactly. See protocols/page-spec-schema.md §Required Sections.`,
+    );
     return { ok: false, errors: ctx.errors };
   }
   const screenName = h1Match[1].trim();
@@ -431,7 +436,11 @@ export function extractPageSpec(input: { mdPath: string; mdContent: string }): E
   // ASCII Wireframe (required)
   const wireframeSec = findH2(h2Sections, "ASCII Wireframe");
   if (!wireframeSec) {
-    pushError(ctx, 1, "Missing required section: '## ASCII Wireframe'");
+    pushError(
+      ctx,
+      1,
+      "Missing required section '## ASCII Wireframe'. If the file uses '## Layout', '## Wireframe', or '## Layouts', rename to '## ASCII Wireframe'. See protocols/page-spec-schema.md §Required Sections.",
+    );
     return { ok: false, errors: ctx.errors };
   }
   const wireframeText = parseWireframe(ctx, wireframeSec, screenName, pageSpecId);
@@ -440,7 +449,11 @@ export function extractPageSpec(input: { mdPath: string; mdContent: string }): E
   // Content Hierarchy (required)
   const hierarchySec = findH2(h2Sections, "Content Hierarchy");
   if (!hierarchySec) {
-    pushError(ctx, 1, "Missing required section: '## Content Hierarchy'");
+    pushError(
+      ctx,
+      1,
+      "Missing required section '## Content Hierarchy'. If the file uses '## Component inventory', '## Components', or '## Sections', rename to '## Content Hierarchy'. See protocols/page-spec-schema.md §Required Sections.",
+    );
     return { ok: false, errors: ctx.errors };
   }
   const contentHierarchy = parseContentHierarchy(ctx, hierarchySec);
@@ -453,7 +466,11 @@ export function extractPageSpec(input: { mdPath: string; mdContent: string }): E
   // Key Copy (required)
   const keyCopySec = findH2(h2Sections, "Key Copy");
   if (!keyCopySec) {
-    pushError(ctx, 1, "Missing required section: '## Key Copy'");
+    pushError(
+      ctx,
+      1,
+      "Missing required section '## Key Copy'. If the file uses '## Copy', '## Strings', or '## Microcopy', rename to '## Key Copy'. See protocols/page-spec-schema.md §Required Sections.",
+    );
     return { ok: false, errors: ctx.errors };
   }
   if (!parseKeyCopy(ctx, keyCopySec, screenName, screenId, pageSpecId)) {
